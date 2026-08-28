@@ -81,7 +81,7 @@ and remote fingerprints and per-action preconditions. Receipts are updated
 atomically after every action, so an interrupted run records its completed
 prefix; refresh and create a new reviewed plan to resume safely.
 
-The launcher chooses an authenticated `gh` session when available. Otherwise, set `GH_TOKEN` or `GITHUB_TOKEN` for direct API access. GitHub MCP is used by the packaged skills when the host exposes compatible tools.
+The launcher chooses an authenticated `gh` session when available. Otherwise, set `GH_TOKEN` or `GITHUB_TOKEN` for direct API access. GitHub MCP is used by the packaged skills when the host exposes compatible tools. Project creation/linking needs organization Projects write access and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
 
 ## Plugin UX
 

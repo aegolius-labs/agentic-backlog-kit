@@ -34,6 +34,6 @@ preconditions. Apply obtains a new scaffold snapshot and aborts before mutation
 if rebuilding changes that digest. The receipt records the completed prefix and
 any failed action; interruption is resumed only through a fresh reviewed plan.
 
-The GitHub token/session needs repository Issues write permission and organization Projects read/write permission. Project creation uses GitHub's `createProjectV2` GraphQL mutation with `repositoryId`; selecting an unlinked Project uses `linkProjectV2ToRepository`. Creating organization issue types is not automatic; `native_or_label` tries an existing native type and falls back to the managed label.
+The GitHub token/session needs repository Issues write permission and organization Projects read/write permission. Creating or linking a Project to the repository also needs repository Contents permission. Project creation uses GitHub's `createProjectV2` GraphQL mutation with `repositoryId`; selecting an unlinked Project uses `linkProjectV2ToRepository`. Creating organization issue types is not automatic; `native_or_label` tries an existing native type and falls back to the managed label.
 
 GitHub API contracts: [Projects GraphQL reference](https://docs.github.com/en/graphql/reference/projects) and [API guide for Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).

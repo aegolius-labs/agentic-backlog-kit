@@ -12,4 +12,4 @@ Do not disclose suspected vulnerabilities in a public issue. Include affected ve
 
 ## Security boundaries
 
-The kit can write GitHub Issues and organization Projects. External mutations require a reviewed plan digest and explicit confirmation. Use the least-privileged GitHub token or MCP connection that provides the repository Issues and organization Projects permissions required by the selected operation.
+The kit can write GitHub Issues and organization Projects. External mutations require a reviewed plan digest and explicit confirmation. Use the least-privileged GitHub token or MCP connection that provides organization Projects write access, repository Issues write access for issue reconciliation, and repository Contents access when creating or linking a Project.
