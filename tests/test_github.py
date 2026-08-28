@@ -75,7 +75,13 @@ class GitHubExecutorTests(unittest.TestCase):
         service = FakeService()
         executor = GitHubPlanExecutor(service, remote_snapshot={"issues": []})
 
-        apply_plan(plan, executor=executor, confirmation=plan.digest)
+        apply_plan(
+            plan,
+            executor=executor,
+            confirmation=plan.digest,
+            manifest=data,
+            remote_snapshot={"issues": []},
+        )
 
         self.assertEqual(
             [

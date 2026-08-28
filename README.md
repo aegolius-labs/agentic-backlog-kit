@@ -51,7 +51,8 @@ python scripts/backlog.py scaffold-plan `
   --output .agentic-backlog/cache/scaffold-plan.json
 python scripts/backlog.py scaffold-apply `
   --plan .agentic-backlog/cache/scaffold-plan.json `
-  --confirm <reviewed-digest>
+  --confirm <reviewed-digest> `
+  --receipt .agentic-backlog/receipts/scaffold-apply.json
 ```
 
 Use the same workflow for issues and Project items:
@@ -62,11 +63,17 @@ python scripts/backlog.py sync-plan `
   --snapshot .agentic-backlog/cache/remote.json `
   --output .agentic-backlog/cache/sync-plan.json
 python scripts/backlog.py sync-apply `
-  --snapshot .agentic-backlog/cache/remote.json `
   --plan .agentic-backlog/cache/sync-plan.json `
   --confirm <reviewed-digest> `
   --receipt .agentic-backlog/receipts/apply.json
 ```
+
+Apply commands do not trust saved snapshots. They refresh GitHub, rebuild the
+plan against the current validated manifest, and abort before the first write
+unless its digest still matches the reviewed plan. Plans bind normalized local
+and remote fingerprints and per-action preconditions. Receipts are updated
+atomically after every action, so an interrupted run records its completed
+prefix; refresh and create a new reviewed plan to resume safely.
 
 The launcher chooses an authenticated `gh` session when available. Otherwise, set `GH_TOKEN` or `GITHUB_TOKEN` for direct API access. GitHub MCP is used by the packaged skills when the host exposes compatible tools.
 

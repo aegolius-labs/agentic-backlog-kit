@@ -156,6 +156,59 @@ class ScaffoldPlanningTests(unittest.TestCase):
         with self.assertRaises(ScaffoldAuthorizationError):
             apply_scaffold_plan(plan, executor=lambda action: None, confirmation="wrong")
 
+    def test_scaffold_apply_aborts_on_fresh_state_drift(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        snapshot = {"fields": [], "views": [], "labels": []}
+        plan = build_scaffold_plan(data, snapshot)
+        writes = []
+        drifted = {"fields": [], "views": [], "labels": [{"name": "type:task"}]}
+
+        with self.assertRaisesRegex(ScaffoldAuthorizationError, "drift"):
+            apply_scaffold_plan(
+                plan,
+                executor=writes.append,
+                confirmation=plan.digest,
+                manifest=data,
+                project_snapshot=drifted,
+            )
+        self.assertEqual([], writes)
+
+    def test_scaffold_failure_journals_completed_prefix(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        snapshot = {"fields": [], "views": [], "labels": []}
+        plan = build_scaffold_plan(data, snapshot)
+        journal = []
+        calls = 0
+
+        def fail_second(action):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("injected scaffold failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected scaffold failure"):
+            apply_scaffold_plan(
+                plan,
+                executor=fail_second,
+                confirmation=plan.digest,
+                manifest=data,
+                project_snapshot=snapshot,
+                journal=journal.append,
+            )
+        self.assertEqual("failed", journal[-1].status)
+        self.assertEqual(1, journal[-1].applied_actions)
+        self.assertEqual(plan.actions[1].as_dict(), journal[-1].failed_action)
+
 
 if __name__ == "__main__":
     unittest.main()

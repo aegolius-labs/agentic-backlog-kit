@@ -67,18 +67,135 @@ class SyncPlanningTests(unittest.TestCase):
             apply_plan(plan, executor=lambda action: None, confirmation=None)
 
     def test_apply_executes_the_validated_plan_in_order(self) -> None:
-        plan = build_sync_plan(manifest(item("T-1")), {"issues": []})
+        data = manifest(item("T-1"))
+        snapshot = {"issues": []}
+        plan = build_sync_plan(data, snapshot)
         seen: list[str] = []
 
         receipt = apply_plan(
             plan,
             executor=lambda action: seen.append(action.kind),
             confirmation=plan.digest,
+            manifest=data,
+            remote_snapshot=snapshot,
         )
 
         self.assertEqual([action.kind for action in plan.actions], seen)
         self.assertEqual(plan.digest, receipt.plan_digest)
         self.assertEqual(len(plan.actions), receipt.applied_actions)
+        self.assertEqual("completed", receipt.status)
+
+    def test_plan_digest_binds_manifest_snapshot_and_action_preconditions(self) -> None:
+        data = manifest(item("T-1"))
+        snapshot = {"issues": []}
+
+        plan = build_sync_plan(data, snapshot)
+
+        self.assertEqual(64, len(plan.manifest_fingerprint))
+        self.assertEqual(64, len(plan.snapshot_fingerprint))
+        self.assertEqual({"issue": None}, plan.actions[0].precondition)
+        payload = plan.as_dict()
+        self.assertEqual(plan.manifest_fingerprint, payload["manifest_fingerprint"])
+        self.assertIn("precondition", payload["actions"][0])
+
+    def test_local_or_remote_drift_aborts_before_first_write(self) -> None:
+        data = manifest(item("T-1"))
+        snapshot = {"issues": []}
+        plan = build_sync_plan(data, snapshot)
+        writes: list[str] = []
+
+        changed = manifest(item("T-1", title="Changed after review"))
+        with self.assertRaisesRegex(ApplyAuthorizationError, "drift"):
+            apply_plan(
+                plan,
+                executor=lambda action: writes.append(action.kind),
+                confirmation=plan.digest,
+                manifest=changed,
+                remote_snapshot=snapshot,
+            )
+        self.assertEqual([], writes)
+
+        remote_changed = {"issues": [{"abk_id": "T-9", "title": "Concurrent"}]}
+        with self.assertRaisesRegex(ApplyAuthorizationError, "drift"):
+            apply_plan(
+                plan,
+                executor=lambda action: writes.append(action.kind),
+                confirmation=plan.digest,
+                manifest=data,
+                remote_snapshot=remote_changed,
+            )
+        self.assertEqual([], writes)
+
+    def test_partial_failure_journals_completed_prefix_and_failure(self) -> None:
+        data = manifest(item("T-1"), item("T-2"))
+        snapshot = {"issues": []}
+        plan = build_sync_plan(data, snapshot)
+        journal = []
+        calls = 0
+
+        def fail_second(action):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("injected failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected failure"):
+            apply_plan(
+                plan,
+                executor=fail_second,
+                confirmation=plan.digest,
+                manifest=data,
+                remote_snapshot=snapshot,
+                journal=journal.append,
+            )
+
+        receipt = journal[-1]
+        self.assertEqual("failed", receipt.status)
+        self.assertEqual(1, receipt.applied_actions)
+        self.assertEqual([plan.actions[0].as_dict()], receipt.completed_actions)
+        self.assertEqual(plan.actions[1].as_dict(), receipt.failed_action)
+        self.assertIn("injected failure", receipt.error)
+
+    def test_interrupted_apply_requires_verified_replan_for_remaining_work(self) -> None:
+        data = manifest(item("T-1", title="New title"))
+        before = {
+            "issues": [
+                {
+                    "abk_id": "T-1",
+                    "title": "Old title",
+                    "body": "",
+                    "type": "Task",
+                    "in_project": False,
+                    "parent_abk_id": None,
+                    "depends_on_abk_ids": [],
+                }
+            ]
+        }
+        reviewed = build_sync_plan(data, before, manage_body=False)
+        after_first_action = {
+            "issues": [{**before["issues"][0], "title": "New title"}]
+        }
+
+        with self.assertRaisesRegex(ApplyAuthorizationError, "drift"):
+            apply_plan(
+                reviewed,
+                executor=lambda action: None,
+                confirmation=reviewed.digest,
+                manifest=data,
+                remote_snapshot=after_first_action,
+            )
+
+        remaining = build_sync_plan(data, after_first_action, manage_body=False)
+        self.assertEqual(["project.add_item"], [a.kind for a in remaining.actions])
+        receipt = apply_plan(
+            remaining,
+            executor=lambda action: None,
+            confirmation=remaining.digest,
+            manifest=data,
+            remote_snapshot=after_first_action,
+        )
+        self.assertEqual("completed", receipt.status)
+        self.assertEqual(1, receipt.applied_actions)
 
     def test_type_change_preserves_unmanaged_remote_labels(self) -> None:
         local_item = item("T-1", item_type="Task")

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from typing import Any, Callable, Iterable
 
+from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
 
 
@@ -38,27 +39,44 @@ class ScaffoldAuthorizationError(PermissionError):
 class ScaffoldAction:
     kind: str
     payload: dict[str, Any]
+    precondition: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"kind": self.kind, "payload": self.payload}
+        return {
+            "kind": self.kind,
+            "payload": self.payload,
+            "precondition": self.precondition,
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class ScaffoldPlan:
     actions: list[ScaffoldAction]
     digest: str
+    manifest_fingerprint: str
+    snapshot_fingerprint: str
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "digest": self.digest,
+            "manifest_fingerprint": self.manifest_fingerprint,
+            "snapshot_fingerprint": self.snapshot_fingerprint,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
         }
 
 
-def _digest(actions: Iterable[ScaffoldAction]) -> str:
+def _digest(
+    actions: Iterable[ScaffoldAction],
+    manifest_fingerprint: str,
+    snapshot_fingerprint: str,
+) -> str:
     canonical = json.dumps(
-        [action.as_dict() for action in actions],
+        {
+            "actions": [action.as_dict() for action in actions],
+            "manifest_fingerprint": manifest_fingerprint,
+            "snapshot_fingerprint": snapshot_fingerprint,
+        },
         sort_keys=True,
         separators=(",", ":"),
     )
@@ -168,7 +186,11 @@ def build_scaffold_plan(
     for expected in expected_fields:
         current = fields_by_name.get(expected["name"])
         if current is None:
-            field_actions.append(ScaffoldAction("project.field.create", expected))
+            field_actions.append(
+                ScaffoldAction(
+                    "project.field.create", expected, {"field": None}
+                )
+            )
             continue
         current_type = current.get("data_type") or current.get("dataType")
         if current_type != expected["data_type"]:
@@ -197,6 +219,7 @@ def build_scaffold_plan(
                             "field_id": field_id,
                             "options": _extended_options(current, missing_options),
                         },
+                        {"field": current},
                     )
                 )
 
@@ -209,6 +232,7 @@ def build_scaffold_plan(
         ScaffoldAction(
             "repository.label.create",
             {"name": name, "color": color, "description": description},
+            {"label": None},
         )
         for name, (color, description) in TYPE_LABELS.items()
         if name not in label_names
@@ -249,7 +273,9 @@ def build_scaffold_plan(
     for expected in expected_views:
         current = views_by_name.get(expected["name"])
         if current is None:
-            view_actions.append(ScaffoldAction("project.view.create", expected))
+            view_actions.append(
+                ScaffoldAction("project.view.create", expected, {"view": None})
+            )
             continue
         if current.get("layout", "").lower() != expected["layout"]:
             raise ManifestError(
@@ -258,7 +284,14 @@ def build_scaffold_plan(
             )
 
     actions = field_actions + label_actions + view_actions
-    return ScaffoldPlan(actions=actions, digest=_digest(actions))
+    manifest_fingerprint = state_fingerprint(data)
+    snapshot_fingerprint = state_fingerprint(project_snapshot)
+    return ScaffoldPlan(
+        actions=actions,
+        digest=_digest(actions, manifest_fingerprint, snapshot_fingerprint),
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+    )
 
 
 def apply_scaffold_plan(
@@ -266,16 +299,83 @@ def apply_scaffold_plan(
     *,
     executor: Callable[[ScaffoldAction], Any],
     confirmation: str | None,
-) -> int:
+    manifest: dict[str, Any] | None = None,
+    project_snapshot: dict[str, Any] | None = None,
+    journal: Journal | None = None,
+) -> ApplyReceipt:
     if not confirmation or confirmation != plan.digest:
         raise ScaffoldAuthorizationError(
             "Scaffold apply requires the exact reviewed plan digest"
         )
-    if _digest(plan.actions) != plan.digest:
+    if _digest(
+        plan.actions, plan.manifest_fingerprint, plan.snapshot_fingerprint
+    ) != plan.digest:
         raise ScaffoldAuthorizationError("Scaffold plan changed after validation")
+    if manifest is None or project_snapshot is None:
+        raise ScaffoldAuthorizationError(
+            "Scaffold apply requires a freshly verified manifest and remote snapshot"
+        )
+    fresh_plan = build_scaffold_plan(manifest, project_snapshot)
+    if fresh_plan.digest != plan.digest:
+        raise ScaffoldAuthorizationError(
+            "Local or remote state drifted after review; rebuild and reconfirm the plan"
+        )
+
+    started_at = datetime.now(UTC).isoformat()
+    completed: list[dict[str, Any]] = []
+    current = receipt(
+        plan.digest,
+        plan.manifest_fingerprint,
+        plan.snapshot_fingerprint,
+        "running",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
     for action in plan.actions:
-        executor(action)
-    return len(plan.actions)
+        try:
+            executor(action)
+        except Exception as exc:
+            current = receipt(
+                plan.digest,
+                plan.manifest_fingerprint,
+                plan.snapshot_fingerprint,
+                "failed",
+                len(plan.actions),
+                completed,
+                started_at,
+                failed_action=action.as_dict(),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            if journal:
+                journal(current)
+            raise
+        completed.append(action.as_dict())
+        current = receipt(
+            plan.digest,
+            plan.manifest_fingerprint,
+            plan.snapshot_fingerprint,
+            "running",
+            len(plan.actions),
+            completed,
+            started_at,
+        )
+        if journal:
+            journal(current)
+    current = receipt(
+        plan.digest,
+        plan.manifest_fingerprint,
+        plan.snapshot_fingerprint,
+        "completed",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
+    return current
 
 
 def scaffold_plan_from_dict(data: dict[str, Any]) -> ScaffoldPlan:
@@ -287,10 +387,27 @@ def scaffold_plan_from_dict(data: dict[str, Any]) -> ScaffoldPlan:
             raise ManifestError(f"Scaffold action at index {index} must be an object")
         kind = raw.get("kind")
         payload = raw.get("payload")
-        if not isinstance(kind, str) or not isinstance(payload, dict):
+        precondition = raw.get("precondition")
+        if (
+            not isinstance(kind, str)
+            or not isinstance(payload, dict)
+            or not isinstance(precondition, dict)
+        ):
             raise ManifestError(f"Scaffold action at index {index} is malformed")
-        actions.append(ScaffoldAction(kind, payload))
+        actions.append(ScaffoldAction(kind, payload, precondition))
     digest = data.get("digest")
-    if not isinstance(digest, str) or _digest(actions) != digest:
+    manifest_fingerprint = data.get("manifest_fingerprint")
+    snapshot_fingerprint = data.get("snapshot_fingerprint")
+    if (
+        not isinstance(digest, str)
+        or not isinstance(manifest_fingerprint, str)
+        or not isinstance(snapshot_fingerprint, str)
+        or _digest(actions, manifest_fingerprint, snapshot_fingerprint) != digest
+    ):
         raise ManifestError("Scaffold plan digest does not match its actions")
-    return ScaffoldPlan(actions=actions, digest=digest)
+    return ScaffoldPlan(
+        actions=actions,
+        digest=digest,
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+    )

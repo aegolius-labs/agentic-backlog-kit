@@ -134,10 +134,11 @@ def _parser() -> argparse.ArgumentParser:
         "sync-apply", help="Apply one exact reviewed plan"
     )
     sync_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
-    sync_apply.add_argument("--snapshot", required=True)
     sync_apply.add_argument("--plan", required=True)
     sync_apply.add_argument("--confirm", required=True)
-    sync_apply.add_argument("--receipt")
+    sync_apply.add_argument(
+        "--receipt", default=".agentic-backlog/receipts/sync-apply.json"
+    )
     sync_apply.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
 
     scaffold_snapshot = commands.add_parser(
@@ -165,6 +166,9 @@ def _parser() -> argparse.ArgumentParser:
     scaffold_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
     scaffold_apply.add_argument("--plan", required=True)
     scaffold_apply.add_argument("--confirm", required=True)
+    scaffold_apply.add_argument(
+        "--receipt", default=".agentic-backlog/receipts/scaffold-apply.json"
+    )
     scaffold_apply.add_argument(
         "--backend", choices=("auto", "gh", "api"), default="auto"
     )
@@ -267,12 +271,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(payload)
         return 0
     if args.command == "sync-apply":
-        snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
         raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
         plan = sync_plan_from_dict(raw_plan)
-        github = manifest["github"]
+        fresh_manifest = load_manifest(args.manifest)
+        github = fresh_manifest["github"]
+        transport = _transport(args.backend)
+        snapshot = GitHubSnapshotReader(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+        ).read()
         service = GitHubService(
-            _transport(args.backend),
+            transport,
             owner=github["owner"],
             repository=github["repository"],
             project_number=github["project_number"],
@@ -282,10 +293,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             plan,
             executor=GitHubPlanExecutor(service, remote_snapshot=snapshot),
             confirmation=args.confirm,
+            manifest=fresh_manifest,
+            remote_snapshot=snapshot,
+            journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
         payload = asdict(receipt)
-        if args.receipt:
-            _write_json(Path(args.receipt), payload)
         _print_json(payload)
         return 0
     if args.command in {"scaffold-snapshot", "scaffold-plan"}:
@@ -323,19 +335,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "scaffold-apply":
         raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
         plan = scaffold_plan_from_dict(raw_plan)
-        github = manifest["github"]
+        fresh_manifest = load_manifest(args.manifest)
+        github = fresh_manifest["github"]
+        transport = _transport(args.backend)
+        snapshot = GitHubScaffoldSnapshotReader(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+        ).read()
         service = GitHubService(
-            _transport(args.backend),
+            transport,
             owner=github["owner"],
             repository=github["repository"],
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
-        applied = apply_scaffold_plan(
+        receipt = apply_scaffold_plan(
             plan,
             executor=GitHubScaffoldExecutor(service),
             confirmation=args.confirm,
+            manifest=fresh_manifest,
+            project_snapshot=snapshot,
+            journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        _print_json({"plan_digest": plan.digest, "applied_actions": applied})
+        _print_json(asdict(receipt))
         return 0
     raise AssertionError(f"Unhandled command: {args.command}")

@@ -11,9 +11,9 @@ Use GitHub MCP when it exposes the exact operations in the plan. Otherwise use t
 2. Refresh a remote snapshot. Never plan from remembered or conversational GitHub state.
 3. Run `sync-plan` and present the action count by kind, affected stable IDs, and digest. Planning is the default.
 4. If required Project fields or views are missing, stop and produce a scaffold plan first.
-5. Before apply, require explicit user acceptance of the exact plan. Refresh the snapshot and rebuild the plan; if the digest changes, present the new plan instead of applying the old one.
-6. Apply the confirmed plan once, in order, using `sync-apply --confirm DIGEST` or equivalent GitHub MCP calls. Stop on the first failure and report the last confirmed action; do not guess or run unbounded retries.
-7. Refresh and re-plan. Zero actions means verified convergence. Persist a receipt under `.agentic-backlog/receipts/` when using the launcher.
+5. Before apply, require explicit user acceptance of the exact plan. The plan digest binds manifest and snapshot fingerprints plus action preconditions. `sync-apply` refreshes GitHub and rebuilds the plan itself; if the digest changes, it aborts before writes and the new plan must be presented and confirmed.
+6. Apply the confirmed plan once, in order, using `sync-apply --confirm DIGEST` or equivalent GitHub MCP calls. The launcher journals each completed action. Stop on the first failure and report the receipt's completed prefix and failed action; do not guess or run unbounded retries.
+7. After success or interruption, refresh and re-plan. Zero actions means verified convergence. A remaining plan needs its own digest confirmation; never replay an interrupted plan blindly. Persist the receipt under `.agentic-backlog/receipts/` when using the launcher.
 
 Read [references/github-mapping.md](references/github-mapping.md) for the remote mapping, executor choices, and non-destructive boundary.
 

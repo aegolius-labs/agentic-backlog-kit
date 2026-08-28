@@ -20,7 +20,13 @@ Commands:
 ```text
 python <plugin-root>/scripts/backlog.py snapshot --output .agentic-backlog/cache/remote.json
 python <plugin-root>/scripts/backlog.py sync-plan --snapshot .agentic-backlog/cache/remote.json --output .agentic-backlog/cache/sync-plan.json
-python <plugin-root>/scripts/backlog.py sync-apply --snapshot .agentic-backlog/cache/remote.json --plan .agentic-backlog/cache/sync-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/apply.json
+python <plugin-root>/scripts/backlog.py sync-apply --plan .agentic-backlog/cache/sync-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/apply.json
 ```
+
+The saved snapshot is a planning input only. Apply refreshes GitHub and checks
+that the rebuilt plan, including state fingerprints and action preconditions,
+has the confirmed digest before performing its first mutation. Its receipt is
+atomically rewritten after every completed action. After interruption, refresh
+and confirm a newly generated remaining plan instead of replaying the old one.
 
 The current reconciler is additive and update-only. It creates or updates managed issues, adds them to the Project, sets fields, adds parents, and adds missing dependencies. It does not infer deletion intent from a missing local item.

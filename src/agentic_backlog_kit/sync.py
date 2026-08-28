@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Callable, Iterable
 
+from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
 from .priority import prioritize
 
@@ -19,29 +20,34 @@ class SyncAction:
     kind: str
     item_id: str
     payload: dict[str, Any]
+    precondition: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"kind": self.kind, "item_id": self.item_id, "payload": self.payload}
+        return {
+            "kind": self.kind,
+            "item_id": self.item_id,
+            "payload": self.payload,
+            "precondition": self.precondition,
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class SyncPlan:
     actions: list[SyncAction]
     digest: str
+    manifest_fingerprint: str
+    snapshot_fingerprint: str
+    manage_body: bool = True
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "digest": self.digest,
+            "manifest_fingerprint": self.manifest_fingerprint,
+            "snapshot_fingerprint": self.snapshot_fingerprint,
+            "manage_body": self.manage_body,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
         }
-
-
-@dataclass(frozen=True, slots=True)
-class ApplyReceipt:
-    plan_digest: str
-    applied_actions: int
-    applied_at: str
 
 
 def render_issue_body(item: dict[str, Any]) -> str:
@@ -99,8 +105,18 @@ def _normalize_remote(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return remote_by_id
 
 
-def _plan_digest(actions: Iterable[SyncAction]) -> str:
-    payload = [action.as_dict() for action in actions]
+def _plan_digest(
+    actions: Iterable[SyncAction],
+    manifest_fingerprint: str,
+    snapshot_fingerprint: str,
+    manage_body: bool,
+) -> str:
+    payload = {
+        "actions": [action.as_dict() for action in actions],
+        "manifest_fingerprint": manifest_fingerprint,
+        "snapshot_fingerprint": snapshot_fingerprint,
+        "manage_body": manage_body,
+    }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -140,6 +156,7 @@ def build_sync_plan(
                         "type": item["type"],
                         "fallback_label": f"type:{item['type'].lower()}",
                     },
+                    {"issue": None},
                 )
             )
             project_actions.append(
@@ -147,6 +164,7 @@ def build_sync_plan(
                     "project.add_item",
                     item_id,
                     {"fields": desired_fields},
+                    {"issue": None, "requires": "issue.create"},
                 )
             )
         else:
@@ -170,7 +188,9 @@ def build_sync_plan(
                     )
                     issue_changes["labels"] = unmanaged_labels + [fallback_label]
             if issue_changes:
-                updates.append(SyncAction("issue.update", item_id, issue_changes))
+                updates.append(
+                    SyncAction("issue.update", item_id, issue_changes, {"issue": remote})
+                )
 
             if not remote.get("in_project", False):
                 project_actions.append(
@@ -178,6 +198,7 @@ def build_sync_plan(
                         "project.add_item",
                         item_id,
                         {"fields": desired_fields},
+                        {"issue": remote},
                     )
                 )
             else:
@@ -193,6 +214,7 @@ def build_sync_plan(
                             "project.set_fields",
                             item_id,
                             {"fields": changed_fields},
+                            {"issue": remote},
                         )
                     )
 
@@ -203,6 +225,7 @@ def build_sync_plan(
                     "issue.set_parent",
                     item_id,
                     {"parent": item["parent"]},
+                    {"issue": remote},
                 )
             )
 
@@ -215,11 +238,22 @@ def build_sync_plan(
                     "issue.add_dependency",
                     item_id,
                     {"depends_on": dependency},
+                    {"issue": remote},
                 )
             )
 
     actions = creates + updates + project_actions + relationship_actions
-    return SyncPlan(actions=actions, digest=_plan_digest(actions))
+    manifest_fingerprint = state_fingerprint(data)
+    snapshot_fingerprint = state_fingerprint(remote_snapshot)
+    return SyncPlan(
+        actions=actions,
+        digest=_plan_digest(
+            actions, manifest_fingerprint, snapshot_fingerprint, manage_body
+        ),
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+        manage_body=manage_body,
+    )
 
 
 def apply_plan(
@@ -227,6 +261,9 @@ def apply_plan(
     *,
     executor: Callable[[SyncAction], Any],
     confirmation: str | None,
+    manifest: dict[str, Any] | None = None,
+    remote_snapshot: dict[str, Any] | None = None,
+    journal: Journal | None = None,
 ) -> ApplyReceipt:
     """Execute only the exact plan the caller reviewed and confirmed."""
 
@@ -234,16 +271,80 @@ def apply_plan(
         raise ApplyAuthorizationError(
             "Apply requires the exact digest of the reviewed sync plan"
         )
-    if _plan_digest(plan.actions) != plan.digest:
+    if _plan_digest(
+        plan.actions,
+        plan.manifest_fingerprint,
+        plan.snapshot_fingerprint,
+        plan.manage_body,
+    ) != plan.digest:
         raise ApplyAuthorizationError("Sync plan changed after validation")
-
-    for action in plan.actions:
-        executor(action)
-    return ApplyReceipt(
-        plan_digest=plan.digest,
-        applied_actions=len(plan.actions),
-        applied_at=datetime.now(UTC).isoformat(),
+    if manifest is None or remote_snapshot is None:
+        raise ApplyAuthorizationError(
+            "Apply requires a freshly verified manifest and remote snapshot"
+        )
+    fresh_plan = build_sync_plan(
+        manifest, remote_snapshot, manage_body=plan.manage_body
     )
+    if fresh_plan.digest != plan.digest:
+        raise ApplyAuthorizationError(
+            "Local or remote state drifted after review; rebuild and reconfirm the plan"
+        )
+
+    started_at = datetime.now(UTC).isoformat()
+    completed: list[dict[str, Any]] = []
+    current = receipt(
+        plan.digest,
+        plan.manifest_fingerprint,
+        plan.snapshot_fingerprint,
+        "running",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
+    for action in plan.actions:
+        try:
+            executor(action)
+        except Exception as exc:
+            current = receipt(
+                plan.digest,
+                plan.manifest_fingerprint,
+                plan.snapshot_fingerprint,
+                "failed",
+                len(plan.actions),
+                completed,
+                started_at,
+                failed_action=action.as_dict(),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            if journal:
+                journal(current)
+            raise
+        completed.append(action.as_dict())
+        current = receipt(
+            plan.digest,
+            plan.manifest_fingerprint,
+            plan.snapshot_fingerprint,
+            "running",
+            len(plan.actions),
+            completed,
+            started_at,
+        )
+        if journal:
+            journal(current)
+    current = receipt(
+        plan.digest,
+        plan.manifest_fingerprint,
+        plan.snapshot_fingerprint,
+        "completed",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
+    return current
 
 
 def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
@@ -256,10 +357,34 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
         kind = raw.get("kind")
         item_id = raw.get("item_id")
         payload = raw.get("payload")
-        if not isinstance(kind, str) or not isinstance(item_id, str) or not isinstance(payload, dict):
+        precondition = raw.get("precondition")
+        if (
+            not isinstance(kind, str)
+            or not isinstance(item_id, str)
+            or not isinstance(payload, dict)
+            or not isinstance(precondition, dict)
+        ):
             raise ManifestError(f"Sync action at index {index} is malformed")
-        actions.append(SyncAction(kind, item_id, payload))
+        actions.append(SyncAction(kind, item_id, payload, precondition))
     digest = data.get("digest")
-    if not isinstance(digest, str) or _plan_digest(actions) != digest:
+    manifest_fingerprint = data.get("manifest_fingerprint")
+    snapshot_fingerprint = data.get("snapshot_fingerprint")
+    manage_body = data.get("manage_body")
+    if (
+        not isinstance(digest, str)
+        or not isinstance(manifest_fingerprint, str)
+        or not isinstance(snapshot_fingerprint, str)
+        or not isinstance(manage_body, bool)
+        or _plan_digest(
+            actions, manifest_fingerprint, snapshot_fingerprint, manage_body
+        )
+        != digest
+    ):
         raise ManifestError("Sync plan digest does not match its actions")
-    return SyncPlan(actions=actions, digest=digest)
+    return SyncPlan(
+        actions=actions,
+        digest=digest,
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+        manage_body=manage_body,
+    )

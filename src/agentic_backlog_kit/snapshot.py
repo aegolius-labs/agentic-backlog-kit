@@ -253,7 +253,7 @@ class GitHubScaffoldSnapshotReader:
                 raise GitHubApiError(200, "List labels response was not an array")
             result.extend(batch)
             if len(batch) < 100:
-                return result
+                return sorted(result, key=lambda label: str(label.get("name", "")))
             page += 1
 
     def read(self) -> dict[str, Any]:
@@ -309,4 +309,8 @@ class GitHubScaffoldSnapshotReader:
             for view in (project.get("views") or {}).get("nodes") or []
             if view.get("name")
         ]
-        return {"fields": fields, "views": views, "labels": self._labels()}
+        return {
+            "fields": sorted(fields, key=lambda field: str(field["name"])),
+            "views": sorted(views, key=lambda view: str(view["name"])),
+            "labels": self._labels(),
+        }

@@ -19,9 +19,10 @@ GitHub-owned operational data such as issue numbers, node IDs, Project item IDs,
 3. Manifest validation rejects invalid references, hierarchy jumps, duplicate IDs, bad dimensions, and dependency cycles.
 4. Scoring and sprint planning are pure local computations.
 5. Snapshot readers retrieve only kit-managed issues, marked by `<!-- agentic-backlog-kit:id=...;schema=1 -->`, plus their Project fields and relationships.
-6. Reconciliation emits a canonical plan and SHA-256 digest.
-7. Executors accept only the exact reviewed digest, then use GitHub CLI or direct REST/GraphQL APIs.
-8. Skills refresh and re-plan after apply; a successful reconciliation has zero remaining actions.
+6. Reconciliation emits a canonical plan whose SHA-256 digest binds normalized manifest and remote-state fingerprints, planning options, action payloads, and action preconditions.
+7. Executors accept only the exact reviewed digest, refresh GitHub, rebuild the plan from the freshly validated local manifest, and abort before mutation on any drift.
+8. Apply journals its completed prefix after every action and records the failed action and error on interruption. Resumption always refreshes, replans, and requires confirmation of the new remaining plan rather than replaying the old plan.
+9. Skills refresh and re-plan after apply; a successful reconciliation has zero remaining actions.
 
 Project scaffolding preserves the IDs, colors, and descriptions of existing single-select options when extending the built-in Status field. This avoids clearing values already assigned to Project items.
 
