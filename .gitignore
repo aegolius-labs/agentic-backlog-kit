@@ -7,10 +7,10 @@ dist/
 build/
 *.egg-info/
 .venv/
+.worktrees/
 
 # Disposable source inspection and generated runtime state
 .source-aio-agentic-sdlc/
 .agentic-backlog/cache/
 .agentic-backlog/receipts/
 .agentic-backlog/*.lock
-
