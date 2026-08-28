@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "github": {
+    "owner": "your-organization",
+    "repository": "your-repository",
+    "project_number": 1,
+    "issue_type_mode": "native_or_label"
+  },
+  "workflow": {
+    "hierarchy": [
+      ["Initiative"],
+      ["Epic"],
+      ["Feature"],
+      ["Story", "Bug"],
+      ["Task"]
+    ],
+    "statuses": [
+      "Inbox",
+      "Refining",
+      "Ready",
+      "Planned",
+      "In Progress",
+      "In Review",
+      "Done",
+      "Blocked"
+    ],
+    "done_statuses": ["Done"],
+    "work_item_types": ["Story", "Bug", "Task"],
+    "default_capacity": 20,
+    "iteration": {
+      "field": "Sprint",
+      "start_date": "2026-09-07",
+      "duration_days": 14
+    }
+  },
+  "scoring": {
+    "weights": {
+      "impact": 2.0,
+      "business_value": 2.0,
+      "enabler_value": 1.0,
+      "effort": 1.0
+    },
+    "dependency_boost": 0.25
+  },
+  "items": []
+}
+

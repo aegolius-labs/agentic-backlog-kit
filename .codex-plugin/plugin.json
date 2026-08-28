@@ -1,0 +1,34 @@
+{
+  "name": "agentic-backlog-kit",
+  "version": "0.1.0",
+  "description": "Deterministic GitHub Issues and Projects backlog workflows for agents",
+  "author": {
+    "name": "Aegolius Labs",
+    "url": "https://github.com/aegolius-labs"
+  },
+  "homepage": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "repository": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "keywords": [
+    "agile",
+    "backlog",
+    "github-issues",
+    "github-projects",
+    "sprint-planning"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agentic Backlog Kit",
+    "shortDescription": "Structured GitHub backlog workflows for agents",
+    "longDescription": "Capture, refine, prioritize, plan, scaffold, and safely synchronize a layered Agile backlog using GitHub Issues and Projects.",
+    "developerName": "Aegolius Labs",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/aegolius-labs/agentic-backlog-kit",
+    "defaultPrompt": [
+      "Turn this feature idea into structured backlog work.",
+      "Prioritize the ready backlog and show the next item.",
+      "Plan the next sprint and preview the GitHub changes."
+    ]
+  }
+}
+

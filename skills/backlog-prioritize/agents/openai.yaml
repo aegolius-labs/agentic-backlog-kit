@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prioritize Backlog"
+  short_description: "Rank work with deterministic scoring"
+  default_prompt: "Use $backlog-prioritize to rank the ready backlog."
+policy:
+  allow_implicit_invocation: true

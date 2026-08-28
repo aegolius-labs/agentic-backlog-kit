@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ingest Backlog Work"
+  short_description: "Turn ideas into structured backlog items"
+  default_prompt: "Use $backlog-ingest to capture and refine this idea."
+policy:
+  allow_implicit_invocation: true

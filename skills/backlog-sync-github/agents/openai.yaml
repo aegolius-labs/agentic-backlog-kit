@@ -1,0 +1,13 @@
+interface:
+  display_name: "Sync GitHub Backlog"
+  short_description: "Preview and apply GitHub backlog changes"
+  default_prompt: "Use $backlog-sync-github to reconcile this backlog with GitHub."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "Read and update GitHub Issues and Projects"
+      transport: "streamable_http"
+      url: "https://api.githubcopilot.com/mcp/"
+policy:
+  allow_implicit_invocation: true

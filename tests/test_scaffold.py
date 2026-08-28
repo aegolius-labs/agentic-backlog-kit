@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import unittest
+
+from agentic_backlog_kit.manifest import ManifestError
+from agentic_backlog_kit.scaffold import (
+    ScaffoldAuthorizationError,
+    apply_scaffold_plan,
+    build_scaffold_plan,
+)
+
+from tests.helpers import manifest
+
+
+class ScaffoldPlanningTests(unittest.TestCase):
+    def test_empty_project_gets_fields_labels_and_four_agile_views(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+
+        plan = build_scaffold_plan(
+            data, {"fields": [], "views": [], "labels": []}
+        )
+
+        kinds = [action.kind for action in plan.actions]
+        self.assertEqual(7, kinds.count("project.field.create"))
+        self.assertEqual(6, kinds.count("repository.label.create"))
+        self.assertEqual(4, kinds.count("project.view.create"))
+        self.assertEqual(
+            ["Backlog", "Kanban", "Current Sprint", "Roadmap"],
+            [
+                action.payload["name"]
+                for action in plan.actions
+                if action.kind == "project.view.create"
+            ],
+        )
+
+    def test_matching_scaffold_is_idempotent(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        first = build_scaffold_plan(data, {"fields": [], "views": [], "labels": []})
+        snapshot = {
+            "fields": [
+                {
+                    "name": action.payload["name"],
+                    "data_type": action.payload["data_type"],
+                    "options": action.payload.get("options", []),
+                }
+                for action in first.actions
+                if action.kind == "project.field.create"
+            ],
+            "views": [
+                {"name": action.payload["name"], "layout": action.payload["layout"]}
+                for action in first.actions
+                if action.kind == "project.view.create"
+            ],
+            "labels": [
+                {"name": action.payload["name"]}
+                for action in first.actions
+                if action.kind == "repository.label.create"
+            ],
+        }
+
+        second = build_scaffold_plan(data, snapshot)
+
+        self.assertEqual([], second.actions)
+
+    def test_incompatible_existing_field_fails_closed(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+
+        with self.assertRaisesRegex(ManifestError, "Impact.*TEXT.*NUMBER"):
+            build_scaffold_plan(
+                data,
+                {
+                    "fields": [{"name": "Impact", "data_type": "TEXT"}],
+                    "views": [],
+                    "labels": [],
+                },
+            )
+
+    def test_existing_status_field_is_extended_without_replacing_option_ids(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        existing = [
+            {
+                "id": "status-todo",
+                "name": "Todo",
+                "color": "GRAY",
+                "description": "Existing project default",
+            },
+            {
+                "id": "status-done",
+                "name": "Done",
+                "color": "GREEN",
+                "description": "Existing project default",
+            },
+        ]
+
+        plan = build_scaffold_plan(
+            data,
+            {
+                "fields": [
+                    {
+                        "id": "status-field",
+                        "name": "Status",
+                        "data_type": "SINGLE_SELECT",
+                        "options": existing,
+                    }
+                ],
+                "views": [],
+                "labels": [],
+            },
+        )
+
+        action = next(
+            action
+            for action in plan.actions
+            if action.kind == "project.field.update_options"
+        )
+        self.assertEqual("status-field", action.payload["field_id"])
+        self.assertEqual(
+            ["status-todo", "status-done"],
+            [option["id"] for option in action.payload["options"][:2]],
+        )
+        self.assertTrue(
+            set(data["workflow"]["statuses"]).issubset(
+                {option["name"] for option in action.payload["options"]}
+            )
+        )
+
+    def test_apply_requires_exact_plan_digest(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        plan = build_scaffold_plan(data, {"fields": [], "views": [], "labels": []})
+
+        with self.assertRaises(ScaffoldAuthorizationError):
+            apply_scaffold_plan(plan, executor=lambda action: None, confirmation="wrong")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "github": {
+    "owner": "aegolius-labs",
+    "repository": "sample-product",
+    "project_number": 1,
+    "issue_type_mode": "native_or_label"
+  },
+  "workflow": {
+    "hierarchy": [
+      ["Initiative"],
+      ["Epic"],
+      ["Feature"],
+      ["Story", "Bug"],
+      ["Task"]
+    ],
+    "statuses": ["Inbox", "Refining", "Ready", "Planned", "In Progress", "In Review", "Done", "Blocked"],
+    "done_statuses": ["Done"],
+    "work_item_types": ["Story", "Bug", "Task"],
+    "default_capacity": 12,
+    "iteration": {
+      "field": "Sprint",
+      "start_date": "2026-09-07",
+      "duration_days": 14
+    }
+  },
+  "scoring": {
+    "weights": {
+      "impact": 2.0,
+      "business_value": 2.0,
+      "enabler_value": 1.0,
+      "effort": 1.0
+    },
+    "dependency_boost": 0.25
+  },
+  "items": [
+    {
+      "id": "INIT-0001",
+      "title": "Make backlog execution predictable",
+      "type": "Initiative",
+      "description": "Give teams and coding agents one structured delivery backlog.",
+      "acceptance_criteria": ["Delivery work is visible in one GitHub Project"],
+      "parent": null,
+      "depends_on": [],
+      "impact": 5,
+      "effort": 5,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-0001",
+      "title": "Agent-ready backlog workflows",
+      "type": "Epic",
+      "description": "Provide reliable intake, ranking, planning, and synchronization.",
+      "acceptance_criteria": ["Every workflow has a deterministic validation path"],
+      "parent": "INIT-0001",
+      "depends_on": [],
+      "impact": 5,
+      "effort": 5,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "FEAT-0001",
+      "title": "Dependency-aware sprint planning",
+      "type": "Feature",
+      "description": "Build a sprint plan that respects prerequisites and capacity.",
+      "acceptance_criteria": ["No selected item precedes an incomplete prerequisite"],
+      "parent": "EPIC-0001",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "STORY-0001",
+      "title": "Plan work within team capacity",
+      "type": "Story",
+      "description": "As a delivery lead, I want a capacity-bounded plan so the sprint is realistic.",
+      "acceptance_criteria": ["Selected effort does not exceed capacity", "Skipped work includes a reason"],
+      "parent": "FEAT-0001",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 1,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    },
+    {
+      "id": "TASK-0001",
+      "title": "Implement capacity-aware selection",
+      "type": "Task",
+      "description": "Add the deterministic sprint packing algorithm and its tests.",
+      "acceptance_criteria": ["Unit tests cover capacity and dependency edge cases"],
+      "parent": "STORY-0001",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    }
+  ]
+}
+

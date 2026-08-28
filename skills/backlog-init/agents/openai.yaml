@@ -1,0 +1,13 @@
+interface:
+  display_name: "Initialize Backlog"
+  short_description: "Set up a structured GitHub backlog"
+  default_prompt: "Use $backlog-init to initialize this project backlog."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "Read and update GitHub Issues and Projects"
+      transport: "streamable_http"
+      url: "https://api.githubcopilot.com/mcp/"
+policy:
+  allow_implicit_invocation: true

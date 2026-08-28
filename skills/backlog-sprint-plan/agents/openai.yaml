@@ -1,0 +1,6 @@
+interface:
+  display_name: "Plan Sprint"
+  short_description: "Build a dependency-safe sprint plan"
+  default_prompt: "Use $backlog-sprint-plan to plan the next sprint."
+policy:
+  allow_implicit_invocation: true
