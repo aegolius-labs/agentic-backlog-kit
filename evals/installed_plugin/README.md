@@ -8,8 +8,8 @@ marketplace, calls GitHub, or claims that Codex activated a skill.
 
 The corpus follows the [official complete-plugin test flow](https://developers.openai.com/plugins/deploy/connect-chatgpt#test-the-complete-plugin):
 each case starts in a fresh task and records direct, indirect, follow-up,
-negative, boundary, and write-confirmation behavior. Every case is run once
-with GitHub MCP available and once with it unavailable. The latter run must
+negative, boundary, and write-confirmation behavior. The complete gate is one
+run per case with GitHub MCP available and unavailable. The latter run must
 show the documented CLI/API fallback for workflows that need GitHub; local
 ingestion, prioritization, and planning remain local-engine operations.
 
@@ -55,6 +55,38 @@ An unavailable or access-denied executable is recorded as a diagnostic; it is
 not silently treated as an installed-task pass.
 
 ## Record and verify fresh-task results
+
+### Bounded installed-CLI traces
+
+The trace runner is an opt-in recorder for real fresh Codex CLI tasks. It
+defaults to one representative case per behavior category and supports one
+case/mode or any selected subset; it never requires the complete 17-by-2
+matrix. Use a new output directory for each invocation:
+
+    python scripts/installed_plugin_eval.py trace --suite .agentic-backlog/evals/installed-plugin/r06-local/suite.json --output .agentic-backlog/evals/installed-plugin/r06-trace --executable C:\path\to\codex.cmd --case direct-ingest --mode mcp_unavailable
+    python scripts/installed_plugin_eval.py trace-verify --suite .agentic-backlog/evals/installed-plugin/r06-local/suite.json --results .agentic-backlog/evals/installed-plugin/r06-trace/trace-results.ndjson --case direct-ingest --mode mcp_unavailable
+
+Each selected case gets an isolated fixture workspace containing only the
+manifest, a compact scaffold snapshot, and prompt hashes. The runner starts
+exec --json --ephemeral with read-only, --ask-for-approval never, the bounded
+default model gpt-5.6-luna, and max reasoning effort. Follow-up turns use
+exec resume and must reuse the observed thread ID. JSONL events are bounded
+and retained only after path/credential redaction; raw prompts, stdout,
+stderr, and executable paths are not retained. Workspace hashes,
+tool/mutation observations, activation and bundled-reference evidence,
+confirmation/authorization evidence, model, effort, session identity, and
+reported token usage are retained. Missing, malformed, truncated, or
+ambiguous evidence fails closed.
+
+The six default representative cases are direct-ingest,
+indirect-prioritize, follow-up-ingest-show, negative-weather,
+boundary-delete-all-issues, and write-without-confirmation. Run the full
+corpus only explicitly with --full-corpus; the command reports
+remaining_full_corpus_pairs so a sampled run cannot be mistaken for full
+coverage. A real remote-skill mcp_available trace also requires the CLI MCP
+catalog to prove an enabled GitHub row, while mcp_unavailable requires that
+row to be absent/unavailable. Catalog or continuation uncertainty is recorded
+as blocked rather than inferred.
 
 For each corpus case, retain the prompt hash, activation decision, selected
 skill, references used/resolved, confirmation request and response, authorization

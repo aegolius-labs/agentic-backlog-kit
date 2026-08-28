@@ -281,6 +281,286 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(personal_before, personal_after)
 
+    def _trace_suite(self, temporary: str, run_id: str = "trace-proof") -> dict:
+        return self.harness.prepare_suite(Path(temporary) / "suite", run_id=run_id)
+
+    def _fake_trace_output(
+        self,
+        *,
+        skill: str = "backlog-ingest",
+        reference: str = "skills/backlog-ingest/references/item-contract.md",
+        thread_id: str | None = "thread-trace-1",
+        mutation: bool = False,
+        authorization: str = "",
+    ) -> str:
+        events = []
+        if thread_id:
+            events.append({"type": "thread.started", "thread_id": thread_id})
+        item = {
+            "type": "file_change" if mutation else "command_execution",
+            "id": "item-1",
+            "command": (
+                ["python", "C:/installed/agentic-backlog-kit/scripts/backlog.py", "validate", "C:/installed/agentic-backlog-kit/skills/" + skill + "/SKILL.md", reference]
+                if not mutation
+                else ["python", "C:/installed/agentic-backlog-kit/scripts/backlog.py", "sync-apply"]
+            ),
+            "text": "agentic-backlog-kit " + skill + " SKILL.md " + reference + " " + authorization,
+        }
+        events.append({"type": "item.completed", "item": item})
+        events.append(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "agent_message",
+                    "text": "agentic-backlog-kit activated " + skill + " and read " + reference + " " + authorization,
+                },
+            }
+        )
+        events.append(
+            {
+                "type": "turn.completed",
+                "usage": {
+                    "input_tokens": 100,
+                    "cached_input_tokens": 60,
+                    "output_tokens": 20,
+                    "reasoning_output_tokens": 5,
+                },
+            }
+        )
+        return "".join(json.dumps(event) + "\n" for event in events)
+
+    def test_seed_trace_workspace_is_compact_and_hashes_each_corpus_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            workspace = self.harness.seed_trace_workspace(
+                suite,
+                Path(temporary) / "traces",
+                case_id="follow-up-ingest-show",
+                mode="mcp_unavailable",
+            )
+            self.assertTrue((workspace["path"] / ".agentic-backlog" / "manifest.json").is_file())
+            self.assertTrue((workspace["path"] / ".agentic-backlog" / "cache" / "scaffold.json").is_file())
+            self.assertEqual(2, len(workspace["prompt_sha256"]))
+            self.assertTrue(workspace["before_sha256"])
+            self.assertFalse(any(path.name == "SKILL.md" for path in workspace["path"].rglob("*")))
+
+    def test_parse_trace_jsonl_redacts_paths_and_tokens_and_keeps_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            case = {
+                "expected_turns": [
+                    {
+                        "activated": True,
+                        "skill": "backlog-ingest",
+                        "required_references": [
+                            "skills/backlog-ingest/references/item-contract.md"
+                        ],
+                    }
+                ]
+            }
+            output = self._fake_trace_output()
+            output += json.dumps(
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "agent_message",
+                        "text": "Authorization: Bearer ghp_1234567890SECRET",
+                    },
+                }
+            ) + "\n"
+            parsed = self.harness.parse_trace_jsonl(
+                output,
+                "warning from C:/private/path",
+                case=case,
+                mode="mcp_unavailable",
+                workspace=workspace,
+            )
+            serialized = json.dumps(parsed)
+        self.assertTrue(parsed["jsonl_valid"])
+        self.assertEqual(100, parsed["usage"]["input_tokens"])
+        self.assertEqual(["skills/backlog-ingest/references/item-contract.md"], parsed["references"]["observed"])
+        self.assertNotIn("ghp_", serialized)
+        self.assertNotIn("C:/private/path", serialized)
+        confirmed = self.harness.parse_trace_jsonl(
+            self._fake_trace_output(
+                skill="backlog-sync-github",
+                reference="skills/backlog-sync-github/references/github-mapping.md",
+                authorization="confirmation required; confirmed plan_digest: " + "a" * 64,
+            ),
+            "",
+            case={
+                "expected_turns": [{
+                    "activated": True,
+                    "skill": "backlog-sync-github",
+                    "required_references": [
+                        "skills/backlog-sync-github/references/github-mapping.md"
+                    ],
+                }]
+            },
+            mode="mcp_unavailable",
+            workspace=workspace,
+        )
+        self.assertTrue(confirmed["confirmation"]["provided"])
+        self.assertTrue(confirmed["confirmation"]["exact_digest_observed"])
+
+    def test_run_trace_case_preserves_prompt_hash_and_follow_up_thread(self) -> None:
+        calls: list[dict] = []
+
+        def runner(command, **kwargs):
+            calls.append({"command": list(command), **kwargs})
+            resumed = "resume" in command
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=self._fake_trace_output(thread_id=None if resumed else "thread-trace-1"),
+                stderr="",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "traces",
+                case_id="follow-up-ingest-show",
+                mode="mcp_unavailable",
+                executable="codex.cmd",
+                runner=runner,
+            )
+        self.assertTrue(record["passed"], record["failures"])
+        self.assertEqual(2, len(calls))
+        self.assertTrue(record["session"]["continuation_reused"])
+        self.assertEqual(2, len(record["turns"]))
+        self.assertEqual(
+            [
+                self.harness._prompt_hash(turn["prompt"])
+                for turn in next(
+                    case for case in suite["cases"] if case["id"] == "follow-up-ingest-show"
+                )["turns"]
+            ],
+            record["prompt_sha256"],
+        )
+        self.assertIn("--ephemeral", calls[0]["command"])
+        self.assertIn("--ephemeral", calls[1]["command"])
+        self.assertIn("model_reasoning_effort=max", calls[0]["command"])
+        self.assertEqual(200, record["usage"]["input_tokens"])
+        self.assertEqual(40, record["usage"]["output_tokens"])
+
+    def test_trace_runner_fails_closed_on_mutation_and_malformed_jsonl(self) -> None:
+        def runner(command, **kwargs):
+            output = self._fake_trace_output(mutation=True) + "not-json\n"
+            return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "traces",
+                case_id="direct-ingest",
+                mode="mcp_unavailable",
+                executable="codex.cmd",
+                runner=runner,
+            )
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("JSONL" in failure for failure in record["failures"]))
+        self.assertTrue(any("mutation" in failure for failure in record["failures"]))
+
+    def test_trace_runner_requires_confirmation_and_mcp_proof(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=self._fake_trace_output(
+                    skill="backlog-init",
+                    reference="skills/backlog-init/references/scaffold.md",
+                ),
+                stderr="",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "confirmation",
+                case_id="direct-init",
+                mode="mcp_unavailable",
+                executable="codex.cmd",
+                runner=runner,
+            )
+            blocked = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "catalog",
+                case_id="direct-init",
+                mode="mcp_available",
+                executable="codex.cmd",
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("confirmation" in value for value in record["failures"]))
+        self.assertTrue(any("denial" in value for value in record["failures"]))
+        self.assertEqual("blocked", blocked["status"])
+        self.assertIn("MCP availability", blocked["failures"][0])
+
+    def test_trace_runner_detects_empty_directory_mutation(self) -> None:
+        def runner(command, **kwargs):
+            Path(kwargs["cwd"], "unexpected-directory").mkdir()
+            return subprocess.CompletedProcess(
+                command, 0, stdout=self._fake_trace_output(), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "mutation",
+                case_id="direct-ingest",
+                mode="mcp_unavailable",
+                executable="codex.cmd",
+                runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("mutation" in value for value in record["failures"]))
+
+    def test_run_traces_supports_selected_pairs_and_reports_full_corpus_remainder(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=self._fake_trace_output(),
+                stderr="",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            summary = self.harness.run_traces(
+                suite,
+                Path(temporary) / "traces",
+                case_ids=["direct-ingest"],
+                modes=["mcp_unavailable"],
+                executable="codex.cmd",
+                runner=runner,
+            )
+            records = self.harness.load_results(Path(temporary) / "traces" / "trace-results.ndjson")
+        self.assertTrue(summary["passed"])
+        self.assertEqual(1, summary["record_count"])
+        self.assertEqual(1, len(records))
+        self.assertEqual(33, len(summary["remaining_full_corpus_pairs"]))
+        report = self.harness.verify_trace_records(
+            suite,
+            records,
+            selected_cases=["direct-ingest"],
+            selected_modes=["mcp_unavailable"],
+        )
+        self.assertTrue(report["passed"], report["failures"])
+
+    def test_write_trace_records_refuses_unredacted_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(self.harness.EvaluationError):
+                self.harness.write_trace_records(
+                    Path(temporary) / "trace.ndjson",
+                    [{"case_id": "direct-ingest", "secret": "ghp_1234567890SECRET"}],
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

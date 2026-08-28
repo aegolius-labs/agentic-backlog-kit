@@ -1049,6 +1049,23 @@ def verify_suite(
     return report
 
 
+from .trace import (
+    TRACE_CASES,
+    TRACE_DEFAULT_MAX_OUTPUT_BYTES,
+    TRACE_DEFAULT_MODEL,
+    TRACE_DEFAULT_REASONING_EFFORT,
+    TRACE_DEFAULT_TIMEOUT_SECONDS,
+    TRACE_SCHEMA_VERSION,
+    parse_trace_jsonl,
+    probe_codex_mcp,
+    probe_plugin_catalog,
+    run_trace_case,
+    run_traces,
+    seed_trace_workspace,
+    verify_trace_records,
+    write_trace_records,
+)
+
 __all__ = [
     "CORPUS_PATH",
     "EXECUTOR_MODES",
@@ -1065,4 +1082,18 @@ __all__ = [
     "verify_results",
     "verify_suite",
     "write_results",
+    "TRACE_CASES",
+    "TRACE_DEFAULT_MAX_OUTPUT_BYTES",
+    "TRACE_DEFAULT_MODEL",
+    "TRACE_DEFAULT_REASONING_EFFORT",
+    "TRACE_DEFAULT_TIMEOUT_SECONDS",
+    "TRACE_SCHEMA_VERSION",
+    "parse_trace_jsonl",
+    "probe_codex_mcp",
+    "probe_plugin_catalog",
+    "run_trace_case",
+    "run_traces",
+    "seed_trace_workspace",
+    "verify_trace_records",
+    "write_trace_records",
 ]

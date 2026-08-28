@@ -13,10 +13,18 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from evals.installed_plugin.harness import (  # noqa: E402
     EvaluationError,
+    EXECUTOR_MODES,
+    TRACE_CASES,
+    TRACE_DEFAULT_MAX_OUTPUT_BYTES,
+    TRACE_DEFAULT_MODEL,
+    TRACE_DEFAULT_REASONING_EFFORT,
+    TRACE_DEFAULT_TIMEOUT_SECONDS,
     load_results,
     prepare_suite,
+    run_traces,
     run_diagnostics,
     synthetic_results,
+    verify_trace_records,
     verify_suite,
     write_results,
 )
@@ -83,6 +91,31 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--suite", required=True)
     verify.add_argument("--results")
     verify.add_argument("--report")
+
+    trace = commands.add_parser(
+        "trace",
+        help="Run selected bounded fresh Codex CLI traces and retain redacted JSONL evidence",
+    )
+    trace.add_argument("--suite", required=True)
+    trace.add_argument("--output", required=True)
+    trace.add_argument("--executable")
+    trace.add_argument("--case", dest="cases", action="append")
+    trace.add_argument("--mode", dest="modes", action="append", choices=EXECUTOR_MODES)
+    trace.add_argument("--full-corpus", action="store_true")
+    trace.add_argument("--model", default=TRACE_DEFAULT_MODEL)
+    trace.add_argument("--reasoning-effort", default=TRACE_DEFAULT_REASONING_EFFORT)
+    trace.add_argument("--timeout-seconds", type=float, default=TRACE_DEFAULT_TIMEOUT_SECONDS)
+    trace.add_argument("--max-output-bytes", type=int, default=TRACE_DEFAULT_MAX_OUTPUT_BYTES)
+
+    trace_verify = commands.add_parser(
+        "trace-verify", help="Verify selected bounded trace records against corpus hashes"
+    )
+    trace_verify.add_argument("--suite", required=True)
+    trace_verify.add_argument("--results", required=True)
+    trace_verify.add_argument("--case", dest="cases", action="append")
+    trace_verify.add_argument("--mode", dest="modes", action="append", choices=EXECUTOR_MODES)
+    trace_verify.add_argument("--full-corpus", action="store_true")
+    trace_verify.add_argument("--report")
     return parser
 
 
@@ -182,6 +215,44 @@ def main(argv: Sequence[str] | None = None) -> int:
                 results_path=Path(args.results).resolve() if args.results else None,
                 report_path=Path(args.report).resolve() if args.report else None,
             )
+            print(json.dumps(report, indent=2))
+            return 0 if report.get("passed") else 1
+        if args.command == "trace":
+            selected_cases = (
+                [str(case.get("id")) for case in suite.get("cases", [])]
+                if args.full_corpus
+                else (args.cases or list(TRACE_CASES))
+            )
+            selected_modes = args.modes or list(EXECUTOR_MODES)
+            summary = run_traces(
+                suite,
+                Path(args.output),
+                case_ids=selected_cases,
+                modes=selected_modes,
+                executable=args.executable,
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+                timeout_seconds=args.timeout_seconds,
+                max_output_bytes=args.max_output_bytes,
+            )
+            print(json.dumps(summary, indent=2))
+            return 0 if summary.get("passed") else 1
+        if args.command == "trace-verify":
+            records = load_results(Path(args.results).resolve())
+            selected_cases = (
+                [str(case.get("id")) for case in suite.get("cases", [])]
+                if args.full_corpus
+                else (args.cases or list(TRACE_CASES))
+            )
+            selected_modes = args.modes or list(EXECUTOR_MODES)
+            report = verify_trace_records(
+                suite,
+                records,
+                selected_cases=selected_cases,
+                selected_modes=selected_modes,
+            )
+            if args.report:
+                _write_json(Path(args.report).resolve(), report)
             print(json.dumps(report, indent=2))
             return 0 if report.get("passed") else 1
         raise AssertionError(f"Unhandled command: {args.command}")
