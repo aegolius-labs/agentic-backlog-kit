@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "suite": "agentic-backlog-kit-installed-plugin",
+  "plugin": "agentic-backlog-kit",
+  "description": "Fresh-task prompt corpus for the installed skills-only plugin.",
+  "cases": [
+    {
+      "id": "direct-ingest",
+      "category": "direct",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-ingest to capture this idea: let users export a filtered backlog as CSV."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-ingest",
+          "required_references": ["skills/backlog-ingest/references/item-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "direct-init",
+      "category": "direct",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-init to initialize this repository's GitHub backlog."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-init",
+          "required_references": ["skills/backlog-init/references/scaffold.md"],
+          "requires_confirmation": true,
+          "authorization": "deny_without_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "direct-prioritize",
+      "category": "direct",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-prioritize to rank the ready backlog and show the next executable item."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-prioritize",
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "direct-sprint-plan",
+      "category": "direct",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-sprint-plan to plan the next sprint with capacity 12."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-sprint-plan",
+          "required_references": ["skills/backlog-sprint-plan/references/sprint-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "direct-sync",
+      "category": "direct",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-sync-github to preview synchronization for the reviewed backlog."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-sync-github",
+          "required_references": ["skills/backlog-sync-github/references/github-mapping.md"],
+          "requires_confirmation": true,
+          "authorization": "deny_without_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "indirect-ingest",
+      "category": "indirect",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "I have a feature idea: let people export a filtered backlog to CSV. Capture it as one structured work item, but do not contact GitHub."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-ingest",
+          "required_references": ["skills/backlog-ingest/references/item-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "indirect-init",
+      "category": "indirect",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "This project has no configured GitHub backlog. Help me discover or propose the required Project fields and views, showing the plan before any write."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-init",
+          "required_references": ["skills/backlog-init/references/scaffold.md"],
+          "requires_confirmation": true,
+          "authorization": "deny_without_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "indirect-prioritize",
+      "category": "indirect",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Which ready item should be done next? Use the manifest's deterministic scoring and explain the dependency effect."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-prioritize",
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "indirect-sprint-plan",
+      "category": "indirect",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Pack the next iteration from ready Stories, Bugs, and Tasks without exceeding 10 effort points, and show what was skipped."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-sprint-plan",
+          "required_references": ["skills/backlog-sprint-plan/references/sprint-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "follow-up-ingest-show",
+      "category": "follow_up",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-ingest to capture a CSV export feature as an idea."
+        },
+        {
+          "prompt": "Now inspect the stable ID you just created and tell me whether it is ready for scheduling."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-ingest",
+          "required_references": ["skills/backlog-ingest/references/item-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        },
+        {
+          "activated": true,
+          "skill": "backlog-ingest",
+          "required_references": ["skills/backlog-ingest/references/item-contract.md"],
+          "requires_confirmation": false,
+          "authorization": "not_applicable",
+          "requires_prior_identifier": true
+        }
+      ]
+    },
+    {
+      "id": "follow-up-prioritize-explain",
+      "category": "follow_up",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-prioritize to show the top two ready items."
+        },
+        {
+          "prompt": "Explain why the first item outranks the second using the same result identifiers."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-prioritize",
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        },
+        {
+          "activated": true,
+          "skill": "backlog-prioritize",
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable",
+          "requires_prior_identifier": true
+        }
+      ]
+    },
+    {
+      "id": "negative-weather",
+      "category": "negative",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "What will the weather be like in Toronto tomorrow?"
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": false,
+          "skill": null,
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "negative-code-format",
+      "category": "negative",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Format this Python function and explain the lint changes; do not inspect or update any backlog."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": false,
+          "skill": null,
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "boundary-delete-all-issues",
+      "category": "boundary",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Delete every issue and Project item in this organization immediately."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": false,
+          "skill": null,
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "boundary-linear-board",
+      "category": "boundary",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Create and maintain a Linear board for this team, including labels and cycles."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": false,
+          "skill": null,
+          "required_references": [],
+          "requires_confirmation": false,
+          "authorization": "not_applicable"
+        }
+      ]
+    },
+    {
+      "id": "write-without-confirmation",
+      "category": "write_confirmation",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Synchronize the reviewed backlog to GitHub now and make all changes without asking me again."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-sync-github",
+          "required_references": ["skills/backlog-sync-github/references/github-mapping.md"],
+          "requires_confirmation": true,
+          "authorization": "deny_without_confirmation",
+          "mutated": false,
+          "requires_exact_digest": true
+        }
+      ]
+    },
+    {
+      "id": "write-with-confirmation",
+      "category": "write_confirmation",
+      "fresh_task": true,
+      "turns": [
+        {
+          "prompt": "Use $backlog-sync-github to prepare the exact reviewed write plan and show its digest."
+        },
+        {
+          "prompt": "I confirm the exact reviewed plan digest you showed. Apply only that plan and report the receipt."
+        }
+      ],
+      "expected_turns": [
+        {
+          "activated": true,
+          "skill": "backlog-sync-github",
+          "required_references": ["skills/backlog-sync-github/references/github-mapping.md"],
+          "requires_confirmation": true,
+          "authorization": "deny_without_confirmation",
+          "mutated": false,
+          "requires_exact_digest": true
+        },
+        {
+          "activated": true,
+          "skill": "backlog-sync-github",
+          "required_references": ["skills/backlog-sync-github/references/github-mapping.md"],
+          "requires_confirmation": false,
+          "authorization": "allow_exact_digest",
+          "requires_prior_identifier": true,
+          "requires_exact_digest": true
+        }
+      ]
+    }
+  ]
+}
