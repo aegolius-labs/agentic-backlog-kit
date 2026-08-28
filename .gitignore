@@ -13,5 +13,6 @@ build/
 # Disposable source inspection and generated runtime state
 .source-aio-agentic-sdlc/
 .agentic-backlog/cache/
+.agentic-backlog/evals/
 .agentic-backlog/receipts/
 .agentic-backlog/*.lock

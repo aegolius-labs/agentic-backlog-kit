@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "github": {
+    "owner": "evaluation-owner",
+    "repository": "abk-eval-placeholder",
+    "project_number": 1,
+    "issue_type_mode": "native_or_label"
+  },
+  "workflow": {
+    "hierarchy": [
+      ["Initiative"],
+      ["Epic"],
+      ["Feature"],
+      ["Story", "Bug"],
+      ["Task"]
+    ],
+    "statuses": [
+      "Inbox",
+      "Refining",
+      "Ready",
+      "Planned",
+      "In Progress",
+      "In Review",
+      "Done",
+      "Blocked"
+    ],
+    "done_statuses": ["Done"],
+    "work_item_types": ["Story", "Bug", "Task"],
+    "default_capacity": 10,
+    "iteration": {
+      "field": "Sprint",
+      "start_date": "2026-09-07",
+      "duration_days": 14
+    }
+  },
+  "scoring": {
+    "weights": {
+      "impact": 2.0,
+      "business_value": 2.0,
+      "enabler_value": 1.0,
+      "effort": 1.0
+    },
+    "dependency_boost": 0.25
+  },
+  "items": [
+    {
+      "id": "INIT-0001",
+      "title": "Deliver a deterministic backlog workflow",
+      "type": "Initiative",
+      "description": "Prove that an agent can establish and reconcile a complete GitHub backlog.",
+      "acceptance_criteria": ["The lifecycle converges from bootstrap through verified synchronization."],
+      "parent": null,
+      "depends_on": [],
+      "impact": 5,
+      "effort": 5,
+      "business_value": 5,
+      "enabler_value": 5,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-0001",
+      "title": "Exercise every backlog layer",
+      "type": "Epic",
+      "description": "Represent initiative, epic, feature, delivery work, and implementation tasks.",
+      "acceptance_criteria": ["Every configured hierarchy layer is represented by a linked issue."],
+      "parent": "INIT-0001",
+      "depends_on": [],
+      "impact": 5,
+      "effort": 5,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "FEAT-0001",
+      "title": "Reconcile a live GitHub Project",
+      "type": "Feature",
+      "description": "Create fields, views, iterations, issues, hierarchy, and dependencies deterministically.",
+      "acceptance_criteria": ["A second scaffold and sync plan both contain zero actions."],
+      "parent": "EPIC-0001",
+      "depends_on": [],
+      "impact": 5,
+      "effort": 4,
+      "business_value": 5,
+      "enabler_value": 5,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "STORY-0001",
+      "title": "Plan a dependency-safe sprint",
+      "type": "Story",
+      "description": "As a maintainer, I want deterministic sprint selection so commitments remain feasible.",
+      "acceptance_criteria": ["A prerequisite appears before work that depends on it."],
+      "parent": "FEAT-0001",
+      "depends_on": [],
+      "impact": 5,
+      "effort": 3,
+      "business_value": 5,
+      "enabler_value": 2,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    },
+    {
+      "id": "TASK-0001",
+      "title": "Establish the evaluation prerequisite",
+      "type": "Task",
+      "description": "Create the prerequisite needed by the dependent implementation task and bug fix.",
+      "acceptance_criteria": ["Dependent items identify this task through a native dependency."],
+      "parent": "STORY-0001",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 5,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    },
+    {
+      "id": "TASK-0002",
+      "title": "Complete the dependent implementation",
+      "type": "Task",
+      "description": "Exercise dependency ordering and iteration assignment on a second task.",
+      "acceptance_criteria": ["The task is selected only after TASK-0001."],
+      "parent": "STORY-0001",
+      "depends_on": ["TASK-0001"],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 2,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    },
+    {
+      "id": "BUG-0001",
+      "title": "Repair a dependency-sensitive defect",
+      "type": "Bug",
+      "description": "Exercise bug typing and dependency reconciliation in the live project.",
+      "acceptance_criteria": ["The bug preserves its type and dependency after synchronization."],
+      "parent": "FEAT-0001",
+      "depends_on": ["TASK-0001"],
+      "impact": 5,
+      "effort": 2,
+      "business_value": 5,
+      "enabler_value": 1,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": "Sprint 1"
+    },
+    {
+      "id": "STORY-0002",
+      "title": "Retain an unrefined idea outside the sprint",
+      "type": "Story",
+      "description": "Prove that ingestion can preserve uncertainty without inventing readiness.",
+      "acceptance_criteria": ["The item remains in Refining and is excluded from sprint commitment."],
+      "parent": "FEAT-0001",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 1,
+      "status": "Refining",
+      "maturity": "refined",
+      "sprint": null
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "fields": [
+    {"name": "Status", "data_type": "SINGLE_SELECT"},
+    {"name": "Sprint", "data_type": "ITERATION"},
+    {"name": "Impact", "data_type": "NUMBER"},
+    {"name": "Effort", "data_type": "NUMBER"},
+    {"name": "Business Value", "data_type": "NUMBER"},
+    {"name": "Enabler Value", "data_type": "NUMBER"},
+    {"name": "Priority", "data_type": "NUMBER"}
+  ],
+  "view_assertion_dimensions": [
+    "layout",
+    "filter",
+    "visible_fields",
+    "group_by",
+    "vertical_group_by",
+    "sort_by"
+  ],
+  "views": [
+    {
+      "name": "Backlog",
+      "layout": "table",
+      "filter": "is:issue",
+      "visible_fields": ["Status", "Sprint", "Priority", "Impact", "Effort", "Business Value", "Enabler Value"],
+      "group_by": [],
+      "vertical_group_by": [],
+      "sort_by": [{"field": "Priority", "direction": "desc"}]
+    },
+    {
+      "name": "Kanban",
+      "layout": "board",
+      "filter": "is:issue is:open",
+      "visible_fields": ["Sprint", "Priority", "Effort"],
+      "group_by": [],
+      "vertical_group_by": ["Status"],
+      "sort_by": []
+    },
+    {
+      "name": "Current Sprint",
+      "layout": "board",
+      "filter": "Sprint:@current",
+      "visible_fields": ["Priority", "Effort"],
+      "group_by": [],
+      "vertical_group_by": ["Status"],
+      "sort_by": []
+    },
+    {
+      "name": "Roadmap",
+      "layout": "roadmap",
+      "filter": "is:issue -status:Done",
+      "visible_fields": [],
+      "group_by": [],
+      "vertical_group_by": [],
+      "sort_by": []
+    }
+  ],
+  "iterations": {
+    "field": "Sprint",
+    "duration_days": 14,
+    "required_alias": "@current",
+    "required_next_alias": "@next",
+    "required_active_titles": ["Sprint 1", "Sprint 2"],
+    "fail_closed_cases": ["completed", "duplicate", "overlapping", "metadata-incomplete"],
+    "extension_requires_identity_refresh": true,
+    "second_lifecycle_plan_actions": 0
+  },
+  "issue_type_assertions": {
+    "native": {"mode": "native", "native_type_required": true, "fallback_label_required": false},
+    "labels": {"mode": "labels", "native_type_required": false, "fallback_label_required": true}
+  },
+  "required_type_labels": [
+    "type:initiative",
+    "type:epic",
+    "type:feature",
+    "type:story",
+    "type:bug",
+    "type:task"
+  ]
+}

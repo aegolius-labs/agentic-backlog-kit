@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "purpose": "Inputs for the backlog-ingest skill during live evaluation",
+  "instructions": "Ingest in array order, preserving supplied IDs so relationships are deterministic.",
+  "items_source": "manifest.template.json#/items",
+  "assertions": [
+    "Every item is validated before the next item is added",
+    "STORY-0002 remains refined rather than being promoted to ready",
+    "TASK-0002 and BUG-0001 retain TASK-0001 as a dependency",
+    "No GitHub synchronization occurs during ingestion"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "required_per_variant": [
+    "manifest.json",
+    "preflight.json",
+    "commands.ndjson",
+    "bootstrap/plan.json",
+    "bootstrap/receipt.json",
+    "scaffold/plan.json",
+    "scaffold/receipt.json",
+    "scaffold/after.json",
+    "scaffold/second-plan.json",
+    "ingestion/result.json",
+    "prioritization/result.json",
+    "sprint/plan.json",
+    "iterations/assertions.json",
+    "sync/plan.json",
+    "sync/receipt.json",
+    "sync/after.json",
+    "sync/second-plan.json",
+    "assertions.json"
+  ],
+  "receipt_requirements": {
+    "status": "completed",
+    "plan_digest_matches": true,
+    "journal_required": true
+  },
+  "redaction_requirements": [
+    "Never capture GH_TOKEN, GITHUB_TOKEN, Authorization headers, cookies, or credential-helper output",
+    "Record authenticated identity and permission results, not credential material",
+    "Review commands.ndjson before publishing evidence"
+  ]
+}
