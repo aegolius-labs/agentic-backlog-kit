@@ -126,6 +126,7 @@ python -c "import sys, unittest; sys.path.insert(0, 'src'); suite=unittest.defau
 
 See [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
 The deterministic payload benchmark and its byte/token budgets are documented in [docs/benchmarks.md](docs/benchmarks.md).
+Release-candidate Windows and local Linux/WSL validation evidence is recorded in [docs/validation.md](docs/validation.md).
 The offline preparation and evidence contract for disposable live GitHub testing are documented in [evals/live_github/README.md](evals/live_github/README.md).
 
 ## License

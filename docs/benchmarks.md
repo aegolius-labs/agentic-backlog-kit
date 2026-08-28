@@ -35,6 +35,10 @@ gate.
 
 These are the compact-JSON baselines produced by generator
 `r09-representative-v1` on 2026-08-27. Each cell is `bytes (estimated tokens)`.
+The release-candidate rerun after Wave B's view and iteration changes produced
+the values below; the report was byte-for-byte identical on Windows and local
+Ubuntu WSL (report SHA-256
+`0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`).
 
 | Operation | 100 items | 1,000 items | 10,000 items |
 | --- | ---: | ---: | ---: |
@@ -42,10 +46,10 @@ These are the compact-JSON baselines produced by generator
 | `show` | 569 (143) | 569 (143) | 569 (143) |
 | `next` | 180 (45) | 180 (45) | 181 (46) |
 | `prioritize` (limit 20) | 3,494 (874) | 3,485 (872) | 3,486 (872) |
-| `sprint-plan` | 5,591 (1,398) | 46,973 (11,744) | 460,814 (115,204) |
-| `sprint-plan --skipped-limit 50` | 3,773 (944) | 3,768 (942) | 3,770 (943) |
+| `sprint-plan` | 6,090 (1,523) | 47,472 (11,868) | 461,313 (115,329) |
+| `sprint-plan --skipped-limit 50` | 4,272 (1,068) | 4,267 (1,067) | 4,269 (1,068) |
 | `snapshot` artifact | 75,240 (18,810) | 753,349 (188,338) | 7,552,509 (1,888,128) |
-| cold `sync-plan` artifact | 62,860 (15,715) | 627,618 (156,905) | 6,275,893 (1,568,974) |
+| cold `sync-plan` artifact | 72,319 (18,080) | 720,417 (180,105) | 7,202,332 (1,800,583) |
 
 Budgets for linear outputs leave approximately 20–30% headroom over the
 observed large-backlog slope; fixed-size command budgets are small absolute
