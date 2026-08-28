@@ -5,6 +5,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+.artifacts/
 *.egg-info/
 .venv/
 .worktrees/

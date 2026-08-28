@@ -94,4 +94,6 @@ See [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs
 
 ## License
 
-No license has been selected yet. The source project reviewed during discovery uses the PolyForm Noncommercial License 1.0.0; see [docs/source-extraction.md](docs/source-extraction.md) for the clean adaptation boundary.
+Agentic Backlog Kit is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). Personal and other noncommercial uses permitted by that license are free. Any use in or for for-profit operations requires a separate paid license from Aegolius Labs; see [COMMERCIAL.md](COMMERCIAL.md).
+
+Because commercial use is restricted, this is not an OSI-approved open-source license. See [docs/source-extraction.md](docs/source-extraction.md) for the clean adaptation boundary from the separately licensed source project reviewed during discovery.

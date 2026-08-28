@@ -9,7 +9,19 @@ description = "Deterministic GitHub Issues and Projects backlog workflows for ag
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Aegolius Labs" }]
+license = { text = "PolyForm Noncommercial License 1.0.0; commercial licenses available separately" }
 dependencies = []
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: Other/Proprietary License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/aegolius-labs/agentic-backlog-kit"
+Repository = "https://github.com/aegolius-labs/agentic-backlog-kit"
+Issues = "https://github.com/aegolius-labs/agentic-backlog-kit/issues"
 
 [project.scripts]
 abk = "agentic_backlog_kit.cli:main"
