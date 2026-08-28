@@ -185,9 +185,20 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
         start = min(item["start_date"] for item in known)
     start_value = _parse_date(start, f"Project iteration field '{name}' start_date")
 
+    database_id = raw_field.get(
+        "database_id", raw_field.get("fullDatabaseId", raw_field.get("databaseId"))
+    )
+    if database_id is not None:
+        try:
+            database_id = int(database_id)
+        except (TypeError, ValueError) as exc:
+            raise ManifestError(
+                f"Project iteration field '{name}' has an invalid database id"
+            ) from exc
+
     return {
         "id": identifier,
-        "database_id": raw_field.get("database_id", raw_field.get("databaseId")),
+        "database_id": database_id,
         "name": name.strip(),
         "data_type": "ITERATION",
         "iteration_configuration": {

@@ -255,6 +255,9 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
             self.assertNotEqual(
                 suite["execution_confirmation"], suite["cleanup_confirmation"]
             )
+            self.assertTrue(
+                all(variant["expected_sprint_ids"] for variant in suite["variants"])
+            )
 
     def test_default_run_never_calls_runner_and_execution_needs_exact_digest(self) -> None:
         calls: list[dict] = []

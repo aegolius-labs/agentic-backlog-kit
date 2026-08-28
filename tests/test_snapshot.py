@@ -231,7 +231,29 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
             {
                 "organization": {
                     "projectV2": {
-                        "fields": {"nodes": []},
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_SPRINT",
+                                    "fullDatabaseId": "103",
+                                    "name": "Sprint",
+                                    "dataType": "ITERATION",
+                                    "configuration": {
+                                        "duration": 14,
+                                        "startDay": 1,
+                                        "iterations": [
+                                            {
+                                                "id": "ITER_1",
+                                                "title": "Sprint 1",
+                                                "startDate": "2026-08-17",
+                                                "duration": 14,
+                                            }
+                                        ],
+                                        "completedIterations": [],
+                                    },
+                                }
+                            ]
+                        },
                         "views": {
                             "nodes": [
                                 {
@@ -283,6 +305,12 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         self.assertEqual(["Status", "Priority"], [entry["name"] for entry in view["visible_fields"]])
         self.assertEqual(102, view["sort_by"][0]["field"]["database_id"])
         self.assertEqual("desc", view["sort_by"][0]["direction"])
+        iteration_field = snapshot["fields"][0]
+        self.assertEqual(103, iteration_field["database_id"])
+        self.assertEqual(
+            "ITER_1",
+            iteration_field["iteration_configuration"]["iterations"][0]["id"],
+        )
 
 
 if __name__ == "__main__":

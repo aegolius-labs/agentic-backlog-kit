@@ -17,14 +17,18 @@ GitHub-owned operational data such as issue numbers, node IDs, Project item IDs,
 1. Focused plugin skills decide which workflow applies and collect only missing judgment inputs.
 2. `scripts/backlog.py` exposes concise commands over the local engine.
 3. Manifest validation rejects invalid references, hierarchy jumps, duplicate IDs, bad dimensions, and dependency cycles.
-4. Scoring and sprint planning are pure local computations.
-5. Snapshot readers retrieve only kit-managed issues, marked by `<!-- agentic-backlog-kit:id=...;schema=1 -->`, plus their Project fields and relationships.
+4. Scoring and capacity packing are pure local computations; a named sprint commitment additionally requires refreshed iteration identity and lifecycle state.
+5. Snapshot readers retrieve only kit-managed issues, marked by `<!-- agentic-backlog-kit:id=...;schema=1 -->`, plus their Project fields, complete managed view configuration, active/completed iterations, and relationships.
 6. Reconciliation emits a canonical plan whose SHA-256 digest binds normalized manifest and remote-state fingerprints, planning options, action payloads, and action preconditions.
 7. Executors accept only the exact reviewed digest, refresh GitHub, rebuild the plan from the freshly validated local manifest, and abort before mutation on any drift.
 8. Apply journals its completed prefix after every action and records the failed action and error on interruption. Resumption always refreshes, replans, and requires confirmation of the new remaining plan rather than replaying the old plan.
 9. Skills refresh and re-plan after apply; a successful reconciliation has zero remaining actions.
 
 Project scaffolding preserves the IDs, colors, and descriptions of existing single-select options when extending the built-in Status field. This avoids clearing values already assigned to Project items.
+
+Managed views are compared across layout, filter, ordered visible fields, horizontal and vertical grouping, and ordered sorting. Supported differences become reviewed update actions. Grouping and sorting differences fail closed because the current GitHub view-update input cannot change them safely; the kit does not delete and recreate a same-name view.
+
+Iteration lifecycle plans resolve exact titles, `@current`, or `@next` from canonical active/completed state. A schedule can be extended only from a contiguous, cadence-matching numeric title sequence. GitHub-owned iteration IDs and completion state are bound as preconditions and rechecked after refresh before assignment proceeds.
 
 GitHub MCP is the preferred interactive tool route when the host exposes the required issue, Project, sub-issue, and dependency operations. The same plan remains the contract regardless of executor.
 

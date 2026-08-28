@@ -13,6 +13,9 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 - Repeatable 100/1,000/10,000-item payload benchmarks with CI-enforced byte budgets and bounded sprint-plan projections.
 - Local Git, package build/smoke-test, and tag-driven GitHub release scaffolding.
 - PolyForm Noncommercial licensing, paid-commercial guidance, and public support, security, contribution, and release documentation.
+- Complete Project view snapshots and semantic reconciliation for layout, filters, ordered visible fields, grouping, and sorting, with safe updates or precise fail-closed conflicts.
+- Deterministic active/completed iteration discovery, exact and alias resolution, safe rolling schedule extension, digest-confirmed apply receipts, and refreshed identity verification.
+- An offline disposable-GitHub evaluation package covering GitHub CLI, API, and MCP backends in native-type and label-fallback modes, including evidence verification and separately authorized cleanup.
 
 ## [0.1.0] - Unreleased
 

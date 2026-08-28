@@ -9,8 +9,8 @@ The kit combines focused skills with a zero-runtime-dependency Python engine. Ag
 - `Initiative -> Epic -> Feature -> Story/Bug -> Task` hierarchy backed by GitHub sub-issues.
 - Native GitHub issue dependencies for blocking relationships.
 - Impact, Effort, Business Value, Enabler Value, and recursive dependency scoring.
-- Dependency-safe, capacity-aware sprint planning.
-- Organization Project discovery/creation plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four views: Backlog, Kanban, Current Sprint, and Roadmap.
+- Dependency-safe, capacity-aware sprint planning against refreshed active/completed iteration state.
+- Organization Project discovery/creation plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four fully reconciled views: Backlog, Kanban, Current Sprint, and Roadmap.
 - GitHub MCP-first agent workflows with authenticated GitHub CLI and direct API fallbacks.
 - Dry-run planning by default and digest-confirmed apply operations.
 - Compact per-item ingestion and optimistic, atomic manifest updates.
@@ -38,14 +38,14 @@ python scripts/backlog.py init-apply `
 
 Add `--project-title TITLE` or `--project-number N` to select explicitly. Ambiguous exact matches stop without mutation. `init-apply` records the resulting Project number in the manifest and refreshes GitHub before proposing scaffold changes. If a known Project number already exists, the legacy local-only `init` command remains available.
 
-Validate and inspect it without contacting GitHub:
+Validate and inspect local backlog data without contacting GitHub:
 
 ```powershell
 python scripts/backlog.py validate
 python scripts/backlog.py summary
 python scripts/backlog.py prioritize --limit 10
 python scripts/backlog.py next
-python scripts/backlog.py sprint-plan --capacity 20 --sprint "Sprint 1"
+python scripts/backlog.py sprint-plan --capacity 20
 ```
 
 Preview GitHub Project scaffolding, then apply only the exact reviewed digest:
@@ -60,6 +60,27 @@ python scripts/backlog.py scaffold-apply `
   --confirm <reviewed-digest> `
   --receipt .agentic-backlog/receipts/scaffold-apply.json
 ```
+
+Resolve or safely extend the iteration schedule, then plan only against refreshed Project state:
+
+```powershell
+python scripts/backlog.py iteration-plan `
+  --snapshot .agentic-backlog/cache/scaffold.json `
+  --target @next `
+  --as-of 2026-08-27 `
+  --output .agentic-backlog/cache/iteration-plan.json
+python scripts/backlog.py iteration-apply `
+  --plan .agentic-backlog/cache/iteration-plan.json `
+  --confirm <reviewed-digest> `
+  --receipt .agentic-backlog/receipts/iteration-apply.json
+python scripts/backlog.py scaffold-snapshot --output .agentic-backlog/cache/scaffold.json
+python scripts/backlog.py sprint-plan `
+  --capacity 20 `
+  --sprint @next `
+  --snapshot .agentic-backlog/cache/scaffold.json
+```
+
+Iteration updates preserve the observed active schedule and require a post-apply refresh to verify GitHub-owned IDs before work can be assigned. Completed, overlapping, duplicate, stale/gapped, or ambiguous targets fail before mutation.
 
 Use the same workflow for issues and Project items:
 
@@ -105,6 +126,7 @@ python -c "import sys, unittest; sys.path.insert(0, 'src'); suite=unittest.defau
 
 See [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
 The deterministic payload benchmark and its byte/token budgets are documented in [docs/benchmarks.md](docs/benchmarks.md).
+The offline preparation and evidence contract for disposable live GitHub testing are documented in [evals/live_github/README.md](evals/live_github/README.md).
 
 ## License
 

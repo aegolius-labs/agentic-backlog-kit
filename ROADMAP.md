@@ -59,8 +59,8 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 - [x] Create or select iterations and assign a dependency-valid sprint slice.
 - [x] Add example manifests and a safe demo workflow.
 - [x] Create or discover the organization Project during first-run setup (R03).
-- [ ] Reconcile complete filters, grouping, sorting, and other view configuration (R04).
-- [ ] Manage current, next, completed, and rolling iterations (R05).
+- [x] Reconcile complete filters, grouping, sorting, and other view configuration (R04).
+- [x] Manage current, next, completed, and rolling iterations (R05).
 
 ### M5 - Release readiness
 
@@ -76,7 +76,7 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 
 ## Current checkpoint
 
-Wave A completed on 2026-08-27. The repository is initialized locally, all 74 Windows tests pass, the 100/1,000/10,000-item byte-budget gate passes, the CLI and built wheel pass smoke checks, and the official plugin plus all five skill validators pass. R01 fresh-state protection and journaling, R03 Project bootstrap, R08 licensing/release documentation, R09 benchmarks, and the local setup portion of R07 are complete. Remote publication, Linux CI execution, R04/R05 Project behavior, R02 live GitHub evaluation, R06 installed-plugin evaluation, and the final tag/release remain open.
+Wave B completed on 2026-08-27. All 108 integrated Windows tests pass, including combined full-view and iteration snapshot coverage, and the 100/1,000/10,000-item byte-budget gate remains green. R04 now compares complete view configuration and applies every update exposed by GitHub while failing closed on grouping or sorting drift that the current update API cannot repair. R05 now discovers active/completed iterations, resolves exact titles plus `@current`/`@next`, safely extends contiguous numeric schedules, journals digest-confirmed updates, and blocks assignment until refreshed server identities are verified. R02 now has deterministic offline fixtures, a six-scenario backend/type matrix, an evidence verifier, and separately gated cleanup preparation; its live execution remains Wave C. Remote publication, Linux CI execution, R02 live execution, R06 installed-plugin evaluation, and the final tag/release remain open.
 
 ## Work items, ranked
 
@@ -95,11 +95,11 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R02 - Run live GitHub end-to-end evaluations
 
-- **Status:** Not started; scheduled for Wave C
+- **Status:** Wave B preparation complete; live execution scheduled for Wave C
 - **Importance:** Critical
 - **Complexity:** Hard
-- **Context:** The 74 tests use local or simulated GitHub responses. No complete workflow has yet created and reconciled real issues, sub-issues, dependencies, Project fields, iterations, or views.
-- **High-level approach:** Create a disposable organization repository and Project. Exercise initialization, scaffolding, ingestion, prioritization, sprint planning, apply, and post-apply convergence through GitHub CLI, direct API, and GitHub MCP. Test native issue types and label fallback independently.
+- **Context:** The local suite and offline evidence verifier cover the workflow contract, but no complete workflow has yet created and reconciled real issues, sub-issues, dependencies, Project fields, iterations, or views. Wave B added deterministic native-type and label-fallback fixtures, GitHub CLI/API/MCP scenario definitions, capability preflights, receipt/redaction checks, full view/iteration oracles, and a separate cleanup gate without contacting GitHub.
+- **High-level approach:** In Wave C, create approved disposable organization repositories and Projects. Run initialization, scaffolding, ingestion, prioritization, sprint planning, apply, and post-apply convergence across three executors and two issue-type modes. Preserve redacted evidence, verify every second plan is empty, and authorize exact-target cleanup separately.
 - **Done when:** Each supported executor completes the representative workflow, the second plan contains zero actions, failure cases are recorded, and the resulting GitHub state matches the manifest and view contracts.
 
 #### R03 - Complete first-run Project creation and discovery
@@ -113,20 +113,20 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R04 - Reconcile complete Project view configuration
 
-- **Status:** Not started; scheduled for Wave B
+- **Status:** Complete in Wave B
 - **Importance:** High
 - **Complexity:** Medium
-- **Context:** Existing views are currently compared only by name and layout. A same-name Kanban or sprint view with the wrong filter, grouping, sort, or visible fields can be incorrectly treated as valid.
-- **High-level approach:** Snapshot complete view configuration through the GitHub view APIs. Compare filters, grouping, sorting, and roadmap settings, then emit safe view-update actions or a precise fail-closed conflict.
+- **Context:** Scaffold snapshots now retain view node/number identity, layout, normalized filter, ordered visible fields, horizontal/vertical grouping, and ordered sorting with both GraphQL and REST field identities. A same-name view is never accepted from name/layout alone.
+- **High-level approach:** Complete view state is compared semantically. Layout, filter, and applicable visible-field drift produce fresh-state-bound `project.view.update` actions. Grouping or sorting drift produces a precise fail-closed conflict because GitHub's current view-update input does not expose those settings; the kit never deletes/recreates a view to work around that boundary.
 - **Done when:** Incorrect same-name views are detected, repair plans converge, and a second scaffold plan is empty only when the full view contract matches.
 
 #### R05 - Manage the iteration lifecycle
 
-- **Status:** Not started; scheduled for Wave B
+- **Status:** Complete in Wave B
 - **Importance:** High
 - **Complexity:** Medium
-- **Context:** The kit creates the Sprint field and can assign work to an existing iteration title, but it does not fully discover, select, create, extend, or roll over iterations.
-- **High-level approach:** List current, completed, and upcoming iterations; select `@current` or calculate the next iteration deterministically; extend the schedule when required; validate requested sprint titles during planning rather than failing during apply.
+- **Context:** Full active/completed iteration definitions and identities are now canonical snapshot state. Sprint planning resolves exact titles, `@current`, and `@next` before commitment and rejects completed, duplicate, overlapping, stale/gapped, duration-mismatched, or otherwise ambiguous schedules.
+- **High-level approach:** Safe missing-current/next cases produce a separately reviewed full-configuration update that preserves every observed active definition and extends only contiguous numeric-suffix schedules. Apply is digest/fresh-state bound and journaled. Because GitHub's mutation input does not accept existing IDs or completion state, those remain preconditions and mandatory post-refresh invariants; item assignment stays blocked until the refreshed target ID is present.
 - **Done when:** Sprint planning can select a valid current or next iteration, missing iterations are handled through a reviewed plan, and rollover/completed-iteration tests pass.
 
 #### R06 - Evaluate the installed plugin and skill activation
@@ -228,10 +228,11 @@ Complexity labels describe implementation and validation effort, not importance.
    - Lane D: R09 token benchmark harness and baseline measurements — GPT-5.6 Luna, max reasoning, isolated `wave-a/r09` worktree.
    - Integration reconciled the shared CLI contract and extended R01 fresh-state/journaling guarantees to the newly introduced bootstrap apply path.
 
-2. **Wave B - Project behavior completion**
-   - Implement R04 view reconciliation and R05 iteration lifecycle after R03 establishes common Project and field identity helpers.
-   - R04 and R05 can run concurrently only in isolated worktrees with agreed interfaces. In one working tree, do them sequentially because they edit the same GitHub, snapshot, and scaffold modules.
-   - Prepare the disposable assets and evaluation scripts for R02 concurrently without executing the final test matrix yet.
+2. **Wave B - Project behavior completion — completed 2026-08-27**
+   - Lane A: R04 complete view reconciliation — GPT-5.6 Luna, max reasoning, isolated `wave-b/r04` worktree.
+   - Lane B: R05 iteration lifecycle — GPT-5.6 Luna, max reasoning, isolated `wave-b/r05` worktree.
+   - Lane C: R02 disposable live-evaluation preparation — GPT-5.6 Sol, medium reasoning, isolated `wave-b/r02-prep` worktree; no live GitHub mutations were authorized or performed.
+   - Integration retained both full view and iteration configuration in the shared Project queries, aligned the evaluation oracle with the implemented view contract, and added observed iteration state to deterministic sprint expectations.
 
 3. **Wave C - Parallel release-candidate evaluation**
    - Run R02 live GitHub evaluation and R06 installed-plugin evaluation concurrently against the stable candidate.

@@ -22,7 +22,7 @@
       "name": "Backlog",
       "layout": "table",
       "filter": "is:issue",
-      "visible_fields": ["Status", "Sprint", "Priority", "Impact", "Effort", "Business Value", "Enabler Value"],
+      "visible_fields": ["Title", "Status", "Sprint", "Priority", "Impact", "Effort", "Business Value", "Enabler Value"],
       "group_by": [],
       "vertical_group_by": [],
       "sort_by": [{"field": "Priority", "direction": "desc"}]
@@ -31,7 +31,7 @@
       "name": "Kanban",
       "layout": "board",
       "filter": "is:issue is:open",
-      "visible_fields": ["Sprint", "Priority", "Effort"],
+      "visible_fields": ["Title", "Sprint", "Priority", "Effort"],
       "group_by": [],
       "vertical_group_by": ["Status"],
       "sort_by": []
@@ -40,7 +40,7 @@
       "name": "Current Sprint",
       "layout": "board",
       "filter": "Sprint:@current",
-      "visible_fields": ["Priority", "Effort"],
+      "visible_fields": ["Title", "Priority", "Effort"],
       "group_by": [],
       "vertical_group_by": ["Status"],
       "sort_by": []

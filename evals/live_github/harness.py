@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import re
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -91,6 +92,45 @@ def materialize_manifest(
     }
     data["workflow"]["iteration"]["start_date"] = iteration_start
     return validate_manifest(data)
+
+
+def _seed_iteration_snapshot(iteration_start: str) -> dict[str, Any]:
+    """Return observed-like state for deterministic offline sprint expectations."""
+
+    start = date.fromisoformat(iteration_start)
+    return {
+        "fields": [
+            {
+                "id": "EVAL_FIELD_SPRINT",
+                "database_id": 1,
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "iteration_configuration": {
+                    "start_date": start.isoformat(),
+                    "duration_days": 14,
+                    "iterations": [
+                        {
+                            "id": "EVAL_ITERATION_1",
+                            "title": "Sprint 1",
+                            "start_date": start.isoformat(),
+                            "duration_days": 14,
+                            "completed": False,
+                        },
+                        {
+                            "id": "EVAL_ITERATION_2",
+                            "title": "Sprint 2",
+                            "start_date": (start + timedelta(days=14)).isoformat(),
+                            "duration_days": 14,
+                            "completed": False,
+                        },
+                    ],
+                    "completed_iterations": [],
+                },
+            }
+        ],
+        "views": [],
+        "labels": [],
+    }
 
 
 def _steps() -> list[dict[str, Any]]:
@@ -203,7 +243,12 @@ def prepare_suite(
             iteration_start=iteration_start,
         )
         ranking = [entry.id for entry in prioritize(seed_manifest)]
-        sprint = plan_sprint(seed_manifest, sprint="Sprint 1")
+        sprint = plan_sprint(
+            seed_manifest,
+            sprint="Sprint 1",
+            project_snapshot=_seed_iteration_snapshot(iteration_start),
+            as_of=iteration_start,
+        )
         entry = {
             "name": mode,
             **names,
