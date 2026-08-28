@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-08-28T03:41:19Z",
+  "refreshed_at_utc": "2026-08-28T03:55:41Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -36,15 +36,15 @@
     "project_field_and_iteration_schema": true,
     "hierarchy_and_dependency_read": true,
     "hierarchy_and_dependency_write_methods_advertised": true,
-    "rest_remaining_at_probe": 4996,
-    "graphql_remaining_at_probe": 4726,
+    "rest_remaining_at_probe": 4999,
+    "graphql_remaining_at_probe": 4905,
     "search_remaining_at_probe": 30,
     "project_field_database_id_name": "databaseId",
     "project_field_schema_fix_verified": true,
     "single_project_snapshot_read_passed": true,
-    "organization_project_discovery_passed": false,
-    "engine_snapshot_query_compatible": false,
-    "engine_snapshot_query_blocker": "Project discovery statically requests up to 1,000,000 visible-field nodes, exceeding GitHub's 500,000-node query limit",
+    "organization_project_discovery_passed": true,
+    "engine_snapshot_query_compatible": true,
+    "engine_snapshot_query_blocker": null,
     "required_native_issue_types": ["Initiative", "Epic", "Feature", "Story", "Bug", "Task"],
     "available_native_issue_types": [
       "Task",
@@ -83,7 +83,6 @@
       "resource_create_digest": "b2b448ab9d0d0aec77421fce7a5452cde16eb50a0230ec2decdb52bcdc5847fa",
       "preflight_passed": false,
       "blockers": [
-        "engine organization Project discovery exceeds GitHub's GraphQL node limit",
         "required native issue type Story is absent"
       ]
     },
@@ -95,10 +94,8 @@
       "project_title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [labels]",
       "project_absence_verified": true,
       "resource_create_digest": "0d9d663fdca2e44d82fd5fb3637f8544c166a9461b49197bb864a2c28b1d69d4",
-      "preflight_passed": false,
-      "blockers": [
-        "engine organization Project discovery exceeds GitHub's GraphQL node limit"
-      ]
+      "preflight_passed": true,
+      "blockers": []
     },
     {
       "backend": "api",
@@ -110,7 +107,6 @@
       "resource_create_digest": "f858097150e5dd170f28eae9489b4641b066fffb474b2efdfa820a47e63bdfec",
       "preflight_passed": false,
       "blockers": [
-        "engine organization Project discovery exceeds GitHub's GraphQL node limit",
         "required native issue type Story is absent"
       ]
     },
@@ -122,10 +118,8 @@
       "project_title": "ABK Eval wave-c-r02-20260827-api-3f546dc6 [labels]",
       "project_absence_verified": true,
       "resource_create_digest": "a1b87fea598b3aa4ac3ace439b7f50a03d91098a99f6973e0d44cc86f959a3d4",
-      "preflight_passed": false,
-      "blockers": [
-        "engine organization Project discovery exceeds GitHub's GraphQL node limit"
-      ]
+      "preflight_passed": true,
+      "blockers": []
     },
     {
       "backend": "mcp",

@@ -521,8 +521,13 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
                 for scenario in audit["scenarios"]
             },
         )
-        self.assertTrue(
-            all(not scenario["preflight_passed"] for scenario in audit["scenarios"])
+        self.assertEqual(
+            {("gh", "labels"), ("api", "labels")},
+            {
+                (scenario["backend"], scenario["variant"])
+                for scenario in audit["scenarios"]
+                if scenario["preflight_passed"]
+            },
         )
         self.assertTrue(
             all(scenario["project_absence_verified"] for scenario in audit["scenarios"])
@@ -531,7 +536,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(
             audit["local_capabilities"]["direct_api_transport_read_passed"]
         )
-        self.assertFalse(
+        self.assertTrue(
             audit["gh_and_api_capabilities"]["engine_snapshot_query_compatible"]
         )
         self.assertEqual(
