@@ -49,7 +49,27 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         write("manifest.json", manifest)
         write(
             "preflight.json",
-            {"passed": True, "backend": "gh", "redactions_confirmed": True},
+            {
+                "passed": True,
+                "backend": "gh",
+                "redactions_confirmed": True,
+                "authenticated_login": "evaluation-operator",
+                "organization_login": suite["owner"],
+                "permission_checks": {
+                    "repository_create_delete": True,
+                    "project_create_delete_link": True,
+                },
+                "capability_results": {
+                    "approved_disposable_target": True,
+                    "repository_absent": True,
+                    "project_absent": True,
+                    "fields_views_iterations": True,
+                    "issues_labels": True,
+                    "hierarchy_dependencies": True,
+                    "rate_limit_sufficient": True,
+                    "native_issue_types": True,
+                },
+            },
         )
         evidence.mkdir(parents=True, exist_ok=True)
         (evidence / "commands.ndjson").write_text(
@@ -293,6 +313,89 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
                 )
             self.assertEqual([], calls)
 
+    def test_execution_requires_variant_specific_target_bound_digests(self) -> None:
+        calls: list[dict] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self.harness.prepare_suite(
+                Path(temporary),
+                owner="aegolius-labs",
+                run_id="variant-digest-proof",
+                iteration_start="2026-09-07",
+                backend="mcp",
+            )
+            shared = {
+                step["id"]: "a" * 64
+                for step in suite["steps"]
+                if step["mutates"]
+            }
+            with self.assertRaisesRegex(
+                self.harness.EvaluationSafetyError, "native:resource-create"
+            ):
+                self.harness.run_suite(
+                    suite,
+                    execute=True,
+                    confirmation=suite["execution_confirmation"],
+                    reviewed_digests=shared,
+                    runner=calls.append,
+                )
+
+            reviewed = {}
+            for variant in suite["variants"]:
+                for step in suite["steps"]:
+                    if not step["mutates"]:
+                        continue
+                    key = f"{variant['name']}:{step['id']}"
+                    reviewed[key] = (
+                        variant["resource_create_action"]["digest"]
+                        if step["id"] == "resource-create"
+                        else "a" * 64
+                    )
+            result = self.harness.run_suite(
+                suite,
+                execute=True,
+                confirmation=suite["execution_confirmation"],
+                reviewed_digests=reviewed,
+                runner=calls.append,
+            )
+
+        self.assertEqual("completed", result["status"])
+        resource_calls = [call for call in calls if call["id"] == "resource-create"]
+        self.assertEqual(2, len(resource_calls))
+        self.assertNotEqual(
+            resource_calls[0]["reviewed_plan_digest"],
+            resource_calls[1]["reviewed_plan_digest"],
+        )
+
+    def test_evidence_contract_rejects_incomplete_preflight_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            suite = self.harness.prepare_suite(
+                root,
+                owner="aegolius-labs",
+                run_id="preflight-contract-proof",
+                iteration_start="2026-09-07",
+                backend="gh",
+            )
+            for variant in suite["variants"]:
+                self._write_complete_evidence(root, suite, variant)
+            preflight_path = root / "native" / "evidence" / "preflight.json"
+            preflight_path.write_text(
+                json.dumps(
+                    {"passed": True, "backend": "gh", "redactions_confirmed": True}
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            report = self.harness.verify_evidence(root, suite)
+
+        self.assertFalse(report["passed"])
+        self.assertTrue(
+            any("authenticated_login" in value for value in report["failures"])
+        )
+        self.assertTrue(any("permission check" in value for value in report["failures"]))
+        self.assertTrue(any("capability" in value for value in report["failures"]))
+
     def test_cleanup_requires_distinct_exact_confirmation(self) -> None:
         calls: list[dict] = []
         with tempfile.TemporaryDirectory() as temporary:
@@ -397,6 +500,52 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertEqual("@current", expected["iterations"]["required_alias"])
         self.assertEqual("native", expected["issue_type_assertions"]["native"]["mode"])
         self.assertEqual("labels", expected["issue_type_assertions"]["labels"]["mode"])
+
+    def test_wave_c_capability_gap_covers_six_non_mutating_scenarios(self) -> None:
+        path = EVAL_ROOT / "capability-gap.wave-c-r02.json"
+        raw = path.read_text(encoding="utf-8")
+        audit = json.loads(raw)
+
+        self.assertTrue(audit["redactions_confirmed"])
+        self.assertFalse(audit["mutation_attempted"])
+        self.assertFalse(audit["credentials_recorded"])
+        self.assertEqual(6, len(audit["scenarios"]))
+        self.assertEqual(
+            {
+                (backend, variant)
+                for backend in ("gh", "api", "mcp")
+                for variant in ("native", "labels")
+            },
+            {
+                (scenario["backend"], scenario["variant"])
+                for scenario in audit["scenarios"]
+            },
+        )
+        self.assertTrue(
+            all(not scenario["preflight_passed"] for scenario in audit["scenarios"])
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            generated = {}
+            for backend in ("gh", "api", "mcp"):
+                suite = self.harness.prepare_suite(
+                    Path(temporary) / backend,
+                    owner=audit["owner"],
+                    run_id=f"wave-c-r02-20260827-{backend}",
+                    iteration_start="2026-09-07",
+                    backend=backend,
+                )
+                for variant in suite["variants"]:
+                    generated[(backend, variant["name"])] = variant
+            for scenario in audit["scenarios"]:
+                variant = generated[(scenario["backend"], scenario["variant"])]
+                self.assertEqual(scenario["repository"], variant["repository"])
+                self.assertEqual(scenario["project_title"], variant["project_title"])
+                self.assertEqual(
+                    scenario["resource_create_digest"],
+                    variant["resource_create_action"]["digest"],
+                )
+        self.assertNotIn("authorization:", raw.lower())
+        self.assertNotIn("bearer ", raw.lower())
 
 
 if __name__ == "__main__":

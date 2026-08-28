@@ -25,6 +25,23 @@
     "plan_digest_matches": true,
     "journal_required": true
   },
+  "preflight_requirements": {
+    "identity": ["authenticated_login", "organization_login"],
+    "permission_checks": [
+      "repository_create_delete",
+      "project_create_delete_link"
+    ],
+    "capability_results": [
+      "approved_disposable_target",
+      "repository_absent",
+      "project_absent",
+      "fields_views_iterations",
+      "issues_labels",
+      "hierarchy_dependencies",
+      "rate_limit_sufficient"
+    ],
+    "native_variant_additional_capabilities": ["native_issue_types"]
+  },
   "redaction_requirements": [
     "Never capture GH_TOKEN, GITHUB_TOKEN, Authorization headers, cookies, or credential-helper output",
     "Record authenticated identity and permission results, not credential material",

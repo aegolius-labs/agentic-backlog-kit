@@ -249,6 +249,18 @@ def prepare_suite(
             project_snapshot=_seed_iteration_snapshot(iteration_start),
             as_of=iteration_start,
         )
+        resource_create_record = {
+            "operation": "resource.create",
+            "owner": owner,
+            "repository": names["repository"],
+            "project_title": names["project_title"],
+            "repository_visibility": "private",
+            "backend": backend,
+            "expected_result": {
+                "repository_created": True,
+                "project_created_by_bootstrap_plan": True,
+            },
+        }
         entry = {
             "name": mode,
             **names,
@@ -257,6 +269,10 @@ def prepare_suite(
             "expected_item_ids": [item["id"] for item in seed_manifest["items"]],
             "expected_priority_ids": ranking,
             "expected_sprint_ids": [item.id for item in sprint.items],
+            "resource_create_action": {
+                **resource_create_record,
+                "digest": _digest(resource_create_record),
+            },
         }
         variants.append(entry)
         variant_root = output_root / mode
@@ -352,20 +368,34 @@ def run_suite(
     if runner is None:
         raise EvaluationSafetyError("Execution requires an explicit backend runner")
     reviewed = dict(reviewed_digests or {})
-    for step in steps:
-        if not step.get("mutates"):
-            continue
-        plan_digest = reviewed.get(str(step.get("id")))
-        if not isinstance(plan_digest, str) or not HEX_DIGEST.fullmatch(plan_digest):
-            raise EvaluationSafetyError(
-                f"Mutating step {step.get('id')} requires its exact reviewed plan digest"
-            )
-        step["reviewed_plan_digest"] = plan_digest
-    completed = 0
+    executions: list[dict[str, Any]] = []
     for variant in suite.get("variants", []):
-        for step in steps:
-            runner({**step, "variant": variant.get("name")})
-            completed += 1
+        variant_name = str(variant.get("name"))
+        for source_step in steps:
+            step = copy.deepcopy(source_step)
+            step["variant"] = variant_name
+            if step.get("mutates"):
+                key = f"{variant_name}:{step.get('id')}"
+                plan_digest = reviewed.get(key)
+                if not isinstance(plan_digest, str) or not HEX_DIGEST.fullmatch(
+                    plan_digest
+                ):
+                    raise EvaluationSafetyError(
+                        f"Mutating step {key} requires its exact reviewed plan digest"
+                    )
+                if step.get("id") == "resource-create":
+                    action = variant.get("resource_create_action")
+                    if not isinstance(action, Mapping) or plan_digest != action.get("digest"):
+                        raise EvaluationSafetyError(
+                            f"Mutating step {key} requires its target-bound resource action digest"
+                        )
+                    step["resource_create_action"] = copy.deepcopy(dict(action))
+                step["reviewed_plan_digest"] = plan_digest
+            executions.append(step)
+    completed = 0
+    for step in executions:
+        runner(step)
+        completed += 1
     return {"status": "completed", "executed": completed}
 
 
@@ -418,6 +448,45 @@ def _actions_are_zero(plan: Mapping[str, Any]) -> bool:
     actions = plan.get("actions")
     count = plan.get("action_count")
     return (isinstance(actions, list) and not actions) or count == 0
+
+
+def _assert_preflight(
+    preflight: Mapping[str, Any],
+    suite: Mapping[str, Any],
+    variant: Mapping[str, Any],
+    failures: list[str],
+) -> None:
+    name = str(variant.get("name"))
+    if preflight.get("passed") is not True:
+        failures.append(f"{name}: preflight did not pass")
+    if preflight.get("backend") != suite.get("selected_backend"):
+        failures.append(f"{name}: preflight backend differs from the selected backend")
+    if preflight.get("redactions_confirmed") is not True:
+        failures.append(f"{name}: evidence redactions were not confirmed")
+    login = preflight.get("authenticated_login")
+    if not isinstance(login, str) or not login.strip():
+        failures.append(f"{name}: preflight lacks authenticated_login")
+    if preflight.get("organization_login") != suite.get("owner"):
+        failures.append(f"{name}: preflight organization_login differs from the suite")
+    permissions = preflight.get("permission_checks")
+    for check in ("repository_create_delete", "project_create_delete_link"):
+        if not isinstance(permissions, Mapping) or permissions.get(check) is not True:
+            failures.append(f"{name}: permission check {check} did not pass")
+    capabilities = preflight.get("capability_results")
+    required_capabilities = [
+        "approved_disposable_target",
+        "repository_absent",
+        "project_absent",
+        "fields_views_iterations",
+        "issues_labels",
+        "hierarchy_dependencies",
+        "rate_limit_sufficient",
+    ]
+    if variant.get("issue_type_mode") == "native":
+        required_capabilities.append("native_issue_types")
+    for capability in required_capabilities:
+        if not isinstance(capabilities, Mapping) or capabilities.get(capability) is not True:
+            failures.append(f"{name}: capability {capability} did not pass")
 
 
 def _field_name(value: Any) -> str | None:
@@ -681,12 +750,7 @@ def _verify_variant(
             failures.append(f"{name}: manifest issue type mode differs from the suite")
 
     preflight = _load_evidence(variant_root / "preflight.json", failures)
-    if preflight.get("passed") is not True:
-        failures.append(f"{name}: preflight did not pass")
-    if preflight.get("backend") != suite.get("selected_backend"):
-        failures.append(f"{name}: preflight backend differs from the selected backend")
-    if preflight.get("redactions_confirmed") is not True:
-        failures.append(f"{name}: evidence redactions were not confirmed")
+    _assert_preflight(preflight, suite, variant, failures)
 
     for stage in ("bootstrap", "scaffold", "sync"):
         plan = _load_evidence(variant_root / stage / "plan.json", failures)

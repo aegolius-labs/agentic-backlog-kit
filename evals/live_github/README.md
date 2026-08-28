@@ -46,6 +46,12 @@ yet represented by an ABK core plan needs a separately reviewed action record
 containing the exact owner, repository name, Project title, visibility, backend,
 and expected result.
 
+Reviewed mutation digests are variant-specific. An execution adapter must key
+them as `<variant>:<step-id>` (for example, `native:scaffold-apply`). The
+generated `resource_create_action.digest` is bound to the exact owner,
+repository, Project title, private visibility, backend, and expected result;
+an arbitrary digest or a digest reviewed for the other variant is rejected.
+
 ## 2. Preflight before any write
 
 Capture `<variant>/evidence/preflight.json` for both `native` and `labels`.

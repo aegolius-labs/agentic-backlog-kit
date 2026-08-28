@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-27",
+  "owner": "aegolius-labs",
+  "authenticated_login": "MustacheMushroom",
+  "redactions_confirmed": true,
+  "github_app_installation": {
+    "account_login": "aegolius-labs",
+    "account_type": "Organization",
+    "events_include": ["issues", "repository", "sub_issues"]
+  },
+  "local_capabilities": {
+    "gh_cli_present": false,
+    "gh_token_present": false,
+    "github_token_present": false
+  },
+  "mcp_exposed_capabilities": {
+    "repository_read": true,
+    "repository_create_delete": false,
+    "issues_labels": true,
+    "projects_read_write": false,
+    "fields_views_iterations": false,
+    "hierarchy_dependencies": false,
+    "native_issue_types": false,
+    "rate_limit": false
+  },
+  "canonical_release_repository": {
+    "name": "aegolius-labs/agentic-backlog-kit",
+    "absent": true
+  },
+  "scenarios": [
+    {
+      "backend": "gh",
+      "variant": "native",
+      "repository": "abk-eval-wave-c-r02-20260827-gh-26c954aa-native",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [native]",
+      "project_absence_verified": false,
+      "resource_create_digest": "b2b448ab9d0d0aec77421fce7a5452cde16eb50a0230ec2decdb52bcdc5847fa",
+      "preflight_passed": false,
+      "blockers": ["gh CLI unavailable", "native issue types unverified"]
+    },
+    {
+      "backend": "gh",
+      "variant": "labels",
+      "repository": "abk-eval-wave-c-r02-20260827-gh-26c954aa-labels",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [labels]",
+      "project_absence_verified": false,
+      "resource_create_digest": "0d9d663fdca2e44d82fd5fb3637f8544c166a9461b49197bb864a2c28b1d69d4",
+      "preflight_passed": false,
+      "blockers": ["gh CLI unavailable"]
+    },
+    {
+      "backend": "api",
+      "variant": "native",
+      "repository": "abk-eval-wave-c-r02-20260827-api-3f546dc6-native",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-api-3f546dc6 [native]",
+      "project_absence_verified": false,
+      "resource_create_digest": "f858097150e5dd170f28eae9489b4641b066fffb474b2efdfa820a47e63bdfec",
+      "preflight_passed": false,
+      "blockers": ["GH_TOKEN and GITHUB_TOKEN unavailable", "native issue types unverified"]
+    },
+    {
+      "backend": "api",
+      "variant": "labels",
+      "repository": "abk-eval-wave-c-r02-20260827-api-3f546dc6-labels",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-api-3f546dc6 [labels]",
+      "project_absence_verified": false,
+      "resource_create_digest": "a1b87fea598b3aa4ac3ace439b7f50a03d91098a99f6973e0d44cc86f959a3d4",
+      "preflight_passed": false,
+      "blockers": ["GH_TOKEN and GITHUB_TOKEN unavailable"]
+    },
+    {
+      "backend": "mcp",
+      "variant": "native",
+      "repository": "abk-eval-wave-c-r02-20260827-mcp-0f109b76-native",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-mcp-0f109b76 [native]",
+      "project_absence_verified": false,
+      "resource_create_digest": "246ad5ad28410cae65ef795e26fbf9940b264d9548fdbf1a5bbd7f1c036631f5",
+      "preflight_passed": false,
+      "blockers": [
+        "repository create/delete unavailable",
+        "Projects and complete views unavailable",
+        "fields and iterations unavailable",
+        "hierarchy and dependencies unavailable",
+        "native issue types unavailable",
+        "rate-limit probe unavailable"
+      ]
+    },
+    {
+      "backend": "mcp",
+      "variant": "labels",
+      "repository": "abk-eval-wave-c-r02-20260827-mcp-0f109b76-labels",
+      "repository_absent": true,
+      "project_title": "ABK Eval wave-c-r02-20260827-mcp-0f109b76 [labels]",
+      "project_absence_verified": false,
+      "resource_create_digest": "455e1ce729c4620dc1a73ae8e615b2ffe54235f29d921431e42292bd6302fd70",
+      "preflight_passed": false,
+      "blockers": [
+        "repository create/delete unavailable",
+        "Projects and complete views unavailable",
+        "fields and iterations unavailable",
+        "hierarchy and dependencies unavailable",
+        "rate-limit probe unavailable"
+      ]
+    }
+  ],
+  "mutation_attempted": false,
+  "credentials_recorded": false
+}
