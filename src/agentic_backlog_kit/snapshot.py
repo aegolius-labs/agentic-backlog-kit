@@ -4,6 +4,57 @@ from typing import Any
 
 from .github import GitHubApiError, GitHubTransport
 from .sync import extract_item_id
+from .views import normalize_project_views
+
+
+VIEW_GRAPHQL_FRAGMENT = """
+  id number name layout filter
+  configuration {
+    visibleFields(first: 100) {
+      nodes {
+        __typename
+        ... on ProjectV2Field { id fullDatabaseId name }
+        ... on ProjectV2SingleSelectField { id fullDatabaseId name }
+        ... on ProjectV2IterationField { id fullDatabaseId name }
+        ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+  groupByFields(first: 100) {
+    nodes {
+      __typename
+      ... on ProjectV2Field { id fullDatabaseId name }
+      ... on ProjectV2SingleSelectField { id fullDatabaseId name }
+      ... on ProjectV2IterationField { id fullDatabaseId name }
+      ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+  verticalGroupByFields(first: 100) {
+    nodes {
+      __typename
+      ... on ProjectV2Field { id fullDatabaseId name }
+      ... on ProjectV2SingleSelectField { id fullDatabaseId name }
+      ... on ProjectV2IterationField { id fullDatabaseId name }
+      ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+  sortByFields(first: 100) {
+    nodes {
+      direction
+      field {
+        __typename
+        ... on ProjectV2Field { id fullDatabaseId name }
+        ... on ProjectV2SingleSelectField { id fullDatabaseId name }
+        ... on ProjectV2IterationField { id fullDatabaseId name }
+        ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+"""
 
 
 def _scaffold_fields(project: dict[str, Any]) -> list[dict[str, Any]]:
@@ -17,18 +68,14 @@ def _scaffold_fields(project: dict[str, Any]) -> list[dict[str, Any]]:
                 "data_type": field["dataType"],
                 "options": field.get("options", []),
                 "id": field.get("id"),
-                "database_id": field.get("databaseId"),
+                "database_id": field.get("fullDatabaseId", field.get("databaseId")),
             }
         )
     return sorted(fields, key=lambda field: str(field["name"]))
 
 
 def _scaffold_views(project: dict[str, Any]) -> list[dict[str, Any]]:
-    return sorted([
-        {"name": view.get("name"), "layout": str(view.get("layout", "")).lower()}
-        for view in (project.get("views") or {}).get("nodes") or []
-        if view.get("name")
-    ], key=lambda view: str(view["name"]))
+    return normalize_project_views(project)
 
 
 class GitHubSnapshotReader:
@@ -283,21 +330,24 @@ class GitHubProjectDiscoveryReader:
             fields(first: 100) {
               nodes {
                 __typename
-                ... on ProjectV2Field { id databaseId name dataType }
+                ... on ProjectV2Field { id fullDatabaseId name dataType }
                 ... on ProjectV2SingleSelectField {
-                  id databaseId name dataType
+                  id fullDatabaseId name dataType
                   options { id name color description }
                 }
                 ... on ProjectV2IterationField {
-                  id databaseId name dataType
+                  id fullDatabaseId name dataType
                   configuration { duration startDay }
                 }
               }
             }
-            views(first: 100) { nodes { name layout } }
+            views(first: 100) {
+              nodes { %s }
+              pageInfo { hasNextPage endCursor }
+            }
           }
           pageInfo { hasNextPage endCursor }
-        """
+        """ % VIEW_GRAPHQL_FRAGMENT
 
     def read(self) -> dict[str, Any]:
         data = self.transport.graphql(
@@ -452,24 +502,25 @@ class GitHubScaffoldSnapshotReader:
                   fields(first: 100) {
                     nodes {
                       __typename
-                      ... on ProjectV2Field { id databaseId name dataType }
+                      ... on ProjectV2Field { id fullDatabaseId name dataType }
                       ... on ProjectV2SingleSelectField {
-                        id databaseId name dataType
+                        id fullDatabaseId name dataType
                         options { id name color description }
                       }
                       ... on ProjectV2IterationField {
-                        id databaseId name dataType
+                        id fullDatabaseId name dataType
                         configuration { duration startDay }
                       }
                     }
                   }
                   views(first: 100) {
-                    nodes { name layout }
+                    nodes { %s }
+                    pageInfo { hasNextPage endCursor }
                   }
                 }
               }
             }
-            """,
+            """ % VIEW_GRAPHQL_FRAGMENT,
             {"owner": self.owner, "number": self.project_number},
         )
         project = (data.get("organization") or {}).get("projectV2")

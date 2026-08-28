@@ -420,30 +420,88 @@ class GitHubService:
             "name": payload["name"],
             "layout": payload["layout"],
             "filter": payload.get("filter", ""),
+            "sort_by": [
+                [
+                    self._resolve_view_field(entry["field"], fields)["database_id"],
+                    str(entry["direction"]).lower(),
+                ]
+                for entry in payload.get("sort_by", [])
+            ],
+            "group_by": [
+                self._resolve_view_field(entry, fields)["database_id"]
+                for entry in payload.get("group_by", [])
+            ],
+            "vertical_group_by": [
+                self._resolve_view_field(entry, fields)["database_id"]
+                for entry in payload.get("vertical_group_by", [])
+            ],
         }
-        column_field = payload.get("column_field")
-        if column_field:
-            field = fields.get(column_field)
-            if not field or field.get("databaseId") is None:
-                raise GitHubApiError(
-                    422, f"Project field '{column_field}' has no REST database id"
-                )
-            request_payload["vertical_group_by"] = [int(field["databaseId"])]
-        sort_field = payload.get("sort_field")
-        if sort_field:
-            field = fields.get(sort_field)
-            if not field or field.get("databaseId") is None:
-                raise GitHubApiError(
-                    422, f"Project field '{sort_field}' has no REST database id"
-                )
-            request_payload["sort_by"] = [
-                [int(field["databaseId"]), payload.get("sort_direction", "asc")]
+        if payload["layout"] != "roadmap":
+            request_payload["visible_fields"] = [
+                self._resolve_view_field(entry, fields)["database_id"]
+                for entry in payload.get("visible_fields", [])
             ]
         self.transport.rest(
             "POST",
             f"/orgs/{self.owner}/projectsV2/{self.project_number}/views",
             request_payload,
         )
+
+    def update_project_view(self, payload: dict[str, Any]) -> None:
+        _, fields = self._load_project()
+        layout = str(payload["layout"]).lower()
+        input_payload: dict[str, Any] = {
+            "viewId": payload["view_id"],
+            "name": payload["name"],
+            "layout": f"{layout.upper()}_LAYOUT",
+            "filter": payload.get("filter", ""),
+        }
+        if layout != "roadmap":
+            input_payload["configuration"] = {
+                "visibleFieldIds": [
+                    self._resolve_view_field(entry, fields)["id"]
+                    for entry in payload.get("visible_fields", [])
+                ]
+            }
+        self.transport.graphql(
+            """
+            mutation UpdateView($input: UpdateProjectV2ViewInput!) {
+              updateProjectV2View(input: $input) {
+                projectV2View { id number name layout filter }
+              }
+            }
+            """,
+            {"input": input_payload},
+        )
+
+    @staticmethod
+    def _resolve_view_field(
+        reference: dict[str, Any], fields: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        if not isinstance(reference, dict) or not isinstance(reference.get("name"), str):
+            raise GitHubApiError(422, "Project view field reference is malformed")
+        name = reference["name"]
+        field = fields.get(name)
+        if not field or not field.get("id"):
+            raise GitHubApiError(422, f"Project field '{name}' has no GraphQL id")
+        database_id = field.get("fullDatabaseId", field.get("databaseId"))
+        try:
+            database_id = int(database_id)
+        except (TypeError, ValueError) as exc:
+            raise GitHubApiError(
+                422, f"Project field '{name}' has no REST database id"
+            ) from exc
+        expected_node_id = reference.get("id")
+        expected_database_id = reference.get("database_id")
+        if expected_node_id is not None and expected_node_id != field["id"]:
+            raise GitHubApiError(
+                409, f"Project field '{name}' GraphQL identity changed after review"
+            )
+        if expected_database_id is not None and int(expected_database_id) != database_id:
+            raise GitHubApiError(
+                409, f"Project field '{name}' REST identity changed after review"
+            )
+        return {"id": str(field["id"]), "database_id": database_id, "name": name}
 
     def add_project_item(self, issue: GitHubIssueRef, fields: dict[str, Any]) -> None:
         project_id, _ = self._load_project()
@@ -484,13 +542,13 @@ class GitHubService:
                   fields(first: 100) {
                     nodes {
                       __typename
-                      ... on ProjectV2Field { id databaseId name dataType }
+                      ... on ProjectV2Field { id fullDatabaseId name dataType }
                       ... on ProjectV2SingleSelectField {
-                        id databaseId name dataType
+                        id fullDatabaseId name dataType
                         options { id name color description }
                       }
                       ... on ProjectV2IterationField {
-                        id databaseId name dataType
+                        id fullDatabaseId name dataType
                         configuration {
                           iterations { id title }
                           completedIterations { id title }
@@ -698,5 +756,7 @@ class GitHubScaffoldExecutor:
             self.service.create_label(action.payload)
         elif action.kind == "project.view.create":
             self.service.create_project_view(action.payload)
+        elif action.kind == "project.view.update":
+            self.service.update_project_view(action.payload)
         else:
             raise ManifestError(f"Unsupported scaffold action kind '{action.kind}'")

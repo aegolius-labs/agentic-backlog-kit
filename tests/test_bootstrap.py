@@ -194,6 +194,9 @@ class FakeBootstrapService:
     def create_project_view(self, payload: dict) -> None:
         self._record("project.view.create", payload)
 
+    def update_project_view(self, payload: dict) -> None:
+        self._record("project.view.update", payload)
+
 
 if __name__ == "__main__":
     unittest.main()

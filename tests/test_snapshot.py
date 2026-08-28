@@ -3,7 +3,11 @@ from __future__ import annotations
 import unittest
 
 from agentic_backlog_kit.github import GitHubApiError
-from agentic_backlog_kit.snapshot import GitHubProjectDiscoveryReader, GitHubSnapshotReader
+from agentic_backlog_kit.snapshot import (
+    GitHubProjectDiscoveryReader,
+    GitHubScaffoldSnapshotReader,
+    GitHubSnapshotReader,
+)
 
 
 class RoutedTransport:
@@ -144,6 +148,77 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         self.assertFalse(result["projects"][0]["linked"])
         self.assertTrue(result["projects"][1]["linked"])
         self.assertEqual("ORG_1", result["organization"]["id"])
+
+
+class ScaffoldSnapshotReaderTests(unittest.TestCase):
+    def test_reads_complete_view_configuration_with_field_identities(self) -> None:
+        transport = RoutedTransport()
+        status = {
+            "id": "FIELD_STATUS",
+            "fullDatabaseId": "101",
+            "name": "Status",
+        }
+        priority = {
+            "id": "FIELD_PRIORITY",
+            "fullDatabaseId": "102",
+            "name": "Priority",
+        }
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "fields": {"nodes": []},
+                        "views": {
+                            "nodes": [
+                                {
+                                    "id": "VIEW_BACKLOG",
+                                    "number": 1,
+                                    "name": "Backlog",
+                                    "layout": "TABLE_LAYOUT",
+                                    "filter": "is:issue",
+                                    "configuration": {
+                                        "visibleFields": {
+                                            "nodes": [status, priority],
+                                            "pageInfo": {"hasNextPage": False},
+                                        }
+                                    },
+                                    "groupByFields": {
+                                        "nodes": [],
+                                        "pageInfo": {"hasNextPage": False},
+                                    },
+                                    "verticalGroupByFields": {
+                                        "nodes": [],
+                                        "pageInfo": {"hasNextPage": False},
+                                    },
+                                    "sortByFields": {
+                                        "nodes": [
+                                            {"field": priority, "direction": "DESC"}
+                                        ],
+                                        "pageInfo": {"hasNextPage": False},
+                                    },
+                                }
+                            ]
+                        },
+                    }
+                }
+            }
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        snapshot = GitHubScaffoldSnapshotReader(
+            transport,
+            owner="aegolius-labs",
+            repository="example",
+            project_number=1,
+        ).read()
+
+        view = snapshot["views"][0]
+        self.assertEqual("VIEW_BACKLOG", view["id"])
+        self.assertEqual(["Status", "Priority"], [entry["name"] for entry in view["visible_fields"]])
+        self.assertEqual(102, view["sort_by"][0]["field"]["database_id"])
+        self.assertEqual("desc", view["sort_by"][0]["direction"])
 
 
 if __name__ == "__main__":

@@ -8,6 +8,12 @@ from typing import Any, Callable, Iterable
 
 from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
+from .views import (
+    canonicalize_view,
+    expected_view_specs,
+    resolve_view_spec,
+    semantic_view_configuration,
+)
 
 
 TYPE_LABELS = {
@@ -238,49 +244,63 @@ def build_scaffold_plan(
         if name not in label_names
     ]
 
-    expected_views = [
-        {
-            "name": "Backlog",
-            "layout": "table",
-            "filter": "is:issue",
-            "sort_field": "Priority",
-            "sort_direction": "desc",
-        },
-        {
-            "name": "Kanban",
-            "layout": "board",
-            "filter": "is:issue is:open",
-            "column_field": "Status",
-        },
-        {
-            "name": "Current Sprint",
-            "layout": "board",
-            "filter": f"{iteration['field']}:@current",
-            "column_field": "Status",
-        },
-        {
-            "name": "Roadmap",
-            "layout": "roadmap",
-            "filter": "is:issue -status:Done",
-        },
-    ]
-    views_by_name = {
-        view.get("name"): view
-        for view in project_snapshot.get("views", [])
-        if isinstance(view, dict) and view.get("name")
-    }
+    expected_views = expected_view_specs(iteration["field"])
+    views_by_name: dict[str, dict[str, Any]] = {}
+    for raw_view in project_snapshot.get("views", []):
+        current = canonicalize_view(raw_view)
+        if current["name"] in views_by_name:
+            raise ManifestError(
+                f"Project has multiple views named '{current['name']}'; "
+                "managed view selection is ambiguous"
+            )
+        views_by_name[current["name"]] = current
     view_actions: list[ScaffoldAction] = []
-    for expected in expected_views:
-        current = views_by_name.get(expected["name"])
+    for spec in expected_views:
+        current = views_by_name.get(spec["name"])
+        expected = resolve_view_spec(
+            spec, project_snapshot.get("fields", []), require_ids=False
+        )
         if current is None:
             view_actions.append(
                 ScaffoldAction("project.view.create", expected, {"view": None})
             )
             continue
-        if current.get("layout", "").lower() != expected["layout"]:
+
+        current_semantics = semantic_view_configuration(current)
+        expected_semantics = semantic_view_configuration(expected)
+        unsupported_drift = [
+            key
+            for key in ("group_by", "vertical_group_by", "sort_by")
+            if current_semantics[key] != expected_semantics[key]
+        ]
+        if unsupported_drift:
             raise ManifestError(
-                f"Project view '{expected['name']}' has layout {current.get('layout')}; "
-                f"expected {expected['layout']}"
+                f"Project view '{expected['name']}' has unsupported configuration drift "
+                f"in {', '.join(unsupported_drift)}; it cannot update grouping or sorting "
+                "safely with the current GitHub API. Repair the view in GitHub, refresh, "
+                "and re-plan"
+            )
+
+        supported_keys = ["layout", "filter"]
+        # GitHub documents visible fields as inapplicable to roadmap views.
+        if expected_semantics["layout"] != "roadmap":
+            supported_keys.append("visible_fields")
+        supported_drift = any(
+            current_semantics[key] != expected_semantics[key]
+            for key in supported_keys
+        )
+        if supported_drift:
+            if not current.get("id"):
+                raise ManifestError(
+                    f"Project view '{expected['name']}' has no GraphQL id; "
+                    "cannot safely update its configuration"
+                )
+            view_actions.append(
+                ScaffoldAction(
+                    "project.view.update",
+                    {"view_id": current["id"], **expected},
+                    {"view": current},
+                )
             )
 
     actions = field_actions + label_actions + view_actions

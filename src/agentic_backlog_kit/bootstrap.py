@@ -328,6 +328,8 @@ class BootstrapExecutor:
             self.service.create_label(action.payload)
         elif action.kind == "project.view.create":
             self.service.create_project_view(action.payload)
+        elif action.kind == "project.view.update":
+            self.service.update_project_view(action.payload)
         else:
             raise ManifestError(f"Unsupported bootstrap action kind '{action.kind}'")
 

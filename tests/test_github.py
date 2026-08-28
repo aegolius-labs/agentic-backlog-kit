@@ -221,6 +221,157 @@ class GitHubServiceTests(unittest.TestCase):
         self.assertEqual("FIELD_STATUS", query_call[1]["input"]["fieldId"])
         self.assertEqual("todo-id", query_call[1]["input"]["singleSelectOptions"][0]["id"])
 
+    def test_create_view_resolves_database_ids_and_preserves_ordered_sort(self) -> None:
+        self.transport.responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "id": "PROJECT_1",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_STATUS",
+                                    "fullDatabaseId": "101",
+                                    "name": "Status",
+                                    "dataType": "SINGLE_SELECT",
+                                    "options": [],
+                                },
+                                {
+                                    "id": "FIELD_PRIORITY",
+                                    "fullDatabaseId": "102",
+                                    "name": "Priority",
+                                    "dataType": "NUMBER",
+                                },
+                            ]
+                        },
+                    }
+                }
+            },
+            {},
+        ]
+
+        self.service.create_project_view(
+            {
+                "name": "Kanban",
+                "layout": "board",
+                "filter": "is:issue is:open",
+                "visible_fields": [
+                    {"id": "FIELD_PRIORITY", "database_id": 102, "name": "Priority"}
+                ],
+                "group_by": [],
+                "vertical_group_by": [
+                    {"id": "FIELD_STATUS", "database_id": 101, "name": "Status"}
+                ],
+                "sort_by": [
+                    {
+                        "field": {
+                            "id": "FIELD_PRIORITY",
+                            "database_id": 102,
+                            "name": "Priority",
+                        },
+                        "direction": "desc",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            {
+                "name": "Kanban",
+                "layout": "board",
+                "filter": "is:issue is:open",
+                "visible_fields": [102],
+                "sort_by": [[102, "desc"]],
+                "group_by": [],
+                "vertical_group_by": [101],
+            },
+            self.transport.calls[1][2],
+        )
+
+    def test_update_view_uses_graphql_for_supported_complete_configuration(self) -> None:
+        self.transport.responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "id": "PROJECT_1",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_PRIORITY",
+                                    "fullDatabaseId": "102",
+                                    "name": "Priority",
+                                    "dataType": "NUMBER",
+                                }
+                            ]
+                        },
+                    }
+                }
+            },
+            {},
+        ]
+
+        GitHubScaffoldExecutor(self.service)(
+            ScaffoldAction(
+                "project.view.update",
+                {
+                    "view_id": "VIEW_BACKLOG",
+                    "name": "Backlog",
+                    "layout": "table",
+                    "filter": "is:issue",
+                    "visible_fields": [
+                        {
+                            "id": "FIELD_PRIORITY",
+                            "database_id": 102,
+                            "name": "Priority",
+                        }
+                    ],
+                    "group_by": [],
+                    "vertical_group_by": [],
+                    "sort_by": [],
+                },
+            )
+        )
+
+        self.assertEqual(
+            {
+                "viewId": "VIEW_BACKLOG",
+                "name": "Backlog",
+                "layout": "TABLE_LAYOUT",
+                "filter": "is:issue",
+                "configuration": {"visibleFieldIds": ["FIELD_PRIORITY"]},
+            },
+            self.transport.calls[1][1]["input"],
+        )
+
+    def test_roadmap_creation_omits_inapplicable_visible_fields(self) -> None:
+        self.transport.responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "id": "PROJECT_1",
+                        "fields": {"nodes": []},
+                    }
+                }
+            },
+            {},
+        ]
+
+        self.service.create_project_view(
+            {
+                "name": "Roadmap",
+                "layout": "roadmap",
+                "filter": "is:issue -status:Done",
+                "visible_fields": [],
+                "group_by": [],
+                "vertical_group_by": [],
+                "sort_by": [],
+            }
+        )
+
+        request = self.transport.calls[1][2]
+        self.assertNotIn("visible_fields", request)
+        self.assertEqual("roadmap", request["layout"])
+
     def test_creates_linked_organization_project_and_captures_identity(self) -> None:
         self.transport.responses = [
             {
