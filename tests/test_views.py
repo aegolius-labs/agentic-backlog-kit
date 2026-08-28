@@ -13,7 +13,7 @@ from agentic_backlog_kit.views import (
 def field(name: str, number: int) -> dict:
     return {
         "id": f"FIELD_{number}",
-        "fullDatabaseId": str(1000 + number),
+        "databaseId": str(1000 + number),
         "name": name,
     }
 

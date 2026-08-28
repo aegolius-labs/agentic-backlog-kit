@@ -37,9 +37,7 @@ def normalize_field_reference(raw: Any) -> dict[str, Any]:
     node_id = raw.get("id")
     database_id = raw.get("database_id")
     if database_id is None:
-        database_id = raw.get("fullDatabaseId")
-    if database_id is None:
-        database_id = raw.get("databaseId")
+        database_id = raw.get("databaseId", raw.get("fullDatabaseId"))
     if not isinstance(name, str) or not name.strip():
         raise ManifestError("Project view field reference has no name")
     if not isinstance(node_id, str) or not node_id:

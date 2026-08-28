@@ -14,10 +14,10 @@ VIEW_GRAPHQL_FRAGMENT = """
     visibleFields(first: 100) {
       nodes {
         __typename
-        ... on ProjectV2Field { id fullDatabaseId name }
-        ... on ProjectV2SingleSelectField { id fullDatabaseId name }
-        ... on ProjectV2IterationField { id fullDatabaseId name }
-        ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+        ... on ProjectV2Field { id databaseId name }
+        ... on ProjectV2SingleSelectField { id databaseId name }
+        ... on ProjectV2IterationField { id databaseId name }
+        ... on ProjectV2MultiSelectField { id databaseId name }
       }
       pageInfo { hasNextPage endCursor }
     }
@@ -25,20 +25,20 @@ VIEW_GRAPHQL_FRAGMENT = """
   groupByFields(first: 100) {
     nodes {
       __typename
-      ... on ProjectV2Field { id fullDatabaseId name }
-      ... on ProjectV2SingleSelectField { id fullDatabaseId name }
-      ... on ProjectV2IterationField { id fullDatabaseId name }
-      ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+      ... on ProjectV2Field { id databaseId name }
+      ... on ProjectV2SingleSelectField { id databaseId name }
+      ... on ProjectV2IterationField { id databaseId name }
+      ... on ProjectV2MultiSelectField { id databaseId name }
     }
     pageInfo { hasNextPage endCursor }
   }
   verticalGroupByFields(first: 100) {
     nodes {
       __typename
-      ... on ProjectV2Field { id fullDatabaseId name }
-      ... on ProjectV2SingleSelectField { id fullDatabaseId name }
-      ... on ProjectV2IterationField { id fullDatabaseId name }
-      ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+      ... on ProjectV2Field { id databaseId name }
+      ... on ProjectV2SingleSelectField { id databaseId name }
+      ... on ProjectV2IterationField { id databaseId name }
+      ... on ProjectV2MultiSelectField { id databaseId name }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -47,10 +47,10 @@ VIEW_GRAPHQL_FRAGMENT = """
       direction
       field {
         __typename
-        ... on ProjectV2Field { id fullDatabaseId name }
-        ... on ProjectV2SingleSelectField { id fullDatabaseId name }
-        ... on ProjectV2IterationField { id fullDatabaseId name }
-        ... on ProjectV2MultiSelectField { id fullDatabaseId name }
+        ... on ProjectV2Field { id databaseId name }
+        ... on ProjectV2SingleSelectField { id databaseId name }
+        ... on ProjectV2IterationField { id databaseId name }
+        ... on ProjectV2MultiSelectField { id databaseId name }
       }
     }
     pageInfo { hasNextPage endCursor }
@@ -72,7 +72,7 @@ def _scaffold_fields(project: dict[str, Any]) -> list[dict[str, Any]]:
                 "data_type": field["dataType"],
                 "options": field.get("options", []),
                 "id": field.get("id"),
-                "database_id": field.get("fullDatabaseId", field.get("databaseId")),
+                "database_id": field.get("databaseId", field.get("fullDatabaseId")),
             }
         )
     return sorted(fields, key=lambda field: str(field["name"]))
@@ -334,13 +334,13 @@ class GitHubProjectDiscoveryReader:
             fields(first: 100) {
               nodes {
                 __typename
-                ... on ProjectV2Field { id fullDatabaseId name dataType }
+                ... on ProjectV2Field { id databaseId name dataType }
                 ... on ProjectV2SingleSelectField {
-                  id fullDatabaseId name dataType
+                  id databaseId name dataType
                   options { id name color description }
                 }
                 ... on ProjectV2IterationField {
-                  id fullDatabaseId name dataType
+                  id databaseId name dataType
                   configuration {
                     duration startDay
                     iterations { id title startDate duration }
@@ -510,13 +510,13 @@ class GitHubScaffoldSnapshotReader:
                   fields(first: 100) {
                     nodes {
                       __typename
-                      ... on ProjectV2Field { id fullDatabaseId name dataType }
+                      ... on ProjectV2Field { id databaseId name dataType }
                       ... on ProjectV2SingleSelectField {
-                        id fullDatabaseId name dataType
+                        id databaseId name dataType
                         options { id name color description }
                       }
                       ... on ProjectV2IterationField {
-                        id fullDatabaseId name dataType
+                        id databaseId name dataType
                         configuration {
                           duration startDay
                           iterations { id title startDate duration }

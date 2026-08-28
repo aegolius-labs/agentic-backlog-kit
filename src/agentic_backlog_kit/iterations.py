@@ -185,9 +185,9 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
         start = min(item["start_date"] for item in known)
     start_value = _parse_date(start, f"Project iteration field '{name}' start_date")
 
-    database_id = raw_field.get(
-        "database_id", raw_field.get("fullDatabaseId", raw_field.get("databaseId"))
-    )
+    database_id = raw_field.get("database_id")
+    if database_id is None:
+        database_id = raw_field.get("databaseId", raw_field.get("fullDatabaseId"))
     if database_id is not None:
         try:
             database_id = int(database_id)

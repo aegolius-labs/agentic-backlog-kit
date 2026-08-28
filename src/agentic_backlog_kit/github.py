@@ -555,7 +555,7 @@ class GitHubService:
         field = fields.get(name)
         if not field or not field.get("id"):
             raise GitHubApiError(422, f"Project field '{name}' has no GraphQL id")
-        database_id = field.get("fullDatabaseId", field.get("databaseId"))
+        database_id = field.get("databaseId", field.get("fullDatabaseId"))
         try:
             database_id = int(database_id)
         except (TypeError, ValueError) as exc:
@@ -613,13 +613,13 @@ class GitHubService:
                   fields(first: 100) {
                     nodes {
                       __typename
-                      ... on ProjectV2Field { id fullDatabaseId name dataType }
+                      ... on ProjectV2Field { id databaseId name dataType }
                       ... on ProjectV2SingleSelectField {
-                        id fullDatabaseId name dataType
+                        id databaseId name dataType
                         options { id name color description }
                       }
                       ... on ProjectV2IterationField {
-                        id fullDatabaseId name dataType
+                        id databaseId name dataType
                         configuration {
                           duration startDay
                           iterations { id title startDate duration }

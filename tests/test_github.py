@@ -51,6 +51,7 @@ class FakeService:
 class FakeTransport:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
+        self.graphql_queries: list[str] = []
         self.responses: list[object] = []
 
     def rest(self, method: str, path: str, payload: dict | None = None):
@@ -61,6 +62,7 @@ class FakeTransport:
         return response
 
     def graphql(self, query: str, variables: dict):
+        self.graphql_queries.append(query)
         self.calls.append(("GRAPHQL", variables))
         response = self.responses.pop(0) if self.responses else {}
         if isinstance(response, Exception):
@@ -270,14 +272,14 @@ class GitHubServiceTests(unittest.TestCase):
                             "nodes": [
                                 {
                                     "id": "FIELD_STATUS",
-                                    "fullDatabaseId": "101",
+                                    "databaseId": "101",
                                     "name": "Status",
                                     "dataType": "SINGLE_SELECT",
                                     "options": [],
                                 },
                                 {
                                     "id": "FIELD_PRIORITY",
-                                    "fullDatabaseId": "102",
+                                    "databaseId": "102",
                                     "name": "Priority",
                                     "dataType": "NUMBER",
                                 },
@@ -326,6 +328,8 @@ class GitHubServiceTests(unittest.TestCase):
             },
             self.transport.calls[1][2],
         )
+        self.assertIn("databaseId", self.transport.graphql_queries[0])
+        self.assertNotIn("fullDatabaseId", self.transport.graphql_queries[0])
 
     def test_update_view_uses_graphql_for_supported_complete_configuration(self) -> None:
         self.transport.responses = [
@@ -337,7 +341,7 @@ class GitHubServiceTests(unittest.TestCase):
                             "nodes": [
                                 {
                                     "id": "FIELD_PRIORITY",
-                                    "fullDatabaseId": "102",
+                                    "databaseId": "102",
                                     "name": "Priority",
                                     "dataType": "NUMBER",
                                 }

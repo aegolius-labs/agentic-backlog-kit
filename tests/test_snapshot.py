@@ -14,6 +14,7 @@ class RoutedTransport:
     def __init__(self) -> None:
         self.rest_responses: dict[tuple[str, str], object] = {}
         self.graphql_responses: list[dict] = []
+        self.graphql_calls: list[tuple[str, dict]] = []
 
     def rest(self, method: str, path: str, payload=None):
         response = self.rest_responses[(method, path)]
@@ -22,6 +23,7 @@ class RoutedTransport:
         return response
 
     def graphql(self, query: str, variables: dict):
+        self.graphql_calls.append((query, variables))
         return self.graphql_responses.pop(0)
 
 
@@ -160,6 +162,8 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         field = result["projects"][0]["fields"][0]
         self.assertEqual("2026-08-17", field["iteration_configuration"]["start_date"])
         self.assertEqual("ITER_10", field["iteration_configuration"]["iterations"][0]["id"])
+        self.assertIn("databaseId", transport.graphql_calls[0][0])
+        self.assertNotIn("fullDatabaseId", transport.graphql_calls[0][0])
 
     def test_reads_sorted_projects_and_marks_repository_links(self) -> None:
         transport = RoutedTransport()
@@ -219,12 +223,12 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         status = {
             "id": "FIELD_STATUS",
-            "fullDatabaseId": "101",
+            "databaseId": "101",
             "name": "Status",
         }
         priority = {
             "id": "FIELD_PRIORITY",
-            "fullDatabaseId": "102",
+            "databaseId": "102",
             "name": "Priority",
         }
         transport.graphql_responses = [
@@ -235,7 +239,7 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
                             "nodes": [
                                 {
                                     "id": "FIELD_SPRINT",
-                                    "fullDatabaseId": "103",
+                                    "databaseId": "103",
                                     "name": "Sprint",
                                     "dataType": "ITERATION",
                                     "configuration": {
@@ -311,6 +315,8 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
             "ITER_1",
             iteration_field["iteration_configuration"]["iterations"][0]["id"],
         )
+        self.assertIn("databaseId", transport.graphql_calls[0][0])
+        self.assertNotIn("fullDatabaseId", transport.graphql_calls[0][0])
 
 
 if __name__ == "__main__":
