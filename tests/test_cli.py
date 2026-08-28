@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from agentic_backlog_kit.bootstrap import build_bootstrap_plan
 from agentic_backlog_kit.cli import main
 from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.sync import build_sync_plan
@@ -16,6 +17,87 @@ from tests.helpers import item, manifest
 
 
 class CliTests(unittest.TestCase):
+    def test_init_apply_captures_created_number_and_emits_fresh_scaffold_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan_path = root / "bootstrap-plan.json"
+            manifest_path = root / "manifest.json"
+            scaffold_path = root / "scaffold-plan.json"
+            plan = build_bootstrap_plan(
+                "aegolius-labs",
+                "example",
+                {
+                    "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+                    "repository": {"name": "example", "id": "REPO_1"},
+                    "projects": [],
+                    "labels": [],
+                },
+            )
+            plan_path.write_text(json.dumps(plan.as_dict()), encoding="utf-8")
+            transport = InitApplyTransport()
+
+            with patch("agentic_backlog_kit.cli._transport", return_value=transport):
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(
+                        0,
+                        main(
+                            [
+                                "init-apply",
+                                "--manifest",
+                                str(manifest_path),
+                                "--plan",
+                                str(plan_path),
+                                "--confirm",
+                                plan.digest,
+                                "--scaffold-plan",
+                                str(scaffold_path),
+                            ]
+                        ),
+                    )
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            scaffold = json.loads(scaffold_path.read_text(encoding="utf-8"))
+            self.assertEqual(11, manifest["github"]["project_number"])
+            self.assertGreater(scaffold["action_count"], 0)
+
+    def test_init_plan_can_start_with_owner_and_repository_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot_path = Path(directory) / "discovery.json"
+            plan_path = Path(directory) / "bootstrap-plan.json"
+            snapshot_path.write_text(
+                json.dumps(
+                    {
+                        "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+                        "repository": {"name": "example", "id": "REPO_1"},
+                        "projects": [],
+                        "labels": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    0,
+                    main(
+                        [
+                            "init-plan",
+                            "--owner",
+                            "aegolius-labs",
+                            "--repository",
+                            "example",
+                            "--snapshot",
+                            str(snapshot_path),
+                            "--output",
+                            str(plan_path),
+                        ]
+                    ),
+                )
+
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            self.assertEqual("project.create", plan["actions"][0]["kind"])
+            self.assertEqual("example", plan["actions"][0]["payload"]["title"])
+
     def test_init_validate_and_prioritize_are_local_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manifest_path = Path(directory) / "manifest.json"
@@ -195,6 +277,36 @@ class CliTests(unittest.TestCase):
             self.assertEqual(
                 "completed", json.loads(receipt_path.read_text())["status"]
             )
+
+
+class InitApplyTransport:
+    def __init__(self) -> None:
+        self.graphql_count = 0
+
+    def graphql(self, query: str, variables: dict):
+        self.graphql_count += 1
+        if self.graphql_count == 1:
+            return {
+                "createProjectV2": {
+                    "projectV2": {
+                        "id": "PROJECT_11",
+                        "number": 11,
+                        "title": "example",
+                        "url": "project-url",
+                    }
+                }
+            }
+        return {
+            "organization": {
+                "projectV2": {
+                    "fields": {"nodes": []},
+                    "views": {"nodes": []},
+                }
+            }
+        }
+
+    def rest(self, method: str, path: str, payload=None):
+        return []
 
 
 if __name__ == "__main__":

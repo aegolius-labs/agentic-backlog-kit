@@ -10,7 +10,7 @@ The kit combines focused skills with a zero-runtime-dependency Python engine. Ag
 - Native GitHub issue dependencies for blocking relationships.
 - Impact, Effort, Business Value, Enabler Value, and recursive dependency scoring.
 - Dependency-safe, capacity-aware sprint planning.
-- Project scaffolding for Status, Sprint, scoring fields, fallback type labels, and four views: Backlog, Kanban, Current Sprint, and Roadmap.
+- Organization Project discovery/creation plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four views: Backlog, Kanban, Current Sprint, and Roadmap.
 - GitHub MCP-first agent workflows with authenticated GitHub CLI and direct API fallbacks.
 - Dry-run planning by default and digest-confirmed apply operations.
 - Compact per-item ingestion and optimistic, atomic manifest updates.
@@ -23,14 +23,20 @@ This repository is the plugin source. Add it to a local marketplace, install it 
 
 ## Quick start
 
-Create the tracked configuration and empty item manifest:
+Discover a matching organization Project or preview creation from only the organization and repository:
 
 ```powershell
-python scripts/backlog.py init `
+python scripts/backlog.py init-plan `
   --owner aegolius-labs `
   --repository your-repository `
-  --project-number 1
+  --output .agentic-backlog/cache/bootstrap-plan.json
+python scripts/backlog.py init-apply `
+  --plan .agentic-backlog/cache/bootstrap-plan.json `
+  --confirm <reviewed-digest> `
+  --scaffold-plan .agentic-backlog/cache/scaffold-plan.json
 ```
+
+Add `--project-title TITLE` or `--project-number N` to select explicitly. Ambiguous exact matches stop without mutation. `init-apply` records the resulting Project number in the manifest and refreshes GitHub before proposing scaffold changes. If a known Project number already exists, the legacy local-only `init` command remains available.
 
 Validate and inspect it without contacting GitHub:
 

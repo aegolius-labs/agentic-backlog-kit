@@ -221,6 +221,49 @@ class GitHubServiceTests(unittest.TestCase):
         self.assertEqual("FIELD_STATUS", query_call[1]["input"]["fieldId"])
         self.assertEqual("todo-id", query_call[1]["input"]["singleSelectOptions"][0]["id"])
 
+    def test_creates_linked_organization_project_and_captures_identity(self) -> None:
+        self.transport.responses = [
+            {
+                "createProjectV2": {
+                    "projectV2": {
+                        "id": "PROJECT_9",
+                        "number": 9,
+                        "title": "Product backlog",
+                        "url": "https://github.com/orgs/aegolius-labs/projects/9",
+                    }
+                }
+            }
+        ]
+
+        identity = self.service.create_project(
+            {
+                "owner_id": "ORG_1",
+                "repository_id": "REPO_1",
+                "title": "Product backlog",
+            }
+        )
+
+        self.assertEqual(9, identity["number"])
+        self.assertEqual(9, self.service.project_number)
+        self.assertEqual(
+            {
+                "ownerId": "ORG_1",
+                "repositoryId": "REPO_1",
+                "title": "Product backlog",
+            },
+            self.transport.calls[0][1]["input"],
+        )
+
+    def test_links_selected_project_to_repository(self) -> None:
+        self.service.link_project_repository(
+            {"project_id": "PROJECT_9", "repository_id": "REPO_1"}
+        )
+
+        self.assertEqual(
+            {"projectId": "PROJECT_9", "repositoryId": "REPO_1"},
+            self.transport.calls[0][1]["input"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -181,6 +181,65 @@ class GitHubService:
     def repository_path(self) -> str:
         return f"/repos/{self.owner}/{self.repository}"
 
+    def use_project(self, identity: dict[str, Any]) -> None:
+        """Bind later mutations to an already reviewed Project identity."""
+
+        try:
+            number = int(identity["number"])
+            project_id = str(identity["id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ManifestError("Project identity is incomplete") from exc
+        if number < 1 or not project_id:
+            raise ManifestError("Project identity is incomplete")
+        self.project_number = number
+        self._project_id = project_id
+        self._project_fields = None
+        self._project_items = {}
+
+    def create_project(self, payload: dict[str, Any]) -> dict[str, Any]:
+        data = self.transport.graphql(
+            """
+            mutation CreateProject($input: CreateProjectV2Input!) {
+              createProjectV2(input: $input) {
+                projectV2 { id number title url }
+              }
+            }
+            """,
+            {
+                "input": {
+                    "ownerId": payload["owner_id"],
+                    "repositoryId": payload["repository_id"],
+                    "title": payload["title"],
+                }
+            },
+        )
+        project = (data.get("createProjectV2") or {}).get("projectV2")
+        if not isinstance(project, dict):
+            raise GitHubApiError(200, "Project creation did not return its identity")
+        identity = {
+            "id": str(project.get("id") or ""),
+            "number": project.get("number"),
+            "title": str(project.get("title") or ""),
+            "url": str(project.get("url") or ""),
+        }
+        self.use_project(identity)
+        return identity
+
+    def link_project_repository(self, payload: dict[str, Any]) -> None:
+        self.transport.graphql(
+            """
+            mutation LinkProjectRepository($input: LinkProjectV2ToRepositoryInput!) {
+              linkProjectV2ToRepository(input: $input) { repository { id } }
+            }
+            """,
+            {
+                "input": {
+                    "projectId": payload["project_id"],
+                    "repositoryId": payload["repository_id"],
+                }
+            },
+        )
+
     @staticmethod
     def _issue_ref(item_id: str, response: dict[str, Any]) -> GitHubIssueRef:
         try:

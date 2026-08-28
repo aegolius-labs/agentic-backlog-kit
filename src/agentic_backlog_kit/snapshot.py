@@ -6,6 +6,31 @@ from .github import GitHubApiError, GitHubTransport
 from .sync import extract_item_id
 
 
+def _scaffold_fields(project: dict[str, Any]) -> list[dict[str, Any]]:
+    fields = []
+    for field in (project.get("fields") or {}).get("nodes") or []:
+        if not field.get("name") or not field.get("dataType"):
+            continue
+        fields.append(
+            {
+                "name": field["name"],
+                "data_type": field["dataType"],
+                "options": field.get("options", []),
+                "id": field.get("id"),
+                "database_id": field.get("databaseId"),
+            }
+        )
+    return sorted(fields, key=lambda field: str(field["name"]))
+
+
+def _scaffold_views(project: dict[str, Any]) -> list[dict[str, Any]]:
+    return sorted([
+        {"name": view.get("name"), "layout": str(view.get("layout", "")).lower()}
+        for view in (project.get("views") or {}).get("nodes") or []
+        if view.get("name")
+    ], key=lambda view: str(view["name"]))
+
+
 class GitHubSnapshotReader:
     """Read only the managed GitHub state needed for deterministic reconciliation."""
 
@@ -225,6 +250,168 @@ class GitHubSnapshotReader:
         }
 
 
+class GitHubProjectDiscoveryReader:
+    """Discover organization Projects and the repository links needed for bootstrap."""
+
+    def __init__(
+        self, transport: GitHubTransport, *, owner: str, repository: str
+    ) -> None:
+        self.transport = transport
+        self.owner = owner
+        self.repository = repository
+
+    def _labels(self) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            batch = self.transport.rest(
+                "GET",
+                f"/repos/{self.owner}/{self.repository}/labels?per_page=100&page={page}",
+            )
+            if not isinstance(batch, list):
+                raise GitHubApiError(200, "List labels response was not an array")
+            result.extend(batch)
+            if len(batch) < 100:
+                return result
+            page += 1
+
+    @staticmethod
+    def _project_fragment() -> str:
+        return """
+          nodes {
+            id number title url closed
+            fields(first: 100) {
+              nodes {
+                __typename
+                ... on ProjectV2Field { id databaseId name dataType }
+                ... on ProjectV2SingleSelectField {
+                  id databaseId name dataType
+                  options { id name color description }
+                }
+                ... on ProjectV2IterationField {
+                  id databaseId name dataType
+                  configuration { duration startDay }
+                }
+              }
+            }
+            views(first: 100) { nodes { name layout } }
+          }
+          pageInfo { hasNextPage endCursor }
+        """
+
+    def read(self) -> dict[str, Any]:
+        data = self.transport.graphql(
+            f"""
+            query DiscoverProjects($owner: String!, $repository: String!) {{
+              organization(login: $owner) {{
+                id
+                projectsV2(first: 100, orderBy: {{field: NUMBER, direction: ASC}}) {{
+                  {self._project_fragment()}
+                }}
+              }}
+              repository(owner: $owner, name: $repository) {{
+                id name
+                projectsV2(first: 100) {{
+                  nodes {{ id }}
+                  pageInfo {{ hasNextPage endCursor }}
+                }}
+              }}
+            }}
+            """,
+            {"owner": self.owner, "repository": self.repository},
+        )
+        organization = data.get("organization")
+        repository = data.get("repository")
+        if not isinstance(organization, dict):
+            raise GitHubApiError(404, f"Organization '{self.owner}' was not found")
+        if not isinstance(repository, dict):
+            raise GitHubApiError(
+                404, f"Repository '{self.owner}/{self.repository}' was not found"
+            )
+
+        project_connection = organization.get("projectsV2") or {}
+        raw_projects = list(project_connection.get("nodes") or [])
+        cursor = (project_connection.get("pageInfo") or {}).get("endCursor")
+        while (project_connection.get("pageInfo") or {}).get("hasNextPage"):
+            page = self.transport.graphql(
+                f"""
+                query MoreProjects($owner: String!, $cursor: String!) {{
+                  organization(login: $owner) {{
+                    projectsV2(first: 100, after: $cursor,
+                      orderBy: {{field: NUMBER, direction: ASC}}) {{
+                      {self._project_fragment()}
+                    }}
+                  }}
+                }}
+                """,
+                {"owner": self.owner, "cursor": cursor},
+            )
+            project_connection = (
+                (page.get("organization") or {}).get("projectsV2") or {}
+            )
+            raw_projects.extend(project_connection.get("nodes") or [])
+            cursor = (project_connection.get("pageInfo") or {}).get("endCursor")
+
+        linked_connection = repository.get("projectsV2") or {}
+        linked_ids = {
+            str(node["id"])
+            for node in linked_connection.get("nodes") or []
+            if node.get("id")
+        }
+        cursor = (linked_connection.get("pageInfo") or {}).get("endCursor")
+        while (linked_connection.get("pageInfo") or {}).get("hasNextPage"):
+            page = self.transport.graphql(
+                """
+                query MoreLinkedProjects($owner: String!, $repository: String!, $cursor: String!) {
+                  repository(owner: $owner, name: $repository) {
+                    projectsV2(first: 100, after: $cursor) {
+                      nodes { id }
+                      pageInfo { hasNextPage endCursor }
+                    }
+                  }
+                }
+                """,
+                {
+                    "owner": self.owner,
+                    "repository": self.repository,
+                    "cursor": cursor,
+                },
+            )
+            linked_connection = (page.get("repository") or {}).get("projectsV2") or {}
+            linked_ids.update(
+                str(node["id"])
+                for node in linked_connection.get("nodes") or []
+                if node.get("id")
+            )
+            cursor = (linked_connection.get("pageInfo") or {}).get("endCursor")
+
+        projects = [
+            {
+                "id": str(project.get("id") or ""),
+                "number": project.get("number"),
+                "title": project.get("title"),
+                "url": project.get("url"),
+                "closed": bool(project.get("closed")),
+                "linked": str(project.get("id")) in linked_ids,
+                "fields": _scaffold_fields(project),
+                "views": _scaffold_views(project),
+            }
+            for project in raw_projects
+        ]
+        try:
+            projects.sort(key=lambda project: int(project["number"]))
+        except (TypeError, ValueError) as exc:
+            raise GitHubApiError(
+                200, "Project discovery returned invalid identity"
+            ) from exc
+        return {
+            "organization": {"login": self.owner, "id": organization.get("id")},
+            "repository": {"name": self.repository, "id": repository.get("id")},
+            "projects": projects,
+            "labels": self._labels(),
+        }
+
+
 class GitHubScaffoldSnapshotReader:
     """Read Project shape and repository labels for an idempotent scaffold plan."""
 
@@ -291,26 +478,8 @@ class GitHubScaffoldSnapshotReader:
                 404,
                 f"Organization project {self.owner}#{self.project_number} was not found",
             )
-        fields = []
-        for field in (project.get("fields") or {}).get("nodes") or []:
-            if not field.get("name") or not field.get("dataType"):
-                continue
-            fields.append(
-                {
-                    "name": field["name"],
-                    "data_type": field["dataType"],
-                    "options": field.get("options", []),
-                    "id": field.get("id"),
-                    "database_id": field.get("databaseId"),
-                }
-            )
-        views = [
-            {"name": view.get("name"), "layout": str(view.get("layout", "")).lower()}
-            for view in (project.get("views") or {}).get("nodes") or []
-            if view.get("name")
-        ]
         return {
-            "fields": sorted(fields, key=lambda field: str(field["name"])),
-            "views": sorted(views, key=lambda view: str(view["name"])),
+            "fields": _scaffold_fields(project),
+            "views": _scaffold_views(project),
             "labels": self._labels(),
         }

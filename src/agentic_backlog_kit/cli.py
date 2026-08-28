@@ -8,6 +8,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Sequence
 
+from .bootstrap import (
+    BootstrapExecutor,
+    apply_bootstrap_plan,
+    bootstrap_plan_from_dict,
+    build_bootstrap_plan,
+)
 from .github import (
     GitHubCliTransport,
     GitHubHttpTransport,
@@ -23,7 +29,11 @@ from .scaffold import (
     build_scaffold_plan,
     scaffold_plan_from_dict,
 )
-from .snapshot import GitHubScaffoldSnapshotReader, GitHubSnapshotReader
+from .snapshot import (
+    GitHubProjectDiscoveryReader,
+    GitHubScaffoldSnapshotReader,
+    GitHubSnapshotReader,
+)
 from .sprint import plan_sprint
 from .sync import apply_plan, build_sync_plan, sync_plan_from_dict
 
@@ -86,6 +96,27 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--repository", required=True)
     init.add_argument("--project-number", type=int, required=True)
     init.add_argument("--force", action="store_true")
+
+    init_plan = commands.add_parser(
+        "init-plan", help="Discover or preview creation of an organization Project"
+    )
+    init_plan.add_argument("--owner", required=True)
+    init_plan.add_argument("--repository", required=True)
+    init_plan.add_argument("--project-title")
+    init_plan.add_argument("--project-number", type=int)
+    init_plan.add_argument("--snapshot")
+    init_plan.add_argument("--output")
+    init_plan.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+
+    init_apply = commands.add_parser(
+        "init-apply", help="Apply one reviewed bootstrap plan and create the manifest"
+    )
+    init_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    init_apply.add_argument("--plan", required=True)
+    init_apply.add_argument("--confirm", required=True)
+    init_apply.add_argument("--scaffold-plan")
+    init_apply.add_argument("--force", action="store_true")
+    init_apply.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
 
     validate = commands.add_parser("validate", help="Validate without mutation")
     validate.add_argument("--manifest", default=DEFAULT_MANIFEST)
@@ -183,6 +214,87 @@ def main(argv: Sequence[str] | None = None) -> int:
         data = default_manifest(args.owner, args.repository, args.project_number)
         _write_json(path, data, force=args.force)
         _print_json({"manifest": str(path), "schema_version": data["schema_version"]})
+        return 0
+
+    if args.command == "init-plan":
+        if args.snapshot:
+            discovery = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+        else:
+            discovery = GitHubProjectDiscoveryReader(
+                _transport(args.backend),
+                owner=args.owner,
+                repository=args.repository,
+            ).read()
+        plan = build_bootstrap_plan(
+            args.owner,
+            args.repository,
+            discovery,
+            project_title=args.project_title,
+            project_number=args.project_number,
+        )
+        payload = plan.as_dict()
+        if args.output:
+            _write_json(Path(args.output), payload)
+            _print_json(
+                {
+                    "plan": args.output,
+                    "digest": plan.digest,
+                    "actions": len(plan.actions),
+                    "project": plan.project,
+                }
+            )
+        else:
+            _print_json(payload)
+        return 0
+
+    if args.command == "init-apply":
+        manifest_path = Path(args.manifest)
+        if manifest_path.exists() and not args.force:
+            raise FileExistsError(
+                f"Refusing to overwrite: {manifest_path} already exists"
+            )
+        raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+        plan = bootstrap_plan_from_dict(raw_plan)
+        transport = _transport(args.backend)
+        service = GitHubService(
+            transport,
+            owner=plan.owner,
+            repository=plan.repository,
+            project_number=plan.project["number"] if plan.project else 1,
+        )
+        result = apply_bootstrap_plan(
+            plan,
+            executor=BootstrapExecutor(service),
+            confirmation=args.confirm,
+        )
+        manifest = default_manifest(
+            plan.owner, plan.repository, result.project["number"]
+        )
+        _write_json(manifest_path, manifest, force=args.force)
+
+        # Creation returns identity, but GitHub may also create default fields/views.
+        # Refresh those before proposing the separately reviewed scaffold plan.
+        snapshot = GitHubScaffoldSnapshotReader(
+            transport,
+            owner=plan.owner,
+            repository=plan.repository,
+            project_number=result.project["number"],
+        ).read()
+        next_plan = build_scaffold_plan(manifest, snapshot)
+        next_payload = next_plan.as_dict()
+        if args.scaffold_plan:
+            _write_json(Path(args.scaffold_plan), next_payload)
+        _print_json(
+            {
+                "manifest": str(manifest_path),
+                "project": result.project,
+                "plan_digest": plan.digest,
+                "applied_actions": result.applied_actions,
+                "scaffold_plan": args.scaffold_plan,
+                "scaffold_digest": next_plan.digest,
+                "scaffold_actions": len(next_plan.actions),
+            }
+        )
         return 0
 
     manifest = load_manifest(args.manifest)

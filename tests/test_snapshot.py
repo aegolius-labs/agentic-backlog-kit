@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from agentic_backlog_kit.github import GitHubApiError
-from agentic_backlog_kit.snapshot import GitHubSnapshotReader
+from agentic_backlog_kit.snapshot import GitHubProjectDiscoveryReader, GitHubSnapshotReader
 
 
 class RoutedTransport:
@@ -90,6 +90,60 @@ class SnapshotReaderTests(unittest.TestCase):
         self.assertFalse(by_id["T-BASE"]["in_project"])
         self.assertEqual("Task", by_id["T-BASE"]["type"])
         self.assertEqual(["customer", "type:task"], by_id["T-BASE"]["labels"])
+
+
+class ProjectDiscoveryReaderTests(unittest.TestCase):
+    def test_reads_sorted_projects_and_marks_repository_links(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "id": "ORG_1",
+                    "projectsV2": {
+                        "nodes": [
+                            {
+                                "id": "PROJECT_7",
+                                "number": 7,
+                                "title": "Later",
+                                "url": "url-7",
+                                "closed": False,
+                                "fields": {"nodes": []},
+                                "views": {"nodes": []},
+                            },
+                            {
+                                "id": "PROJECT_2",
+                                "number": 2,
+                                "title": "First",
+                                "url": "url-2",
+                                "closed": False,
+                                "fields": {"nodes": []},
+                                "views": {"nodes": []},
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+                "repository": {
+                    "id": "REPO_1",
+                    "projectsV2": {
+                        "nodes": [{"id": "PROJECT_7"}],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            },
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        result = GitHubProjectDiscoveryReader(
+            transport, owner="aegolius-labs", repository="example"
+        ).read()
+
+        self.assertEqual([2, 7], [entry["number"] for entry in result["projects"]])
+        self.assertFalse(result["projects"][0]["linked"])
+        self.assertTrue(result["projects"][1]["linked"])
+        self.assertEqual("ORG_1", result["organization"]["id"])
 
 
 if __name__ == "__main__":
