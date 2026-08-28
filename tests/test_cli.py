@@ -23,6 +23,7 @@ class CliTests(unittest.TestCase):
             plan_path = root / "bootstrap-plan.json"
             manifest_path = root / "manifest.json"
             scaffold_path = root / "scaffold-plan.json"
+            receipt_path = root / "init-receipt.json"
             plan = build_bootstrap_plan(
                 "aegolius-labs",
                 "example",
@@ -51,14 +52,18 @@ class CliTests(unittest.TestCase):
                                 plan.digest,
                                 "--scaffold-plan",
                                 str(scaffold_path),
+                                "--receipt",
+                                str(receipt_path),
                             ]
                         ),
                     )
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             scaffold = json.loads(scaffold_path.read_text(encoding="utf-8"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             self.assertEqual(11, manifest["github"]["project_number"])
             self.assertGreater(scaffold["action_count"], 0)
+            self.assertEqual("completed", receipt["status"])
 
     def test_init_plan_can_start_with_owner_and_repository_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -285,7 +290,25 @@ class InitApplyTransport:
 
     def graphql(self, query: str, variables: dict):
         self.graphql_count += 1
-        if self.graphql_count == 1:
+        if "DiscoverProjects" in query:
+            return {
+                "organization": {
+                    "id": "ORG_1",
+                    "projectsV2": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+                "repository": {
+                    "id": "REPO_1",
+                    "name": "example",
+                    "projectsV2": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            }
+        if "CreateProject" in query:
             return {
                 "createProjectV2": {
                     "projectV2": {

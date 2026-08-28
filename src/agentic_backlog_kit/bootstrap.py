@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
+from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
 from .manifest import ManifestError, default_manifest
 from .scaffold import ScaffoldAction, build_scaffold_plan
 
@@ -17,15 +19,21 @@ class BootstrapAuthorizationError(PermissionError):
 class BootstrapPlan:
     owner: str
     repository: str
+    project_title: str | None
+    requested_project_number: int | None
     project: dict[str, Any] | None
     actions: list[ScaffoldAction]
+    snapshot_fingerprint: str
     digest: str
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "owner": self.owner,
             "repository": self.repository,
+            "project_title": self.project_title,
+            "requested_project_number": self.requested_project_number,
             "project": self.project,
+            "snapshot_fingerprint": self.snapshot_fingerprint,
             "digest": self.digest,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
@@ -36,20 +44,27 @@ class BootstrapPlan:
 class BootstrapResult:
     project: dict[str, Any]
     applied_actions: int
+    receipt: ApplyReceipt
 
 
 def _plan_digest(
     owner: str,
     repository: str,
+    project_title: str | None,
+    requested_project_number: int | None,
     project: dict[str, Any] | None,
     actions: list[ScaffoldAction],
+    snapshot_fingerprint: str,
 ) -> str:
     canonical = json.dumps(
         {
             "owner": owner,
             "repository": repository,
+            "project_title": project_title,
+            "requested_project_number": requested_project_number,
             "project": project,
             "actions": [action.as_dict() for action in actions],
+            "snapshot_fingerprint": snapshot_fingerprint,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -173,6 +188,7 @@ def build_bootstrap_plan(
                     "repository_id": str(repository_id),
                     "title": title,
                 },
+                {"project": None},
             )
         )
         project_identity = None
@@ -194,6 +210,7 @@ def build_bootstrap_plan(
                         "project_id": project_identity["id"],
                         "repository_id": str(repository_id),
                     },
+                    {"project": project_identity, "linked": False},
                 )
             )
         project_snapshot = {
@@ -207,8 +224,26 @@ def build_bootstrap_plan(
             default_manifest(owner, repository, manifest_number), project_snapshot
         )
         actions.extend(scaffold.actions)
-    digest = _plan_digest(owner, repository, project_identity, actions)
-    return BootstrapPlan(owner, repository, project_identity, actions, digest)
+    snapshot_fingerprint = state_fingerprint(discovery_snapshot)
+    digest = _plan_digest(
+        owner,
+        repository,
+        project_title,
+        project_number,
+        project_identity,
+        actions,
+        snapshot_fingerprint,
+    )
+    return BootstrapPlan(
+        owner,
+        repository,
+        project_title,
+        project_number,
+        project_identity,
+        actions,
+        snapshot_fingerprint,
+        digest,
+    )
 
 
 def bootstrap_plan_from_dict(data: dict[str, Any]) -> BootstrapPlan:
@@ -216,11 +251,21 @@ def bootstrap_plan_from_dict(data: dict[str, Any]) -> BootstrapPlan:
         raise ManifestError("Bootstrap plan must contain an actions array")
     owner = data.get("owner")
     repository = data.get("repository")
+    project_title = data.get("project_title")
+    requested_project_number = data.get("requested_project_number")
     project = data.get("project")
     if not isinstance(owner, str) or not isinstance(repository, str):
         raise ManifestError("Bootstrap plan must identify owner and repository")
     if project is not None and not isinstance(project, dict):
         raise ManifestError("Bootstrap plan project identity is malformed")
+    if project_title is not None and not isinstance(project_title, str):
+        raise ManifestError("Bootstrap plan Project title selector is malformed")
+    if requested_project_number is not None and (
+        not isinstance(requested_project_number, int)
+        or isinstance(requested_project_number, bool)
+        or requested_project_number < 1
+    ):
+        raise ManifestError("Bootstrap plan Project number selector is malformed")
     actions: list[ScaffoldAction] = []
     for index, raw in enumerate(data["actions"]):
         if (
@@ -229,13 +274,34 @@ def bootstrap_plan_from_dict(data: dict[str, Any]) -> BootstrapPlan:
             or not isinstance(raw.get("payload"), dict)
         ):
             raise ManifestError(f"Bootstrap action at index {index} is malformed")
-        actions.append(ScaffoldAction(raw["kind"], raw["payload"]))
+        precondition = raw.get("precondition")
+        if not isinstance(precondition, dict):
+            raise ManifestError(f"Bootstrap action at index {index} is malformed")
+        actions.append(ScaffoldAction(raw["kind"], raw["payload"], precondition))
     digest = data.get("digest")
+    snapshot_fingerprint = data.get("snapshot_fingerprint")
     if not isinstance(digest, str) or digest != _plan_digest(
-        owner, repository, project, actions
+        owner,
+        repository,
+        project_title,
+        requested_project_number,
+        project,
+        actions,
+        snapshot_fingerprint,
     ):
         raise ManifestError("Bootstrap plan digest does not match its contents")
-    return BootstrapPlan(owner, repository, project, actions, digest)
+    if not isinstance(snapshot_fingerprint, str):
+        raise ManifestError("Bootstrap plan snapshot fingerprint is malformed")
+    return BootstrapPlan(
+        owner,
+        repository,
+        project_title,
+        requested_project_number,
+        project,
+        actions,
+        snapshot_fingerprint,
+        digest,
+    )
 
 
 class BootstrapExecutor:
@@ -271,17 +337,103 @@ def apply_bootstrap_plan(
     *,
     executor: BootstrapExecutor,
     confirmation: str | None,
+    discovery_snapshot: dict[str, Any] | None = None,
+    journal: Journal | None = None,
 ) -> BootstrapResult:
     if not confirmation or confirmation != plan.digest:
         raise BootstrapAuthorizationError(
             "Bootstrap apply requires the exact reviewed plan digest"
         )
-    if plan.digest != _plan_digest(plan.owner, plan.repository, plan.project, plan.actions):
+    if plan.digest != _plan_digest(
+        plan.owner,
+        plan.repository,
+        plan.project_title,
+        plan.requested_project_number,
+        plan.project,
+        plan.actions,
+        plan.snapshot_fingerprint,
+    ):
         raise BootstrapAuthorizationError("Bootstrap plan changed after validation")
+    if discovery_snapshot is None:
+        raise BootstrapAuthorizationError(
+            "Bootstrap apply requires a freshly verified discovery snapshot"
+        )
+    fresh_plan = build_bootstrap_plan(
+        plan.owner,
+        plan.repository,
+        discovery_snapshot,
+        project_title=plan.project_title,
+        project_number=plan.requested_project_number,
+    )
+    if fresh_plan.digest != plan.digest:
+        raise BootstrapAuthorizationError(
+            "Remote Project state drifted after review; rebuild and reconfirm the plan"
+        )
+
+    inputs_fingerprint = state_fingerprint(
+        {
+            "owner": plan.owner,
+            "repository": plan.repository,
+            "project_title": plan.project_title,
+            "project_number": plan.requested_project_number,
+        }
+    )
+    started_at = datetime.now(UTC).isoformat()
+    completed: list[dict[str, Any]] = []
+    current = receipt(
+        plan.digest,
+        inputs_fingerprint,
+        plan.snapshot_fingerprint,
+        "running",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
     if plan.project is not None:
         executor.select(plan.project)
     for action in plan.actions:
-        executor(action)
+        try:
+            executor(action)
+        except Exception as exc:
+            current = receipt(
+                plan.digest,
+                inputs_fingerprint,
+                plan.snapshot_fingerprint,
+                "failed",
+                len(plan.actions),
+                completed,
+                started_at,
+                failed_action=action.as_dict(),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            if journal:
+                journal(current)
+            raise
+        completed.append(action.as_dict())
+        current = receipt(
+            plan.digest,
+            inputs_fingerprint,
+            plan.snapshot_fingerprint,
+            "running",
+            len(plan.actions),
+            completed,
+            started_at,
+        )
+        if journal:
+            journal(current)
     if executor.project is None:
         raise ManifestError("Bootstrap apply completed without a Project identity")
-    return BootstrapResult(executor.project, len(plan.actions))
+    current = receipt(
+        plan.digest,
+        inputs_fingerprint,
+        plan.snapshot_fingerprint,
+        "completed",
+        len(plan.actions),
+        completed,
+        started_at,
+    )
+    if journal:
+        journal(current)
+    return BootstrapResult(executor.project, len(plan.actions), current)

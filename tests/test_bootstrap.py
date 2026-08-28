@@ -5,6 +5,7 @@ import unittest
 from agentic_backlog_kit.bootstrap import (
     BootstrapAuthorizationError,
     BootstrapExecutor,
+    bootstrap_plan_from_dict,
     build_bootstrap_plan,
     apply_bootstrap_plan,
 )
@@ -84,7 +85,8 @@ class BootstrapPlanningTests(unittest.TestCase):
         self.assertEqual(["project.create"], [action.kind for action in plan.actions])
 
     def test_apply_requires_digest_and_returns_created_identity(self) -> None:
-        plan = build_bootstrap_plan("aegolius-labs", "example", discovery())
+        snapshot = discovery()
+        plan = build_bootstrap_plan("aegolius-labs", "example", snapshot)
         service = FakeBootstrapService()
 
         with self.assertRaises(BootstrapAuthorizationError):
@@ -92,12 +94,14 @@ class BootstrapPlanningTests(unittest.TestCase):
                 plan,
                 executor=BootstrapExecutor(service),
                 confirmation="wrong",
+                discovery_snapshot=snapshot,
             )
 
         result = apply_bootstrap_plan(
             plan,
             executor=BootstrapExecutor(service),
             confirmation=plan.digest,
+            discovery_snapshot=snapshot,
         )
 
         self.assertEqual(11, result.project["number"])
@@ -105,16 +109,69 @@ class BootstrapPlanningTests(unittest.TestCase):
         self.assertEqual("project.create", service.calls[0][0])
         self.assertEqual(["project.create"], [call[0] for call in service.calls])
 
+    def test_serialized_existing_project_plan_preserves_preconditions(self) -> None:
+        plan = build_bootstrap_plan(
+            "aegolius-labs", "example", discovery(project(7, "Backlog")),
+            project_number=7,
+        )
+
+        restored = bootstrap_plan_from_dict(plan.as_dict())
+
+        self.assertEqual(plan, restored)
+        self.assertTrue(any(action.precondition for action in restored.actions))
+
+    def test_fresh_discovery_drift_aborts_before_first_write(self) -> None:
+        initial = discovery()
+        plan = build_bootstrap_plan("aegolius-labs", "example", initial)
+        service = FakeBootstrapService()
+
+        with self.assertRaisesRegex(BootstrapAuthorizationError, "drifted"):
+            apply_bootstrap_plan(
+                plan,
+                executor=BootstrapExecutor(service),
+                confirmation=plan.digest,
+                discovery_snapshot=discovery(project(9, "example", linked=True)),
+            )
+
+        self.assertEqual([], service.calls)
+
+    def test_partial_failure_journals_completed_prefix(self) -> None:
+        snapshot = discovery(project(7, "Backlog"))
+        plan = build_bootstrap_plan(
+            "aegolius-labs", "example", snapshot, project_number=7
+        )
+        service = FakeBootstrapService(fail_kind="project.field.create")
+        receipts = []
+
+        with self.assertRaisesRegex(RuntimeError, "injected"):
+            apply_bootstrap_plan(
+                plan,
+                executor=BootstrapExecutor(service),
+                confirmation=plan.digest,
+                discovery_snapshot=snapshot,
+                journal=receipts.append,
+            )
+
+        self.assertEqual("failed", receipts[-1].status)
+        self.assertEqual("project.field.create", receipts[-1].failed_action["kind"])
+        self.assertEqual("project.link_repository", receipts[-1].completed_actions[0]["kind"])
+
 
 class FakeBootstrapService:
-    def __init__(self) -> None:
+    def __init__(self, *, fail_kind: str | None = None) -> None:
         self.calls: list[tuple] = []
+        self.fail_kind = fail_kind
+
+    def _record(self, kind: str, payload: dict) -> None:
+        if self.fail_kind == kind:
+            raise RuntimeError("injected failure")
+        self.calls.append((kind, payload))
 
     def use_project(self, identity: dict) -> None:
         self.calls.append(("project.use", identity["number"]))
 
     def create_project(self, payload: dict) -> dict:
-        self.calls.append(("project.create", payload))
+        self._record("project.create", payload)
         return {
             "id": "PROJECT_11",
             "number": 11,
@@ -123,19 +180,19 @@ class FakeBootstrapService:
         }
 
     def link_project_repository(self, payload: dict) -> None:
-        self.calls.append(("project.link_repository", payload))
+        self._record("project.link_repository", payload)
 
     def create_project_field(self, payload: dict) -> None:
-        self.calls.append(("project.field.create", payload))
+        self._record("project.field.create", payload)
 
     def update_project_field_options(self, payload: dict) -> None:
-        self.calls.append(("project.field.update_options", payload))
+        self._record("project.field.update_options", payload)
 
     def create_label(self, payload: dict) -> None:
-        self.calls.append(("repository.label.create", payload))
+        self._record("repository.label.create", payload)
 
     def create_project_view(self, payload: dict) -> None:
-        self.calls.append(("project.view.create", payload))
+        self._record("project.view.create", payload)
 
 
 if __name__ == "__main__":

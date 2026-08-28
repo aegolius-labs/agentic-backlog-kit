@@ -115,6 +115,9 @@ def _parser() -> argparse.ArgumentParser:
     init_apply.add_argument("--plan", required=True)
     init_apply.add_argument("--confirm", required=True)
     init_apply.add_argument("--scaffold-plan")
+    init_apply.add_argument(
+        "--receipt", default=".agentic-backlog/receipts/init-apply.json"
+    )
     init_apply.add_argument("--force", action="store_true")
     init_apply.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
 
@@ -256,6 +259,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
         plan = bootstrap_plan_from_dict(raw_plan)
         transport = _transport(args.backend)
+        discovery = GitHubProjectDiscoveryReader(
+            transport,
+            owner=plan.owner,
+            repository=plan.repository,
+        ).read()
         service = GitHubService(
             transport,
             owner=plan.owner,
@@ -266,6 +274,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             plan,
             executor=BootstrapExecutor(service),
             confirmation=args.confirm,
+            discovery_snapshot=discovery,
+            journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
         manifest = default_manifest(
             plan.owner, plan.repository, result.project["number"]
