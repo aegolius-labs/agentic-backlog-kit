@@ -104,6 +104,7 @@ python -c "import sys, unittest; sys.path.insert(0, 'src'); suite=unittest.defau
 ```
 
 See [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
+The deterministic payload benchmark and its byte/token budgets are documented in [docs/benchmarks.md](docs/benchmarks.md).
 
 ## License
 

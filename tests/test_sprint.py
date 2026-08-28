@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from agentic_backlog_kit.manifest import ManifestError
-from agentic_backlog_kit.sprint import plan_sprint
+from agentic_backlog_kit.sprint import plan_sprint, sprint_plan_payload
 
 from tests.helpers import item, manifest
 
@@ -60,6 +60,25 @@ class SprintPlanningTests(unittest.TestCase):
     def test_explicit_zero_capacity_is_rejected(self) -> None:
         with self.assertRaisesRegex(ManifestError, "positive integer"):
             plan_sprint(manifest(item("T-1")), capacity=0)
+
+    def test_skipped_limit_projects_large_preview_with_total(self) -> None:
+        data = manifest(
+            item("T-1", effort=1),
+            item("T-2", effort=5),
+            item("T-3", effort=5),
+            item("T-4", effort=5),
+        )
+
+        plan = plan_sprint(data, capacity=1)
+        payload = sprint_plan_payload(plan, skipped_limit=2)
+
+        self.assertEqual(3, payload["skipped_count"])
+        self.assertEqual(2, len(payload["skipped"]))
+        self.assertTrue(payload["skipped_truncated"])
+
+    def test_negative_skipped_limit_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ManifestError, "skipped_limit"):
+            sprint_plan_payload(plan_sprint(manifest(item("T-1"))), skipped_limit=-1)
 
 
 if __name__ == "__main__":

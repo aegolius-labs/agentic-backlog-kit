@@ -34,7 +34,7 @@ from .snapshot import (
     GitHubScaffoldSnapshotReader,
     GitHubSnapshotReader,
 )
-from .sprint import plan_sprint
+from .sprint import plan_sprint, sprint_plan_payload
 from .sync import apply_plan, build_sync_plan, sync_plan_from_dict
 
 
@@ -135,6 +135,11 @@ def _parser() -> argparse.ArgumentParser:
     sprint.add_argument("--manifest", default=DEFAULT_MANIFEST)
     sprint.add_argument("--capacity", type=int)
     sprint.add_argument("--sprint")
+    sprint.add_argument(
+        "--skipped-limit",
+        type=int,
+        help="Project the skipped-item reasons to this many entries",
+    )
 
     show = commands.add_parser("show", help="Return one compact backlog item")
     show.add_argument("item_id")
@@ -327,7 +332,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "sprint-plan":
         plan = plan_sprint(manifest, capacity=args.capacity, sprint=args.sprint)
-        payload = asdict(plan)
+        payload = sprint_plan_payload(plan, skipped_limit=args.skipped_limit)
         _print_json(payload)
         return 0
     if args.command == "show":

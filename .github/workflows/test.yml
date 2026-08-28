@@ -24,3 +24,5 @@ jobs:
           python -m build
           python -m pip install --force-reinstall dist/*.whl
           abk --help
+      - name: Check token and byte budgets
+        run: python scripts/benchmark.py --check

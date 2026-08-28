@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .manifest import ManifestError, validate_manifest
@@ -15,6 +15,43 @@ class SprintPlan:
     remaining_capacity: int
     items: list[ScoredItem]
     skipped: dict[str, str]
+
+
+def sprint_plan_payload(
+    plan: SprintPlan,
+    *,
+    skipped_limit: int | None = None,
+) -> dict[str, Any]:
+    """Return a JSON-ready sprint plan, optionally projecting skipped items.
+
+    A large backlog can have thousands of skipped items while only a handful
+    fit in a sprint.  The full mapping remains available by default for local
+    callers; an explicit limit adds a total and truncation marker so a caller
+    can keep a model-facing preview bounded without losing the reason that
+    more entries exist.
+    """
+
+    if skipped_limit is not None and (
+        isinstance(skipped_limit, bool)
+        or not isinstance(skipped_limit, int)
+        or skipped_limit < 0
+    ):
+        raise ManifestError("skipped_limit must be a non-negative integer")
+
+    payload = {
+        "sprint": plan.sprint,
+        "capacity": plan.capacity,
+        "committed_effort": plan.committed_effort,
+        "remaining_capacity": plan.remaining_capacity,
+        "items": [asdict(item) for item in plan.items],
+        "skipped": dict(plan.skipped),
+    }
+    if skipped_limit is not None:
+        skipped = payload["skipped"]
+        payload["skipped"] = dict(list(skipped.items())[:skipped_limit])
+        payload["skipped_count"] = len(skipped)
+        payload["skipped_truncated"] = len(skipped) > skipped_limit
+    return payload
 
 
 def plan_sprint(
