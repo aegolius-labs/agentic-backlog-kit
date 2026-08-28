@@ -9,6 +9,39 @@ from tests.helpers import item, manifest
 
 
 class SprintPlanningTests(unittest.TestCase):
+    @staticmethod
+    def _iteration_snapshot() -> dict:
+        return {
+            "fields": [
+                {
+                    "id": "FIELD_SPRINT",
+                    "name": "Sprint",
+                    "data_type": "ITERATION",
+                    "iteration_configuration": {
+                        "start_date": "2026-08-03",
+                        "duration_days": 14,
+                        "iterations": [
+                            {
+                                "id": "ITER_10",
+                                "title": "Sprint 10",
+                                "start_date": "2026-08-17",
+                                "duration_days": 14,
+                                "completed": False,
+                            },
+                            {
+                                "id": "ITER_11",
+                                "title": "Sprint 11",
+                                "start_date": "2026-08-31",
+                                "duration_days": 14,
+                                "completed": False,
+                            },
+                        ],
+                        "completed_iterations": [],
+                    },
+                }
+            ]
+        }
+
     def test_selects_dependencies_before_dependents_within_capacity(self) -> None:
         data = manifest(
             item("T-BASE", effort=2, impact=1, business_value=1),
@@ -22,11 +55,54 @@ class SprintPlanningTests(unittest.TestCase):
             item("T-LOW", effort=2, impact=1, business_value=1),
         )
 
-        plan = plan_sprint(data, capacity=5, sprint="Sprint 1")
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-08-03",
+            "duration_days": 14,
+        }
+        plan = plan_sprint(
+            data,
+            capacity=5,
+            sprint="@next",
+            project_snapshot=self._iteration_snapshot(),
+            as_of="2026-08-27",
+        )
 
         self.assertEqual(["T-BASE", "T-VALUE"], [entry.id for entry in plan.items])
         self.assertEqual(5, plan.committed_effort)
         self.assertEqual(0, plan.remaining_capacity)
+        self.assertEqual("Sprint 11", plan.sprint)
+        self.assertEqual("ITER_11", plan.iteration_id)
+        self.assertTrue(plan.ready_to_commit)
+
+    def test_target_requires_project_state_and_rejects_completed_iteration(self) -> None:
+        data = manifest(item("T-1"))
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-08-03",
+            "duration_days": 14,
+        }
+
+        with self.assertRaisesRegex(ManifestError, "snapshot"):
+            plan_sprint(data, sprint="Sprint 10", as_of="2026-08-27")
+
+        snapshot = self._iteration_snapshot()
+        snapshot["fields"][0]["iteration_configuration"]["completed_iterations"] = [
+            {
+                "id": "ITER_9",
+                "title": "Sprint 9",
+                "start_date": "2026-08-03",
+                "duration_days": 14,
+                "completed": True,
+            }
+        ]
+        with self.assertRaisesRegex(ManifestError, "completed"):
+            plan_sprint(
+                data,
+                sprint="Sprint 9",
+                project_snapshot=snapshot,
+                as_of="2026-08-27",
+            )
 
     def test_tracking_layers_do_not_consume_sprint_capacity(self) -> None:
         data = manifest(

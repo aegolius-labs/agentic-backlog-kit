@@ -14,6 +14,7 @@ Use GitHub Issues and the configured organization Project as the operational sys
 5. Present the scaffold action count, field/view/label summary, any view-configuration conflict, and the digest. Planning remains the default. A same-name view is matching only when its complete managed configuration matches, not merely its name and layout.
 6. Apply only after the user explicitly accepts that exact scaffold digest. Pass it to `scaffold-apply`, which refreshes GitHub and aborts before writes if the manifest, scaffold state, or action preconditions changed. When using GitHub MCP, perform the equivalent fresh-state check.
 7. The launcher journals every completed bootstrap or scaffold action. After success or interruption, refresh and re-plan. Success means zero remaining actions, including zero view updates; otherwise report and separately confirm the residual plan without replaying the interrupted plan. Never delete and recreate a same-name view to bypass an unsupported update.
+8. After the Sprint field exists, resolve `@current` or `@next` from a fresh full iteration snapshot. If a safe contiguous extension is required, use the separately reviewed `iteration-plan` and `iteration-apply` workflow; do not assign backlog items until its post-apply identity verification succeeds.
 
 For field mappings, permissions, and commands, read [references/scaffold.md](references/scaffold.md).
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .github import GitHubApiError, GitHubTransport
+from .iterations import normalize_iteration_field
 from .sync import extract_item_id
 from .views import normalize_project_views
 
@@ -61,6 +62,9 @@ def _scaffold_fields(project: dict[str, Any]) -> list[dict[str, Any]]:
     fields = []
     for field in (project.get("fields") or {}).get("nodes") or []:
         if not field.get("name") or not field.get("dataType"):
+            continue
+        if field.get("dataType") == "ITERATION":
+            fields.append(normalize_iteration_field(field))
             continue
         fields.append(
             {
@@ -337,7 +341,11 @@ class GitHubProjectDiscoveryReader:
                 }
                 ... on ProjectV2IterationField {
                   id fullDatabaseId name dataType
-                  configuration { duration startDay }
+                  configuration {
+                    duration startDay
+                    iterations { id title startDate duration }
+                    completedIterations { id title startDate duration }
+                  }
                 }
               }
             }
@@ -509,7 +517,11 @@ class GitHubScaffoldSnapshotReader:
                       }
                       ... on ProjectV2IterationField {
                         id fullDatabaseId name dataType
-                        configuration { duration startDay }
+                        configuration {
+                          duration startDay
+                          iterations { id title startDate duration }
+                          completedIterations { id title startDate duration }
+                        }
                       }
                     }
                   }

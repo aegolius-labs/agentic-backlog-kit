@@ -232,6 +232,37 @@ def representative_snapshot(
     }
 
 
+def representative_iteration_snapshot() -> dict[str, Any]:
+    """Return a fixed active iteration for deterministic sprint benchmarks."""
+
+    return {
+        "fields": [
+            {
+                "id": "FIELD_SPRINT",
+                "database_id": 42,
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "iteration_configuration": {
+                    "start_date": "2026-01-05",
+                    "duration_days": 14,
+                    "iterations": [
+                        {
+                            "id": "ITER_BENCHMARK",
+                            "title": SPRINT_NAME,
+                            "start_date": "2026-08-17",
+                            "duration_days": 14,
+                            "completed": False,
+                        }
+                    ],
+                    "completed_iterations": [],
+                },
+            }
+        ],
+        "views": [],
+        "labels": [],
+    }
+
+
 def serialize_json(value: Any, *, pretty: bool = False) -> bytes:
     """Serialize a payload as deterministic UTF-8 JSON with one trailing newline."""
 
@@ -330,7 +361,13 @@ def benchmark(sizes: Sequence[int] = BACKLOG_SIZES) -> dict[str, Any]:
             "count": len(scored[:PRIORITIZE_LIMIT]),
             "items": [asdict(entry) for entry in scored[:PRIORITIZE_LIMIT]],
         }
-        sprint_plan = plan_sprint(data, capacity=SPRINT_CAPACITY, sprint=SPRINT_NAME)
+        sprint_plan = plan_sprint(
+            data,
+            capacity=SPRINT_CAPACITY,
+            sprint=SPRINT_NAME,
+            project_snapshot=representative_iteration_snapshot(),
+            as_of="2026-08-27",
+        )
         sprint_payload = sprint_plan_payload(sprint_plan)
         compact_sprint_payload = sprint_plan_payload(
             sprint_plan,

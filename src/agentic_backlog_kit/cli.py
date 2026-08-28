@@ -22,6 +22,12 @@ from .github import (
     GitHubService,
 )
 from .manifest import default_manifest, load_manifest
+from .iterations import (
+    apply_iteration_plan,
+    build_iteration_plan,
+    iteration_plan_from_dict,
+    verify_iteration_apply,
+)
 from .mutations import add_item, file_sha256, save_manifest, update_item
 from .priority import prioritize, select_next
 from .scaffold import (
@@ -135,6 +141,9 @@ def _parser() -> argparse.ArgumentParser:
     sprint.add_argument("--manifest", default=DEFAULT_MANIFEST)
     sprint.add_argument("--capacity", type=int)
     sprint.add_argument("--sprint")
+    sprint.add_argument("--snapshot", help="Fresh Project scaffold snapshot for target validation")
+    sprint.add_argument("--as-of", help="ISO date used to resolve @current and @next")
+    sprint.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
     sprint.add_argument(
         "--skipped-limit",
         type=int,
@@ -209,6 +218,31 @@ def _parser() -> argparse.ArgumentParser:
         "--receipt", default=".agentic-backlog/receipts/scaffold-apply.json"
     )
     scaffold_apply.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
+
+    iteration_plan = commands.add_parser(
+        "iteration-plan", help="Resolve or preview a safe Project iteration lifecycle update"
+    )
+    iteration_plan.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    iteration_plan.add_argument("--target", required=True)
+    iteration_plan.add_argument("--as-of")
+    iteration_plan.add_argument("--snapshot")
+    iteration_plan.add_argument("--output")
+    iteration_plan.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
+
+    iteration_apply = commands.add_parser(
+        "iteration-apply", help="Apply one exact reviewed iteration lifecycle plan"
+    )
+    iteration_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    iteration_apply.add_argument("--plan", required=True)
+    iteration_apply.add_argument("--confirm", required=True)
+    iteration_apply.add_argument(
+        "--receipt", default=".agentic-backlog/receipts/iteration-apply.json"
+    )
+    iteration_apply.add_argument(
         "--backend", choices=("auto", "gh", "api"), default="auto"
     )
     return parser
@@ -331,7 +365,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_json({"item": asdict(item) if item else None})
         return 0
     if args.command == "sprint-plan":
-        plan = plan_sprint(manifest, capacity=args.capacity, sprint=args.sprint)
+        project_snapshot = None
+        if args.sprint:
+            if args.snapshot:
+                project_snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+            else:
+                github = manifest["github"]
+                project_snapshot = GitHubScaffoldSnapshotReader(
+                    _transport(args.backend),
+                    owner=github["owner"],
+                    repository=github["repository"],
+                    project_number=github["project_number"],
+                ).read()
+        plan = plan_sprint(
+            manifest,
+            capacity=args.capacity,
+            sprint=args.sprint,
+            project_snapshot=project_snapshot,
+            as_of=args.as_of,
+        )
         payload = sprint_plan_payload(plan, skipped_limit=args.skipped_limit)
         _print_json(payload)
         return 0
@@ -458,6 +510,75 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             _print_json(payload)
+        return 0
+    if args.command == "iteration-plan":
+        github = manifest["github"]
+        if args.snapshot:
+            snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+        else:
+            snapshot = GitHubScaffoldSnapshotReader(
+                _transport(args.backend),
+                owner=github["owner"],
+                repository=github["repository"],
+                project_number=github["project_number"],
+            ).read()
+        plan = build_iteration_plan(
+            manifest, snapshot, target=args.target, as_of=args.as_of
+        )
+        payload = plan.as_dict()
+        if args.output:
+            _write_json(Path(args.output), payload)
+            _print_json(
+                {
+                    "plan": args.output,
+                    "digest": plan.digest,
+                    "target": plan.target,
+                    "resolved_title": plan.resolved_title,
+                    "ready": plan.ready,
+                    "actions": len(plan.actions),
+                }
+            )
+        else:
+            _print_json(payload)
+        return 0
+    if args.command == "iteration-apply":
+        raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+        plan = iteration_plan_from_dict(raw_plan)
+        fresh_manifest = load_manifest(args.manifest)
+        github = fresh_manifest["github"]
+        transport = _transport(args.backend)
+        reader = GitHubScaffoldSnapshotReader(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+        )
+        snapshot = reader.read()
+        service = GitHubService(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+            issue_type_mode=github["issue_type_mode"],
+        )
+        result = apply_iteration_plan(
+            plan,
+            executor=GitHubScaffoldExecutor(service),
+            confirmation=args.confirm,
+            manifest=fresh_manifest,
+            project_snapshot=snapshot,
+            journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
+        )
+        verified = verify_iteration_apply(plan, fresh_manifest, reader.read())
+        _print_json(
+            {
+                **asdict(result),
+                "verified": True,
+                "resolved_title": verified.resolved_title,
+                "resolved_iteration_id": verified.resolved_iteration_id,
+                "remaining_actions": len(verified.actions),
+            }
+        )
         return 0
     if args.command == "scaffold-apply":
         raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))

@@ -8,6 +8,24 @@ from tests.helpers import item, manifest
 
 
 class SyncPlanningTests(unittest.TestCase):
+    def test_uses_configured_iteration_field_and_rejects_unresolved_alias(self) -> None:
+        data = manifest(item("T-1", sprint="Sprint 11"))
+        data["workflow"]["iteration"] = {
+            "field": "Delivery Cycle",
+            "start_date": "2026-08-03",
+            "duration_days": 14,
+        }
+
+        plan = build_sync_plan(data, {"issues": []})
+
+        add = next(action for action in plan.actions if action.kind == "project.add_item")
+        self.assertEqual("Sprint 11", add.payload["fields"]["Delivery Cycle"])
+        self.assertNotIn("Sprint", add.payload["fields"])
+
+        data["items"][0]["sprint"] = "@next"
+        with self.assertRaisesRegex(Exception, "resolved"):
+            build_sync_plan(data, {"issues": []})
+
     def test_plans_create_before_relationship_actions(self) -> None:
         data = manifest(
             item("T-BASE"),

@@ -23,6 +23,8 @@ python <plugin-root>/scripts/backlog.py sync-plan --snapshot .agentic-backlog/ca
 python <plugin-root>/scripts/backlog.py sync-apply --plan .agentic-backlog/cache/sync-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/apply.json
 ```
 
+Sprint values must be resolved exact titles from a fresh Project iteration snapshot. Alias resolution and lifecycle extension belong to `iteration-plan`/`iteration-apply`; item-field assignment rejects aliases, completed iterations, duplicate titles, and missing refreshed IDs. A successful lifecycle apply is not sufficient by itself: refresh verification must prove existing IDs/configuration were unchanged and the target now has a GitHub ID before synchronization continues.
+
 The saved snapshot is a planning input only. Apply refreshes GitHub and checks
 that the rebuilt plan, including state fingerprints and action preconditions,
 has the confirmed digest before performing its first mutation. Its receipt is

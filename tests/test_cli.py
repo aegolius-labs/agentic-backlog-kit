@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 from agentic_backlog_kit.bootstrap import build_bootstrap_plan
 from agentic_backlog_kit.cli import main
+from agentic_backlog_kit.iterations import build_iteration_plan
 from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.sync import build_sync_plan
 
@@ -17,6 +18,96 @@ from tests.helpers import item, manifest
 
 
 class CliTests(unittest.TestCase):
+    def test_iteration_apply_refreshes_then_verifies_identity_convergence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            plan_path = root / "iteration-plan.json"
+            receipt_path = root / "iteration-receipt.json"
+            data = manifest()
+            data["workflow"]["iteration"] = {
+                "field": "Sprint",
+                "start_date": "2026-08-03",
+                "duration_days": 14,
+            }
+            old = {
+                "id": "ITER_10",
+                "title": "Sprint 10",
+                "start_date": "2026-08-17",
+                "duration_days": 14,
+                "completed": False,
+            }
+            field = {
+                "id": "FIELD_SPRINT",
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "iteration_configuration": {
+                    "start_date": "2026-08-03",
+                    "duration_days": 14,
+                    "iterations": [old],
+                    "completed_iterations": [],
+                },
+            }
+            before = {"fields": [field], "views": [], "labels": []}
+            after = {
+                "fields": [
+                    {
+                        **field,
+                        "iteration_configuration": {
+                            **field["iteration_configuration"],
+                            "iterations": [
+                                old,
+                                {
+                                    "id": "ITER_11",
+                                    "title": "Sprint 11",
+                                    "start_date": "2026-08-31",
+                                    "duration_days": 14,
+                                    "completed": False,
+                                },
+                            ],
+                        },
+                    }
+                ],
+                "views": [],
+                "labels": [],
+            }
+            plan = build_iteration_plan(
+                data, before, target="@next", as_of="2026-08-27"
+            )
+            manifest_path.write_text(json.dumps(data), encoding="utf-8")
+            plan_path.write_text(json.dumps(plan.as_dict()), encoding="utf-8")
+            reader = Mock()
+            reader.return_value.read.side_effect = [before, after]
+
+            with (
+                patch("agentic_backlog_kit.cli._transport", return_value=object()),
+                patch("agentic_backlog_kit.cli.GitHubScaffoldSnapshotReader", reader),
+                patch("agentic_backlog_kit.cli.GitHubService"),
+                patch(
+                    "agentic_backlog_kit.cli.GitHubScaffoldExecutor",
+                    return_value=lambda action: None,
+                ),
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                result = main(
+                    [
+                        "iteration-apply",
+                        "--manifest",
+                        str(manifest_path),
+                        "--plan",
+                        str(plan_path),
+                        "--confirm",
+                        plan.digest,
+                        "--receipt",
+                        str(receipt_path),
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            self.assertEqual(2, reader.return_value.read.call_count)
+            self.assertTrue(json.loads(output.getvalue())["verified"])
+            self.assertEqual("completed", json.loads(receipt_path.read_text())["status"])
+
     def test_init_apply_captures_created_number_and_emits_fresh_scaffold_plan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

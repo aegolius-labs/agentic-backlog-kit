@@ -97,6 +97,70 @@ class SnapshotReaderTests(unittest.TestCase):
 
 
 class ProjectDiscoveryReaderTests(unittest.TestCase):
+    def test_normalizes_full_iteration_configuration(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "id": "ORG_1",
+                    "projectsV2": {
+                        "nodes": [
+                            {
+                                "id": "PROJECT_2",
+                                "number": 2,
+                                "title": "First",
+                                "url": "url-2",
+                                "closed": False,
+                                "fields": {
+                                    "nodes": [
+                                        {
+                                            "id": "FIELD_SPRINT",
+                                            "databaseId": 42,
+                                            "name": "Sprint",
+                                            "dataType": "ITERATION",
+                                            "configuration": {
+                                                "duration": 14,
+                                                "startDay": 1,
+                                                "iterations": [
+                                                    {
+                                                        "id": "ITER_10",
+                                                        "title": "Sprint 10",
+                                                        "startDate": "2026-08-17",
+                                                        "duration": 14,
+                                                    }
+                                                ],
+                                                "completedIterations": [],
+                                            },
+                                        }
+                                    ]
+                                },
+                                "views": {"nodes": []},
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+                "repository": {
+                    "id": "REPO_1",
+                    "projectsV2": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            }
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        result = GitHubProjectDiscoveryReader(
+            transport, owner="aegolius-labs", repository="example"
+        ).read()
+
+        field = result["projects"][0]["fields"][0]
+        self.assertEqual("2026-08-17", field["iteration_configuration"]["start_date"])
+        self.assertEqual("ITER_10", field["iteration_configuration"]["iterations"][0]["id"])
+
     def test_reads_sorted_projects_and_marks_repository_links(self) -> None:
         transport = RoutedTransport()
         transport.graphql_responses = [

@@ -192,6 +192,45 @@ class GitHubServiceTests(unittest.TestCase):
             {"labels": ["customer", "type:task"]}, self.transport.calls[1][2]
         )
 
+    def test_iteration_assignment_rejects_completed_titles_and_aliases(self) -> None:
+        issue = GitHubIssueRef(
+            "T-1", 11, 111, "NODE_11", "child-url", project_item_id="PITEM_1"
+        )
+        self.transport.responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "id": "PROJECT_1",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_SPRINT",
+                                    "name": "Sprint",
+                                    "dataType": "ITERATION",
+                                    "configuration": {
+                                        "duration": 14,
+                                        "iterations": [
+                                            {"id": "ITER_10", "title": "Sprint 10"}
+                                        ],
+                                        "completedIterations": [
+                                            {"id": "ITER_9", "title": "Sprint 9"}
+                                        ],
+                                    },
+                                }
+                            ]
+                        },
+                    }
+                }
+            }
+        ]
+
+        with self.assertRaisesRegex(GitHubApiError, "completed"):
+            self.service.set_project_fields(issue, {"Sprint": "Sprint 9"})
+        with self.assertRaisesRegex(GitHubApiError, "resolved"):
+            self.service.set_project_fields(issue, {"Sprint": "@current"})
+
+        self.assertEqual(1, len(self.transport.calls))
+
     def test_scaffold_executor_updates_single_select_options(self) -> None:
         action = ScaffoldAction(
             "project.field.update_options",
@@ -371,6 +410,97 @@ class GitHubServiceTests(unittest.TestCase):
         request = self.transport.calls[1][2]
         self.assertNotIn("visible_fields", request)
         self.assertEqual("roadmap", request["layout"])
+
+    def test_scaffold_executor_updates_full_iteration_configuration(self) -> None:
+        preserved = {
+            "id": "ITER_10",
+            "title": "Sprint 10",
+            "start_date": "2026-08-17",
+            "duration_days": 14,
+            "completed": False,
+        }
+        action = ScaffoldAction(
+            "project.field.update_iterations",
+            {
+                "name": "Sprint",
+                "field_id": "FIELD_SPRINT",
+                "iteration_configuration": {
+                    "start_date": "2026-08-03",
+                    "duration_days": 14,
+                    "iterations": [
+                        preserved,
+                        {
+                            "id": None,
+                            "title": "Sprint 11",
+                            "start_date": "2026-08-31",
+                            "duration_days": 14,
+                            "completed": False,
+                        },
+                    ],
+                },
+            },
+            {
+                "field": {
+                    "iteration_configuration": {"iterations": [preserved]}
+                }
+            },
+        )
+
+        GitHubScaffoldExecutor(self.service)(action)
+
+        input_value = self.transport.calls[0][1]["input"]
+        self.assertEqual("FIELD_SPRINT", input_value["fieldId"])
+        self.assertEqual(
+            {
+                "duration": 14,
+                "startDate": "2026-08-03",
+                "iterations": [
+                    {"title": "Sprint 10", "startDate": "2026-08-17", "duration": 14},
+                    {"title": "Sprint 11", "startDate": "2026-08-31", "duration": 14},
+                ],
+            },
+            input_value["iterationConfiguration"],
+        )
+
+    def test_iteration_executor_rejects_replacement_that_changes_observed_active_entry(self) -> None:
+        action = ScaffoldAction(
+            "project.field.update_iterations",
+            {
+                "field_id": "FIELD_SPRINT",
+                "iteration_configuration": {
+                    "start_date": "2026-08-03",
+                    "duration_days": 14,
+                    "iterations": [
+                        {
+                            "id": "ITER_10",
+                            "title": "Changed",
+                            "start_date": "2026-08-17",
+                            "duration_days": 14,
+                            "completed": False,
+                        }
+                    ],
+                },
+            },
+            {
+                "field": {
+                    "iteration_configuration": {
+                        "iterations": [
+                            {
+                                "id": "ITER_10",
+                                "title": "Sprint 10",
+                                "start_date": "2026-08-17",
+                                "duration_days": 14,
+                                "completed": False,
+                            }
+                        ]
+                    }
+                }
+            },
+        )
+
+        with self.assertRaisesRegex(Exception, "preserve"):
+            GitHubScaffoldExecutor(self.service)(action)
+        self.assertEqual([], self.transport.calls)
 
     def test_creates_linked_organization_project_and_captures_identity(self) -> None:
         self.transport.responses = [

@@ -414,6 +414,77 @@ class GitHubService:
         )
         self._project_fields = None
 
+    def update_project_field_iterations(self, payload: dict[str, Any]) -> None:
+        """Replace an iteration schedule with the complete reviewed configuration.
+
+        GitHub's current ProjectV2Iteration input does not accept existing IDs or
+        completion state. The reviewed plan carries those as preconditions; the
+        mutation repeats all active title/date/duration definitions and refresh
+        verification is responsible for confirming their server-owned IDs.
+        """
+
+        configuration = payload.get("iteration_configuration")
+        if not isinstance(configuration, dict):
+            raise GitHubApiError(422, "Iteration field update requires configuration")
+        start_date = configuration.get("start_date")
+        duration = configuration.get("duration_days")
+        iterations = configuration.get("iterations")
+        if (
+            not isinstance(start_date, str)
+            or isinstance(duration, bool)
+            or not isinstance(duration, int)
+            or duration < 1
+            or not isinstance(iterations, list)
+            or not iterations
+        ):
+            raise GitHubApiError(422, "Iteration field update configuration is incomplete")
+        mutation_iterations = []
+        for raw in iterations:
+            if not isinstance(raw, dict):
+                raise GitHubApiError(422, "Iteration field update entry is malformed")
+            title = raw.get("title")
+            entry_start = raw.get("start_date")
+            entry_duration = raw.get("duration_days")
+            if (
+                not isinstance(title, str)
+                or not title
+                or not isinstance(entry_start, str)
+                or isinstance(entry_duration, bool)
+                or not isinstance(entry_duration, int)
+                or entry_duration < 1
+                or raw.get("completed") is not False
+            ):
+                raise GitHubApiError(422, "Iteration field update entry is incomplete")
+            mutation_iterations.append(
+                {
+                    "title": title,
+                    "startDate": entry_start,
+                    "duration": entry_duration,
+                }
+            )
+        self.transport.graphql(
+            """
+            mutation UpdateIterationField($input: UpdateProjectV2FieldInput!) {
+              updateProjectV2Field(input: $input) {
+                projectV2Field {
+                  ... on ProjectV2IterationField { id name dataType }
+                }
+              }
+            }
+            """,
+            {
+                "input": {
+                    "fieldId": payload["field_id"],
+                    "iterationConfiguration": {
+                        "startDate": start_date,
+                        "duration": duration,
+                        "iterations": mutation_iterations,
+                    },
+                }
+            },
+        )
+        self._project_fields = None
+
     def create_project_view(self, payload: dict[str, Any]) -> None:
         _, fields = self._load_project()
         request_payload: dict[str, Any] = {
@@ -550,8 +621,9 @@ class GitHubService:
                       ... on ProjectV2IterationField {
                         id fullDatabaseId name dataType
                         configuration {
-                          iterations { id title }
-                          completedIterations { id title }
+                          duration startDay
+                          iterations { id title startDate duration }
+                          completedIterations { id title startDate duration }
                         }
                       }
                     }
@@ -641,17 +713,31 @@ class GitHubService:
                 value = {"singleSelectOptionId": option["id"]}
             elif data_type == "ITERATION":
                 configuration = field.get("configuration") or {}
-                iterations = (configuration.get("iterations") or []) + (
-                    configuration.get("completedIterations") or []
-                )
-                iteration = next(
-                    (
-                        candidate
-                        for candidate in iterations
-                        if candidate.get("title") == raw_value
-                    ),
-                    None,
-                )
+                if raw_value in {"@current", "@next"}:
+                    raise GitHubApiError(
+                        422,
+                        f"Project iteration alias '{raw_value}' must be resolved by "
+                        "a refreshed iteration plan before assignment",
+                    )
+                active = [
+                    candidate
+                    for candidate in configuration.get("iterations") or []
+                    if candidate.get("title") == raw_value
+                ]
+                completed = [
+                    candidate
+                    for candidate in configuration.get("completedIterations") or []
+                    if candidate.get("title") == raw_value
+                ]
+                if completed:
+                    raise GitHubApiError(
+                        422, f"Project iteration '{raw_value}' is completed"
+                    )
+                if len(active) > 1:
+                    raise GitHubApiError(
+                        422, f"Project iteration '{raw_value}' is ambiguous"
+                    )
+                iteration = active[0] if active else None
                 if not iteration:
                     raise GitHubApiError(
                         422, f"Project field '{name}' has no iteration '{raw_value}'"
@@ -752,6 +838,22 @@ class GitHubScaffoldExecutor:
             self.service.create_project_field(action.payload)
         elif action.kind == "project.field.update_options":
             self.service.update_project_field_options(action.payload)
+        elif action.kind == "project.field.update_iterations":
+            current = action.precondition.get("field")
+            configuration = action.payload.get("iteration_configuration") or {}
+            if not isinstance(current, dict):
+                raise ManifestError(
+                    "Iteration update requires the reviewed field precondition"
+                )
+            previous = (current.get("iteration_configuration") or {}).get(
+                "iterations"
+            ) or []
+            replacement = configuration.get("iterations") or []
+            if replacement[: len(previous)] != previous:
+                raise ManifestError(
+                    "Iteration update does not preserve every observed active definition"
+                )
+            self.service.update_project_field_iterations(action.payload)
         elif action.kind == "repository.label.create":
             self.service.create_label(action.payload)
         elif action.kind == "project.view.create":

@@ -75,7 +75,9 @@ def extract_item_id(body: str | None) -> str | None:
     return value or None
 
 
-def _desired_fields(item: dict[str, Any], priority_score: float) -> dict[str, Any]:
+def _desired_fields(
+    item: dict[str, Any], priority_score: float, *, sprint_field: str
+) -> dict[str, Any]:
     fields: dict[str, Any] = {
         "Status": item["status"],
         "Impact": item["impact"],
@@ -85,7 +87,12 @@ def _desired_fields(item: dict[str, Any], priority_score: float) -> dict[str, An
         "Priority": priority_score,
     }
     if item.get("sprint"):
-        fields["Sprint"] = item["sprint"]
+        if item["sprint"] in {"@current", "@next"}:
+            raise ManifestError(
+                f"Item '{item['id']}' sprint alias must be resolved to an exact "
+                "active iteration title before synchronization"
+            )
+        fields[sprint_field] = item["sprint"]
     return fields
 
 
@@ -133,6 +140,8 @@ def build_sync_plan(
     remote_by_id = _normalize_remote(remote_snapshot)
     local_by_id = {item["id"]: item for item in data["items"]}
     score_by_id = {entry.id: entry.priority_score for entry in prioritize(data)}
+    iteration = data["workflow"].get("iteration") or {}
+    sprint_field = iteration.get("field", "Sprint")
 
     creates: list[SyncAction] = []
     updates: list[SyncAction] = []
@@ -143,7 +152,9 @@ def build_sync_plan(
         item = local_by_id[item_id]
         remote = remote_by_id.get(item_id)
         desired_body = render_issue_body(item)
-        desired_fields = _desired_fields(item, score_by_id[item_id])
+        desired_fields = _desired_fields(
+            item, score_by_id[item_id], sprint_field=sprint_field
+        )
 
         if remote is None:
             creates.append(

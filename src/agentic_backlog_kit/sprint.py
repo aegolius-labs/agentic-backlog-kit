@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .iterations import IterationPlan, build_iteration_plan
 from .manifest import ManifestError, validate_manifest
 from .priority import ScoredItem, prioritize
 
@@ -10,11 +11,21 @@ from .priority import ScoredItem, prioritize
 @dataclass(frozen=True, slots=True)
 class SprintPlan:
     sprint: str | None
+    iteration_id: str | None
+    iteration_plan: IterationPlan | None
     capacity: int
     committed_effort: int
     remaining_capacity: int
     items: list[ScoredItem]
     skipped: dict[str, str]
+
+    @property
+    def ready_to_commit(self) -> bool:
+        return (
+            self.sprint is not None
+            and self.iteration_plan is not None
+            and self.iteration_plan.ready
+        )
 
 
 def sprint_plan_payload(
@@ -40,6 +51,11 @@ def sprint_plan_payload(
 
     payload = {
         "sprint": plan.sprint,
+        "iteration_id": plan.iteration_id,
+        "ready_to_commit": plan.ready_to_commit,
+        "iteration_plan": (
+            plan.iteration_plan.as_dict() if plan.iteration_plan is not None else None
+        ),
         "capacity": plan.capacity,
         "committed_effort": plan.committed_effort,
         "remaining_capacity": plan.remaining_capacity,
@@ -59,10 +75,24 @@ def plan_sprint(
     *,
     capacity: int | None = None,
     sprint: str | None = None,
+    project_snapshot: dict[str, Any] | None = None,
+    as_of: str | None = None,
 ) -> SprintPlan:
     """Pack ready work deterministically while preserving prerequisite order."""
 
     data = validate_manifest(manifest)
+    iteration_plan: IterationPlan | None = None
+    iteration_id: str | None = None
+    if sprint is not None:
+        if project_snapshot is None:
+            raise ManifestError(
+                "A sprint target requires a fresh Project scaffold snapshot"
+            )
+        iteration_plan = build_iteration_plan(
+            data, project_snapshot, target=sprint, as_of=as_of
+        )
+        sprint = iteration_plan.resolved_title
+        iteration_id = iteration_plan.resolved_iteration_id
     selected_capacity = (
         data["workflow"]["default_capacity"] if capacity is None else capacity
     )
@@ -115,6 +145,8 @@ def plan_sprint(
 
     return SprintPlan(
         sprint=sprint,
+        iteration_id=iteration_id,
+        iteration_plan=iteration_plan,
         capacity=selected_capacity,
         committed_effort=selected_capacity - remaining,
         remaining_capacity=remaining,
