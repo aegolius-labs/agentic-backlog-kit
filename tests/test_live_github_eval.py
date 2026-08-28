@@ -524,6 +524,19 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(
             all(not scenario["preflight_passed"] for scenario in audit["scenarios"])
         )
+        self.assertTrue(
+            all(scenario["project_absence_verified"] for scenario in audit["scenarios"])
+        )
+        self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
+        self.assertTrue(
+            audit["local_capabilities"]["direct_api_transport_read_passed"]
+        )
+        self.assertFalse(
+            audit["gh_and_api_capabilities"]["engine_snapshot_query_compatible"]
+        )
+        self.assertEqual(
+            ["Story"], audit["gh_and_api_capabilities"]["missing_native_issue_types"]
+        )
         with tempfile.TemporaryDirectory() as temporary:
             generated = {}
             for backend in ("gh", "api", "mcp"):
