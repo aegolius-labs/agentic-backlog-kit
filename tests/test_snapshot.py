@@ -99,6 +99,87 @@ class SnapshotReaderTests(unittest.TestCase):
 
 
 class ProjectDiscoveryReaderTests(unittest.TestCase):
+    def test_discovers_shallow_projects_then_hydrates_only_selected_project(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "id": "ORG_1",
+                    "projectsV2": {
+                        "nodes": [
+                            {
+                                "id": "PROJECT_2",
+                                "number": 2,
+                                "title": "First",
+                                "url": "url-2",
+                                "closed": False,
+                            },
+                            {
+                                "id": "PROJECT_7",
+                                "number": 7,
+                                "title": "Selected",
+                                "url": "url-7",
+                                "closed": False,
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+                "repository": {
+                    "id": "REPO_1",
+                    "name": "example",
+                    "projectsV2": {
+                        "nodes": [{"id": "PROJECT_7"}],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            },
+            {
+                "organization": {
+                    "projectV2": {
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_EFFORT",
+                                    "databaseId": 42,
+                                    "name": "Effort",
+                                    "dataType": "NUMBER",
+                                }
+                            ]
+                        },
+                        "views": {"nodes": []},
+                    }
+                }
+            },
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        result = GitHubProjectDiscoveryReader(
+            transport,
+            owner="aegolius-labs",
+            repository="example",
+            project_number=7,
+        ).read()
+
+        discovery_query, discovery_variables = transport.graphql_calls[0]
+        self.assertNotIn("fields(first:", discovery_query)
+        self.assertNotIn("views(first:", discovery_query)
+        self.assertNotIn("visibleFields(first:", discovery_query)
+        self.assertEqual(
+            {"owner": "aegolius-labs", "repository": "example"},
+            discovery_variables,
+        )
+        hydration_query, hydration_variables = transport.graphql_calls[1]
+        self.assertIn("query ProjectScaffold", hydration_query)
+        self.assertEqual(
+            {"owner": "aegolius-labs", "number": 7}, hydration_variables
+        )
+        self.assertEqual([], result["projects"][0]["fields"])
+        self.assertEqual("Effort", result["projects"][1]["fields"][0]["name"])
+        self.assertEqual([], result["projects"][1]["views"])
+
     def test_normalizes_full_iteration_configuration(self) -> None:
         transport = RoutedTransport()
         transport.graphql_responses = [
@@ -162,8 +243,9 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         field = result["projects"][0]["fields"][0]
         self.assertEqual("2026-08-17", field["iteration_configuration"]["start_date"])
         self.assertEqual("ITER_10", field["iteration_configuration"]["iterations"][0]["id"])
-        self.assertIn("databaseId", transport.graphql_calls[0][0])
-        self.assertNotIn("fullDatabaseId", transport.graphql_calls[0][0])
+        # Responses captured from the legacy deep discovery query remain parseable,
+        # even though current discovery no longer requests nested scaffold state.
+        self.assertNotIn("fields(first:", transport.graphql_calls[0][0])
 
     def test_reads_sorted_projects_and_marks_repository_links(self) -> None:
         transport = RoutedTransport()
@@ -202,6 +284,14 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
                     },
                 },
+            },
+            {
+                "organization": {
+                    "projectV2": {
+                        "fields": {"nodes": []},
+                        "views": {"nodes": []},
+                    }
+                }
             },
         ]
         transport.rest_responses[

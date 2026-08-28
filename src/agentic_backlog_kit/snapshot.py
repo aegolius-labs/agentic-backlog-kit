@@ -302,14 +302,22 @@ class GitHubSnapshotReader:
 
 
 class GitHubProjectDiscoveryReader:
-    """Discover organization Projects and the repository links needed for bootstrap."""
+    """Discover Project identities shallowly and hydrate at most one selection."""
 
     def __init__(
-        self, transport: GitHubTransport, *, owner: str, repository: str
+        self,
+        transport: GitHubTransport,
+        *,
+        owner: str,
+        repository: str,
+        project_title: str | None = None,
+        project_number: int | None = None,
     ) -> None:
         self.transport = transport
         self.owner = owner
         self.repository = repository
+        self.project_title = project_title
+        self.project_number = project_number
 
     def _labels(self) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
@@ -323,7 +331,7 @@ class GitHubProjectDiscoveryReader:
                 raise GitHubApiError(200, "List labels response was not an array")
             result.extend(batch)
             if len(batch) < 100:
-                return result
+                return sorted(result, key=lambda label: str(label.get("name", "")))
             page += 1
 
     @staticmethod
@@ -331,31 +339,40 @@ class GitHubProjectDiscoveryReader:
         return """
           nodes {
             id number title url closed
-            fields(first: 100) {
-              nodes {
-                __typename
-                ... on ProjectV2Field { id databaseId name dataType }
-                ... on ProjectV2SingleSelectField {
-                  id databaseId name dataType
-                  options { id name color description }
-                }
-                ... on ProjectV2IterationField {
-                  id databaseId name dataType
-                  configuration {
-                    duration startDay
-                    iterations { id title startDate duration }
-                    completedIterations { id title startDate duration }
-                  }
-                }
-              }
-            }
-            views(first: 100) {
-              nodes { %s }
-              pageInfo { hasNextPage endCursor }
-            }
           }
           pageInfo { hasNextPage endCursor }
-        """ % VIEW_GRAPHQL_FRAGMENT
+        """
+
+    def _selected_project(
+        self, projects: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        """Mirror bootstrap selection enough to bound scaffold hydration to one Project."""
+
+        active = [project for project in projects if not project.get("closed", False)]
+        if self.project_number is not None:
+            matches = [
+                project
+                for project in active
+                if project.get("number") == self.project_number
+                and (
+                    self.project_title is None
+                    or project.get("title") == self.project_title
+                )
+            ]
+        elif self.project_title is not None:
+            matches = [
+                project
+                for project in active
+                if project.get("title") == self.project_title
+            ]
+        else:
+            matches = [
+                project
+                for project in active
+                if project.get("linked") is True
+                or project.get("title") == self.repository
+            ]
+        return matches[0] if len(matches) == 1 else None
 
     def read(self) -> dict[str, Any]:
         data = self.transport.graphql(
@@ -452,7 +469,11 @@ class GitHubProjectDiscoveryReader:
                 "closed": bool(project.get("closed")),
                 "linked": str(project.get("id")) in linked_ids,
                 "fields": _scaffold_fields(project),
-                "views": _scaffold_views(project),
+                "views": (
+                    _scaffold_views(project)
+                    if isinstance(project.get("views"), dict)
+                    else []
+                ),
             }
             for project in raw_projects
         ]
@@ -462,11 +483,24 @@ class GitHubProjectDiscoveryReader:
             raise GitHubApiError(
                 200, "Project discovery returned invalid identity"
             ) from exc
+        selected = self._selected_project(projects)
+        if selected is None:
+            labels = self._labels()
+        else:
+            scaffold = GitHubScaffoldSnapshotReader(
+                self.transport,
+                owner=self.owner,
+                repository=self.repository,
+                project_number=int(selected["number"]),
+            ).read()
+            selected["fields"] = scaffold["fields"]
+            selected["views"] = scaffold["views"]
+            labels = scaffold["labels"]
         return {
             "organization": {"login": self.owner, "id": organization.get("id")},
             "repository": {"name": self.repository, "id": repository.get("id")},
             "projects": projects,
-            "labels": self._labels(),
+            "labels": labels,
         }
 
 

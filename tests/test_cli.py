@@ -18,6 +18,64 @@ from tests.helpers import item, manifest
 
 
 class CliTests(unittest.TestCase):
+    def test_init_plan_bounds_discovery_for_gh_and_api_backends(self) -> None:
+        discovery = {
+            "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+            "repository": {"name": "example", "id": "REPO_1"},
+            "projects": [
+                {
+                    "id": "PROJECT_7",
+                    "number": 7,
+                    "title": "example",
+                    "url": "url-7",
+                    "closed": False,
+                    "linked": True,
+                    "fields": [],
+                    "views": [],
+                }
+            ],
+            "labels": [],
+        }
+        for backend in ("gh", "api"):
+            with self.subTest(backend=backend):
+                transport = object()
+                transport_factory = Mock(return_value=transport)
+                reader = Mock()
+                reader.return_value.read.return_value = discovery
+                with (
+                    patch("agentic_backlog_kit.cli._transport", transport_factory),
+                    patch(
+                        "agentic_backlog_kit.cli.GitHubProjectDiscoveryReader",
+                        reader,
+                    ),
+                    redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(
+                        0,
+                        main(
+                            [
+                                "init-plan",
+                                "--owner",
+                                "aegolius-labs",
+                                "--repository",
+                                "example",
+                                "--project-number",
+                                "7",
+                                "--backend",
+                                backend,
+                            ]
+                        ),
+                    )
+
+                transport_factory.assert_called_once_with(backend)
+                reader.assert_called_once_with(
+                    transport,
+                    owner="aegolius-labs",
+                    repository="example",
+                    project_title=None,
+                    project_number=7,
+                )
+
     def test_iteration_apply_refreshes_then_verifies_identity_convergence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

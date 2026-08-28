@@ -266,6 +266,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _transport(args.backend),
                 owner=args.owner,
                 repository=args.repository,
+                project_title=args.project_title,
+                project_number=args.project_number,
             ).read()
         plan = build_bootstrap_plan(
             args.owner,
@@ -302,6 +304,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             transport,
             owner=plan.owner,
             repository=plan.repository,
+            project_title=plan.project_title,
+            project_number=plan.requested_project_number,
         ).read()
         service = GitHubService(
             transport,
