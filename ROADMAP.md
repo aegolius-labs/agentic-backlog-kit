@@ -95,7 +95,7 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R02 - Run live GitHub end-to-end evaluations
 
-- **Status:** Wave B preparation complete; live execution scheduled for Wave C
+- **Status:** Wave C live execution in progress; repository/Project creation and the first GH scaffold are complete, with fresh residual scaffold and API scaffold plans awaiting exact-digest confirmation
 - **Importance:** Critical
 - **Complexity:** Hard
 - **Context:** The local suite and offline evidence verifier cover the workflow contract, but no complete workflow has yet created and reconciled real issues, sub-issues, dependencies, Project fields, iterations, or views. Wave B added deterministic native-type and label-fallback fixtures, GitHub CLI/API/MCP scenario definitions, capability preflights, receipt/redaction checks, full view/iteration oracles, and a separate cleanup gate without contacting GitHub.
@@ -122,20 +122,20 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R05 - Manage the iteration lifecycle
 
-- **Status:** Complete in Wave B
+- **Status:** Complete in Wave B; Wave C live empty-field initialization repair validated locally and awaiting exact-digest apply
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** Full active/completed iteration definitions and identities are now canonical snapshot state. Sprint planning resolves exact titles, `@current`, and `@next` before commitment and rejects completed, duplicate, overlapping, stale/gapped, duration-mismatched, or otherwise ambiguous schedules.
-- **High-level approach:** Safe missing-current/next cases produce a separately reviewed full-configuration update that preserves every observed active definition and extends only contiguous numeric-suffix schedules. Apply is digest/fresh-state bound and journaled. Because GitHub's mutation input does not accept existing IDs or completion state, those remain preconditions and mandatory post-refresh invariants; item assignment stays blocked until the refreshed target ID is present.
+- **High-level approach:** Safe missing-current/next cases produce a separately reviewed full-configuration update that preserves every observed active definition and extends only contiguous numeric-suffix schedules. Wave C additionally proved that GitHub may create an empty iteration field while ignoring its empty configuration; the canonical snapshot now retains that uninitialized state without inventing a start or identity, and a separate initialization plan binds the null-start/empty precondition. Apply is digest/fresh-state bound and journaled. Because GitHub's mutation input does not accept existing IDs or completion state, those remain preconditions and mandatory post-refresh invariants; item assignment stays blocked until the refreshed target ID is present.
 - **Done when:** Sprint planning can select a valid current or next iteration, missing iterations are handled through a reviewed plan, and rollover/completed-iteration tests pass.
 
 #### R06 - Evaluate the installed plugin and skill activation
 
-- **Status:** Not started; scheduled for Wave C
+- **Status:** Complete in Wave C with token-bounded representative real traces and complete deterministic corpus/verifier coverage
 - **Importance:** High
 - **Complexity:** Medium
-- **Context:** The plugin manifest and skills validate structurally, but the complete plugin has not been installed from a local marketplace and exercised through real Codex conversations.
-- **High-level approach:** Install the checkout through a development marketplace and run a recorded evaluation set containing direct, indirect, follow-up, negative, and write-confirmation prompts. Repeat with GitHub MCP available and unavailable to confirm executor fallback.
+- **Context:** The plugin was installed and enabled from the personal local marketplace, structurally validated, and exercised through real Codex conversations covering direct, indirect, follow-up, negative, boundary, and write-confirmation behavior. The durable two-turn trace proves fresh-task identity, exact-session reuse, result-ID continuity, zero workspace mutation, no external contact, redaction, and reported token use. The complete 17-case/two-mode corpus remains available to the deterministic verifier; the full real 34-pair matrix was intentionally not executed because representative traces already exposed the integration defects and the project prioritizes bounded token use.
+- **High-level approach:** Keep real evaluation representative and bounded, while the deterministic harness enforces every corpus pair's evidence contract. Real traces fail closed on malformed/truncated output, incomplete turns, unproven references, unexpected filesystem changes, external contact, missing confirmation, or lost continuation identity. The installed generic GitHub MCP is recorded as capability-incomplete rather than pretending `mcp_available`; authenticated `gh` and direct GraphQL/REST remain the supported native Project routes.
 - **Done when:** The intended skill activates consistently, unsupported requests do not activate it, bundled references resolve after installation, and authorization boundaries hold in end-to-end conversations.
 
 #### R07 - Publish the repository, run Linux CI, and release `0.1.0`
@@ -236,7 +236,7 @@ Complexity labels describe implementation and validation effort, not importance.
    - Integration retained both full view and iteration configuration in the shared Project queries, aligned the evaluation oracle with the implemented view contract, and added observed iteration state to deterministic sprint expectations.
 
 3. **Wave C - Parallel release-candidate evaluation**
-   - Run R02 live GitHub evaluation and R06 installed-plugin evaluation concurrently against the stable candidate.
+   - R06 installed-plugin evaluation is complete; R02 live GitHub evaluation remains in progress at exact-digest scaffold gates.
    - Run Linux CI at the same time and rerun R09 measurements on the final behavior.
    - Failures return to the owning Wave A/B lane; do not patch production and evaluation branches independently.
 

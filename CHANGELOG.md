@@ -16,6 +16,8 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 - Complete Project view snapshots and semantic reconciliation for layout, filters, ordered visible fields, grouping, and sorting, with safe updates or precise fail-closed conflicts.
 - Deterministic active/completed iteration discovery, exact and alias resolution, safe rolling schedule extension, digest-confirmed apply receipts, and refreshed identity verification.
 - An offline disposable-GitHub evaluation package covering GitHub CLI, API, and MCP backends in native-type and label-fallback modes, including evidence verification and separately authorized cleanup.
+- A bounded installed-plugin trace runner with fail-closed multi-turn continuation, safe path canonicalization/redaction, validated local-ingestion mutation proof, and durable Wave C representative evidence.
+- Safe initialization planning for GitHub iteration fields that exist with an empty server configuration.
 
 ## [0.1.0] - Unreleased
 

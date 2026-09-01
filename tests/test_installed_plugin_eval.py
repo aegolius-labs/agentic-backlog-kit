@@ -57,6 +57,29 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         )
         self.assertTrue(all(case["fresh_task"] for case in corpus["cases"]))
 
+    def test_wave_c_r06_evidence_is_bounded_redacted_and_complete_by_category(self) -> None:
+        evidence = json.loads(
+            (EVAL_ROOT / "evidence.wave-c-r06.json").read_text(encoding="utf-8")
+        )
+        self.assertFalse(evidence["execution_scope"]["full_real_corpus_executed"])
+        self.assertEqual(
+            {"direct", "indirect", "follow_up", "negative", "boundary", "write_confirmation"},
+            set(evidence["execution_scope"]["real_prompt_categories_observed"]),
+        )
+        self.assertTrue(evidence["complete_corpus_contract"]["deterministic_schema_and_verifier_tests_passed"])
+        trace = evidence["durable_trace"]
+        self.assertTrue(trace["passed"])
+        self.assertEqual(2, trace["turn_count"])
+        self.assertTrue(trace["session_identity_proven"])
+        self.assertTrue(trace["continuation_reused"])
+        self.assertFalse(trace["workspace_changed"])
+        self.assertFalse(trace["external_contact_observed"])
+        self.assertTrue(trace["session_archived"])
+        self.assertTrue(trace["reused_identifiers"])
+        self.assertGreater(trace["token_usage"]["input_tokens"], 0)
+        self.assertFalse(evidence["credentials_recorded"])
+        self.assertFalse(evidence["raw_prompts_or_session_ids_recorded"])
+
     def test_prepare_suite_is_deterministic_and_materializes_workspace_marketplace(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
