@@ -501,13 +501,17 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertEqual("native", expected["issue_type_assertions"]["native"]["mode"])
         self.assertEqual("labels", expected["issue_type_assertions"]["labels"]["mode"])
 
-    def test_wave_c_capability_gap_covers_six_non_mutating_scenarios(self) -> None:
+    def test_wave_c_capability_gap_covers_six_scenarios_and_resource_create_evidence(self) -> None:
         path = EVAL_ROOT / "capability-gap.wave-c-r02.json"
         raw = path.read_text(encoding="utf-8")
         audit = json.loads(raw)
 
         self.assertTrue(audit["redactions_confirmed"])
-        self.assertFalse(audit["mutation_attempted"])
+        self.assertTrue(audit["mutation_attempted"])
+        self.assertEqual(
+            "confirmed repository creation only; Projects not created",
+            audit["mutation_scope"],
+        )
         self.assertFalse(audit["credentials_recorded"])
         self.assertEqual(6, len(audit["scenarios"]))
         self.assertEqual(
@@ -529,6 +533,33 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
                 if scenario["preflight_passed"]
             },
         )
+        applied = [
+            scenario
+            for scenario in audit["scenarios"]
+            if "resource_create" in scenario
+        ]
+        self.assertEqual(
+            {("gh", "labels"), ("api", "labels")},
+            {
+                (scenario["backend"], scenario["variant"])
+                for scenario in applied
+            },
+        )
+        for scenario in applied:
+            resource = scenario["resource_create"]
+            bootstrap = scenario["bootstrap_plan"]
+            self.assertFalse(scenario["repository_absent"])
+            self.assertTrue(scenario["repository_present_verified"])
+            self.assertEqual(scenario["backend"], resource["backend"])
+            self.assertEqual(
+                scenario["resource_create_digest"], resource["confirmed_digest"]
+            )
+            self.assertTrue(resource["owner_name_private_verified"])
+            self.assertEqual("private", resource["repository_visibility"])
+            self.assertTrue(bootstrap["fresh_discovery"])
+            self.assertTrue(bootstrap["validated"])
+            self.assertEqual(1, bootstrap["action_count"])
+            self.assertEqual(["project.create"], bootstrap["action_kinds"])
         self.assertTrue(
             all(scenario["project_absence_verified"] for scenario in audit["scenarios"])
         )
