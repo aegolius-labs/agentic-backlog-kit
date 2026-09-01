@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-01T01:06:19Z",
+  "refreshed_at_utc": "2026-09-01T01:37:16Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -150,6 +150,29 @@
         "status": "refresh_failed_closed",
         "zero_action_convergence": false
       },
+      "read_only_recheck": {
+        "empty_iteration_field_retained": true,
+        "residual_action_count": 3,
+        "residual_actions_by_kind": {
+          "project.view.update": 3
+        },
+        "residual_digest": "e6ea32e21e629466b5e06465101fdb2bb12788340b0229b71eb5a64d37f8043d",
+        "snapshot_fingerprint": "f1947c91f723ffc314e9324b135470a0d165ee998115750b361796e7e58d7d12",
+        "status": "refresh_succeeded_with_residual_actions",
+        "zero_action_convergence": false
+      },
+      "iteration_initialization_plan": {
+        "action_count": 1,
+        "action_kinds": ["project.field.update_iterations"],
+        "as_of": "2026-09-07",
+        "digest": "7222c3af9ae7efe570bb88a77736978b764f4de06460b7f660658f64e9961694",
+        "manifest_fingerprint": "a914071b1a3e83048df19315369c4ba84a54ce4cfb5a3c0de4c3767ba1999e74",
+        "ready": false,
+        "resolved_iteration_id": null,
+        "snapshot_fingerprint": "f1947c91f723ffc314e9324b135470a0d165ee998115750b361796e7e58d7d12",
+        "target": "Sprint 1",
+        "validated": true
+      },
       "preflight_passed": true,
       "blockers": []
     },
@@ -229,7 +252,10 @@
         },
         "digest": "4eb8be39a13e8fa1b67c3c2f832a5fb2b3456b50e990a3593e79c95baf476676",
         "fresh_post_create_snapshot": true,
-        "validated": true
+        "manifest_fingerprint": "5ee46cf96420942f8e5f6c3f55630cbd5c5f931350c49a90df1133e3cadfd19e",
+        "snapshot_fingerprint": "99a8991173bafb7e586aabfba397e507e178c3fa11c4e7b36150dc99ce7aaed4",
+        "validated": true,
+        "write_applied": false
       },
       "preflight_passed": true,
       "blockers": []
@@ -272,6 +298,23 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation, two confirmed Project creations, and one confirmed GH scaffold apply; no API scaffold, iteration lifecycle, or item writes",
+  "mutation_scope": "confirmed repository creation, two confirmed Project creations, and one confirmed GH scaffold apply; latest pass was read-only with no API scaffold, iteration lifecycle, or item writes",
+  "pending_write_gates": [
+    {
+      "action_count": 3,
+      "digest": "e6ea32e21e629466b5e06465101fdb2bb12788340b0229b71eb5a64d37f8043d",
+      "gate": "gh_scaffold_residual"
+    },
+    {
+      "action_count": 1,
+      "digest": "7222c3af9ae7efe570bb88a77736978b764f4de06460b7f660658f64e9961694",
+      "gate": "gh_iteration_initialization"
+    },
+    {
+      "action_count": 17,
+      "digest": "4eb8be39a13e8fa1b67c3c2f832a5fb2b3456b50e990a3593e79c95baf476676",
+      "gate": "api_scaffold"
+    }
+  ],
   "credentials_recorded": false
 }

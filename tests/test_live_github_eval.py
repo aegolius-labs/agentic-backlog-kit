@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation, two confirmed Project creations, and one confirmed GH scaffold apply; no API scaffold, iteration lifecycle, or item writes",
+            "confirmed repository creation, two confirmed Project creations, and one confirmed GH scaffold apply; latest pass was read-only with no API scaffold, iteration lifecycle, or item writes",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -580,6 +580,21 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         )
         self.assertFalse(gh_labels["scaffold_verification"]["zero_action_convergence"])
         self.assertIsNone(gh_labels["scaffold_verification"]["residual_digest"])
+        recheck = gh_labels["read_only_recheck"]
+        self.assertEqual("refresh_succeeded_with_residual_actions", recheck["status"])
+        self.assertTrue(recheck["empty_iteration_field_retained"])
+        self.assertFalse(recheck["zero_action_convergence"])
+        self.assertEqual(3, recheck["residual_action_count"])
+        self.assertEqual({"project.view.update": 3}, recheck["residual_actions_by_kind"])
+        iteration = gh_labels["iteration_initialization_plan"]
+        self.assertEqual("Sprint 1", iteration["target"])
+        self.assertEqual("2026-09-07", iteration["as_of"])
+        self.assertFalse(iteration["ready"])
+        self.assertIsNone(iteration["resolved_iteration_id"])
+        self.assertEqual(1, iteration["action_count"])
+        self.assertEqual(
+            ["project.field.update_iterations"], iteration["action_kinds"]
+        )
         api_labels = next(
             scenario
             for scenario in audit["scenarios"]
@@ -602,6 +617,15 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(api_labels["scaffold_plan"]["fresh_post_create_snapshot"])
         self.assertTrue(api_labels["scaffold_plan"]["validated"])
         self.assertEqual(17, api_labels["scaffold_plan"]["action_count"])
+        self.assertFalse(api_labels["scaffold_plan"]["write_applied"])
+        self.assertEqual(
+            {
+                "api_scaffold",
+                "gh_iteration_initialization",
+                "gh_scaffold_residual",
+            },
+            {gate["gate"] for gate in audit["pending_write_gates"]},
+        )
         self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
         self.assertTrue(
             audit["local_capabilities"]["direct_api_transport_read_passed"]
