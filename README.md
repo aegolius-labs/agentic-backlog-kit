@@ -11,7 +11,7 @@ The kit combines focused skills with a zero-runtime-dependency Python engine. Ag
 - Impact, Effort, Business Value, Enabler Value, and recursive dependency scoring.
 - Dependency-safe, capacity-aware sprint planning against refreshed active/completed iteration state.
 - Organization Project discovery/creation plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four fully reconciled views: Backlog, Kanban, Current Sprint, and Roadmap.
-- GitHub MCP-first agent workflows with authenticated GitHub CLI and direct API fallbacks.
+- Native GitHub Projects workflows through any complete supported transport: the Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, or direct GraphQL/REST API.
 - Dry-run planning by default and digest-confirmed apply operations.
 - Compact per-item ingestion and optimistic, atomic manifest updates.
 
@@ -102,7 +102,7 @@ and remote fingerprints and per-action preconditions. Receipts are updated
 atomically after every action, so an interrupted run records its completed
 prefix; refresh and create a new reviewed plan to resume safely.
 
-The launcher chooses an authenticated `gh` session when available. Otherwise, set `GH_TOKEN` or `GITHUB_TOKEN` for direct API access. GitHub MCP is used by the packaged skills when the host exposes compatible tools. Project creation/linking needs organization Projects write access and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
+The skills capability-check the host GitHub integration/MCP before using it. The launcher uses an authenticated `gh` session when selected, while `GH_TOKEN` or `GITHUB_TOKEN` enables the equally native direct GraphQL/REST route. Every route must produce the same canonical snapshots, plans, digests, and receipts; an incomplete MCP surface is reported explicitly, and write transports are never silently mixed within an apply. Project creation/linking needs organization Projects write access and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
 
 ## Plugin UX
 

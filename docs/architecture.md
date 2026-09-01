@@ -30,7 +30,7 @@ Managed views are compared across layout, filter, ordered visible fields, horizo
 
 Iteration lifecycle plans resolve exact titles, `@current`, or `@next` from canonical active/completed state. A schedule can be extended only from a contiguous, cadence-matching numeric title sequence. GitHub-owned iteration IDs and completion state are bound as preconditions and rechecked after refresh before assignment proceeds.
 
-GitHub MCP is the preferred interactive tool route when the host exposes the required issue, Project, sub-issue, and dependency operations. The same plan remains the contract regardless of executor.
+Native GitHub Projects access is a transport invariant, not an MCP-only feature. A compatible Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API are peer execution routes over the same deterministic engine contract. Capability discovery must prove that a route exposes every operation and identity required by a plan. An incomplete MCP surface is reported and the workflow selects one complete route; writes from different transports are never silently mixed within one apply. The same canonical snapshot, plan, digest, receipt, and post-apply verification contract applies regardless of executor.
 
 ## Backlog mapping
 

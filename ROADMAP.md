@@ -15,7 +15,7 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 - Backlog hierarchy defaults to `Initiative -> Epic -> Feature -> Story/Bug -> Task`.
 - GitHub sub-issues represent hierarchy; native issue dependencies represent blocking relationships; Project fields represent planning metadata.
 - Priority is computed locally from Impact, Effort, Dependencies, Enabler value, and Business Value. Dependency ordering is cycle-safe and deterministic.
-- GitHub access may use an available GitHub MCP server, GitHub CLI, or direct API. Skills choose the best available route, while the local engine remains provider-neutral.
+- Native GitHub Projects access is a first-class transport invariant across a capability-complete Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API. Skills select one complete route per apply, never silently mix write transports, and keep the local engine provider-neutral.
 - The implementation uses test-first development for schemas, scoring, planning, reconciliation, and mutation safety.
 
 ## Milestones
@@ -50,7 +50,7 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 - [x] Validate hierarchy, cycles, plan integrity, and field compatibility before apply; surface permission failures without retry loops.
 - [x] Bind apply to freshly verified local and remote state and journal partial execution (R01).
 - [x] Apply creates and updates through GitHub CLI/API, stopping on first failure and writing receipts.
-- [x] Support GitHub MCP as the preferred interactive route when matching tools are available.
+- [x] Support a capability-complete GitHub MCP as an interactive route and authenticated GitHub CLI/direct GraphQL API as peer native routes under the same plan/apply contract.
 
 ### M4 - Backlog and sprint scaffolding
 
@@ -191,13 +191,14 @@ Complexity labels describe implementation and validation effort, not importance.
 - **High-level approach:** Separate portfolio items from repository-owned delivery items, introduce repository-qualified stable references, support cross-repository dependencies, and retain compact per-repository snapshots.
 - **Done when:** Multiple repositories can participate in one portfolio Project without ID ambiguity or loading every repository backlog into model context.
 
-#### R13 - Decide whether to build a dedicated MCP server
+#### R13 - Complete native transport parity and decide whether to build a dedicated MCP server
 
-- **Importance:** Conditional
+- **Status:** Decision gate opened by Wave C evidence; direct GraphQL works, installed generic GitHub MCP is incomplete for Projects
+- **Importance:** High
 - **Complexity:** Hard
-- **Context:** The kit currently relies on the host GitHub MCP with CLI/API fallbacks. A custom server is useful only if live evaluation shows that the generic GitHub MCP cannot expose the required deterministic or compact operations.
-- **High-level approach:** Use R02 and R06 results to identify missing operations, excessive tool calls, or poor result shapes. If justified, expose compact query, plan, validate, apply, and verify tools while keeping the local engine as the shared core.
-- **Done when:** The decision is supported by evaluation evidence; if built, the server reduces calls/context and preserves the same plan/apply contract.
+- **Context:** The product requirement is native GitHub Projects interaction through the Codex GitHub integration/GitHub MCP when it exposes the complete surface, or through direct GraphQL/REST calls. Wave C proved the authenticated CLI and direct API routes can discover and create Projects, while the installed generic GitHub MCP lacks repository lifecycle, Projects, fields/views/iterations, hierarchy/dependency, issue-type, and rate-limit operations. Direct GraphQL is a first-class route, not reduced fallback behavior.
+- **High-level approach:** Formalize a capability router for three peer transports: compatible host GitHub integration/MCP, authenticated `gh` GraphQL/REST, and direct GraphQL/REST. Every declared-compatible route must emit the same compact canonical snapshots and use the shared deterministic plan, digest, apply, receipt, and verification engine. Select one complete write route per apply and report missing MCP capabilities explicitly. Use R02/R06 call counts and result shapes to decide whether a thin dedicated MCP adapter is justified; do not duplicate planning logic in that server.
+- **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence.
 
 ## Concurrency and dependency plan
 
@@ -246,7 +247,7 @@ Complexity labels describe implementation and validation effort, not importance.
 5. **Wave E - Post-release parallel tracks**
    - R10 destructive/reverse reconciliation and R11 import/bulk ingestion may start concurrently after R01, but require isolated branches and a shared authority/conflict contract.
    - Begin R12 only after single-repository behavior and import/reconciliation policies stabilize.
-   - Make the R13 MCP decision only after R02/R06 provide evidence; do not build a server preemptively.
+   - Complete R13 transport-parity hardening from R02/R06 evidence, then build a dedicated MCP adapter only if it materially improves capability coverage or token/tool-call efficiency.
 
 ### Critical path
 
