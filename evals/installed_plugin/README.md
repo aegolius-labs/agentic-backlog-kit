@@ -66,16 +66,19 @@ matrix. Use a new output directory for each invocation:
     python scripts/installed_plugin_eval.py trace --suite .agentic-backlog/evals/installed-plugin/r06-local/suite.json --output .agentic-backlog/evals/installed-plugin/r06-trace --executable C:\path\to\codex.cmd --case direct-ingest --mode mcp_unavailable
     python scripts/installed_plugin_eval.py trace-verify --suite .agentic-backlog/evals/installed-plugin/r06-local/suite.json --results .agentic-backlog/evals/installed-plugin/r06-trace/trace-results.ndjson --case direct-ingest --mode mcp_unavailable
 
-Each selected case gets an isolated fixture workspace containing only the
-manifest, a compact scaffold snapshot, and prompt hashes. The runner starts
-exec --json --ephemeral with read-only, --ask-for-approval never, the bounded
-default model gpt-5.6-luna, and max reasoning effort. Follow-up turns use
-exec resume and must reuse the observed thread ID. JSONL events are bounded
-and retained only after path/credential redaction; raw prompts, stdout,
-stderr, and executable paths are not retained. Workspace hashes,
-tool/mutation observations, activation and bundled-reference evidence,
-confirmation/authorization evidence, model, effort, session identity, and
-reported token usage are retained. Missing, malformed, truncated, or
+Each selected case gets an isolated fixture workspace containing the manifest,
+a compact scaffold snapshot, prompt hashes, and a local AGENTS.md policy. The
+runner uses read-only sandboxing for every non-ingestion case; cases that
+activate backlog-ingest alone use workspace-write and may change only the
+fixture manifest. The local policy forbids GitHub, MCP, network, and external
+writes. Single-turn runs use exec --json --ephemeral; multi-turn runs use a
+disposable persisted session so exec resume can reuse the observed thread.
+Remove that persisted session after retaining the redacted evidence. JSONL
+events are bounded and retained only after path/credential redaction; raw
+prompts, stdout, stderr, executable paths, and session IDs are not retained.
+Workspace hashes, tool/mutation observations, activation and bundled-reference
+evidence, confirmation/authorization evidence, model, effort, session hash,
+and reported token usage are retained. Missing, malformed, truncated, or
 ambiguous evidence fails closed.
 
 The six default representative cases are direct-ingest,

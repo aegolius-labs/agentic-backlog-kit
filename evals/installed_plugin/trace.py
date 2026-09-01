@@ -1,7 +1,7 @@
 """Bounded, redacted Codex CLI traces for the installed-plugin gate.
 
 This module is deliberately an observer: it seeds local fixtures, starts only
-the selected read-only CLI tasks, and fails closed when evidence is absent.
+the selected case-scoped CLI tasks, and fails closed when evidence is absent.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -31,6 +32,10 @@ from .harness import (
     _write_json,
     write_results,
 )
+
+if str(REPOSITORY_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT / "src"))
+from agentic_backlog_kit.manifest import validate_manifest
 
 TRACE_SCHEMA_VERSION = 1
 TRACE_DEFAULT_MODEL = "gpt-5.6-luna"
@@ -130,10 +135,20 @@ def seed_trace_workspace(
     manifest = _read_json(source)
     if not isinstance(manifest, Mapping):
         raise EvaluationError("The manifest fixture must be an object")
+    write_manifest = _ingestion_case(case)
     workspace.mkdir(parents=True, exist_ok=False)
     _write_json(workspace / ".agentic-backlog" / "manifest.json", manifest)
     _write_json(workspace / ".agentic-backlog" / "cache" / "scaffold.json",
                 {"fields": [], "views": [], "labels": []})
+    (workspace / "AGENTS.md").write_text(
+        "# Disposable installed-plugin trace workspace\n"
+        + ("Remove the disposable persisted session after retaining redacted evidence.\n"
+           if len(case.get("turns", [])) > 1 else "")
+        + "Never contact GitHub, call MCP, use a network, or make external writes.\n"
+        + ("Only the fixture manifest may change: .agentic-backlog/manifest.json.\n"
+           if write_manifest else "No files may change during this trace.\n"),
+        encoding="utf-8",
+    )
     hashes = [_hash(str(turn["prompt"])) for turn in case.get("turns", [])]
     _write_json(workspace / ".r06-trace.json", {
         "schema_version": TRACE_SCHEMA_VERSION, "case_id": case_id, "mode": mode,
@@ -145,6 +160,10 @@ def seed_trace_workspace(
         "path": workspace, "relative_path": workspace.relative_to(output).as_posix(),
         "before": before, "before_sha256": _state_digest(before),
         "prompt_sha256": hashes, "fresh_task": True,
+        "sandbox": "workspace-write" if write_manifest else "read-only",
+        "manifest_path": ".agentic-backlog/manifest.json",
+        "manifest_ids": sorted(str(item["id"]) for item in manifest["items"]),
+        "manifest_write": write_manifest,
     }
 
 
@@ -154,6 +173,22 @@ def _redact(value: Any, *, root: Path | None = None, limit: int = 4000) -> str:
         for value in (str(root.resolve()), str(root.resolve()).replace("\\", "/")):
             text = text.replace(value, "<workspace>")
     return _PATH.sub("<path>", _TOKEN.sub("<redacted>", _CREDENTIAL.sub("<redacted>", text)))[:limit]
+
+
+def _ingestion_case(case: Mapping[str, Any]) -> bool:
+    expected = [value for value in case.get("expected_turns", []) if isinstance(value, Mapping)]
+    return bool(expected) and all(value.get("skill") == "backlog-ingest" for value in expected)
+
+
+def _manifest_state(path: Path) -> tuple[set[str], str | None]:
+    try:
+        if path.is_symlink():
+            raise EvaluationError("fixture manifest must not be a symlink")
+        manifest = validate_manifest(_read_json(path))
+        ids = {str(item["id"]) for item in manifest["items"]}
+    except (EvaluationError, ValueError, KeyError, TypeError) as exc:
+        return set(), str(exc)
+    return ids, None
 
 
 def _sensitive(value: Any) -> bool:
@@ -256,14 +291,19 @@ def probe_codex_mcp(
     }
 
 
-def _command(executable: str, workspace: Path, model: str, effort: str, thread: str | None = None) -> list[str]:
+def _command(
+    executable: str, workspace: Path, model: str, effort: str,
+    thread: str | None = None, *, sandbox: str = "read-only", ephemeral: bool = True,
+) -> list[str]:
     if thread:
         return [executable, "--ask-for-approval", "never", "exec", "resume", thread,
-                "--json", "--ephemeral", "--model", model, "-c",
+                "--json", "--model", model, "-c",
                 f"model_reasoning_effort={effort}", "-"]
-    return [executable, "--ask-for-approval", "never", "exec", "--json", "--ephemeral",
-            "--model", model, "-c", f"model_reasoning_effort={effort}", "-s",
-            "read-only", "--skip-git-repo-check", "-C", str(workspace), "-"]
+    command = [executable, "--ask-for-approval", "never", "exec", "--json"]
+    if ephemeral:
+        command.append("--ephemeral")
+    return command + ["--model", model, "-c", f"model_reasoning_effort={effort}", "-s",
+            sandbox, "--skip-git-repo-check", "-C", str(workspace), "-"]
 
 
 def _invoke_subprocess(
@@ -430,7 +470,8 @@ def parse_trace_jsonl(
             compact = {"type": str(event.get("type", ""))}
             for key in ("thread_id", "turn_id"):
                 if event.get(key) is not None:
-                    compact[key] = _redact(event[key], root=workspace, limit=160)
+                    compact[key] = (_hash(str(event[key])) if key == "thread_id"
+                                    else _redact(event[key], root=workspace, limit=160))
             if item:
                 compact["item"] = _redact(_canonical(item), root=workspace, limit=2000)
             if event.get("usage") is not None:
@@ -526,12 +567,15 @@ def _blocked(
     suite: Mapping[str, Any], case: Mapping[str, Any], mode: str, reason: str,
     workspace: Mapping[str, Any], model: str, effort: str,
 ) -> dict[str, Any]:
+    multi_turn = len(case.get("turns", [])) > 1
     return {
         "schema_version": TRACE_SCHEMA_VERSION, "suite": suite.get("suite"),
         **_expected_record(case, mode), "plugin": suite.get("plugin", {}).get("name", PLUGIN_NAME),
         "model": model, "reasoning_effort": effort, "status": "blocked", "passed": False,
-        "failures": [reason], "session": {"fresh_task": True, "ephemeral": True,
-        "thread_ids": [], "turn_count": 0, "continuation_reused": False, "identity_proven": False},
+        "failures": [reason], "session": {"fresh_task": True, "ephemeral": not multi_turn,
+        "session_persisted": multi_turn, "sandbox": workspace.get("sandbox", "read-only"),
+        "session_hash": None, "cleanup_required": multi_turn, "thread_ids": [], "turn_count": 0,
+        "continuation_reused": False, "identity_proven": False},
         "workspace": {"relative_path": workspace["relative_path"],
         "before_sha256": workspace["before_sha256"], "after_sha256": workspace["before_sha256"],
         "changed": False, "changed_paths": []},
@@ -623,19 +667,26 @@ def run_trace_case(
                         workspace, model, reasoning_effort)
     prompts = [str(turn["prompt"]) for turn in case.get("turns", [])]
     expected = [value for value in case.get("expected_turns", []) if isinstance(value, Mapping)]
+    sandbox = workspace["sandbox"]
+    ephemeral = len(prompts) == 1
     process = runner
     parts: list[dict[str, Any]] = []
     statuses: list[str] = []
     exits: list[int | None] = []
     commands: list[dict[str, Any]] = []
     failures: list[str] = []
+    manifest_turn_ids: list[set[str]] = []
+    manifest_errors: list[str] = []
     elapsed = 0
     thread: str | None = None
     for index, prompt in enumerate(prompts):
         if index and not thread:
             failures.append("follow-up could not reuse an observed fresh-task thread")
             break
-        command = _command(str(candidate or executable), workspace["path"], model, reasoning_effort, thread)
+        command = _command(
+            str(candidate or executable), workspace["path"], model, reasoning_effort, thread,
+            sandbox=sandbox, ephemeral=ephemeral,
+        )
         status, exit_code, stdout, stderr, duration = _invoke(
             process, command, workspace["path"], prompt, timeout_seconds, max_output_bytes
         )
@@ -645,12 +696,23 @@ def run_trace_case(
                                  mode=mode, workspace=workspace["path"],
                                  output_truncated=(status == "output_limit_exceeded" or size > max_output_bytes))
         parts.append(part)
+        if workspace["manifest_write"]:
+            ids, error = _manifest_state(workspace["path"] / workspace["manifest_path"])
+            manifest_turn_ids.append(ids)
+            if error:
+                manifest_errors.append(f"turn {index + 1}: {error}")
+        command_args = ["--ask-for-approval", "never", "exec"]
+        if index:
+            command_args += ["resume", "<thread>", "--json"]
+        else:
+            command_args += ["--json"] + (["--ephemeral"] if ephemeral else [])
+        command_args += ["--model", model, "-c", f"model_reasoning_effort={reasoning_effort}"]
+        if not index:
+            command_args += ["-s", sandbox]
         commands.append({"kind": "follow_up" if index else "fresh",
-                         "thread_id": thread,
-                         "args": ["--ask-for-approval", "never", "exec",
-                                  "resume" if index else "--json", "--ephemeral",
-                                  "--model", model, "-c",
-                                  f"model_reasoning_effort={reasoning_effort}", "-s", "read-only"]})
+                         "thread_id_sha256": _hash(thread) if thread else None,
+                         "sandbox": sandbox, "ephemeral": ephemeral if index == 0 else False,
+                         "args": command_args})
         observed = part["thread_ids"]
         if index == 0:
             thread = observed[0] if observed else None
@@ -700,8 +762,47 @@ def run_trace_case(
             confirmation.get("provided") and confirmation.get("exact_digest_observed")
         ):
             failures.append(f"turn {index + 1}: exact reviewed digest confirmation was not observed")
-    if changed or trace["mutation"]["detected_in_events"]:
+    manifest_path = workspace["manifest_path"]
+    before_ids = set(workspace["manifest_ids"])
+    after_ids = manifest_turn_ids[-1] if manifest_turn_ids else before_ids
+    stable_id: str | None = None
+    if workspace["manifest_write"]:
+        if manifest_path not in changed:
+            failures.append("ingestion did not update the fixture manifest")
+        if manifest_errors:
+            failures.extend(f"manifest validation failed: {error}" for error in manifest_errors)
+        if manifest_turn_ids:
+            added = manifest_turn_ids[0] - before_ids
+            if len(added) != 1:
+                failures.append("ingestion did not create exactly one stable item ID")
+            else:
+                stable_id = next(iter(added))
+            for ids in manifest_turn_ids:
+                if not before_ids <= ids:
+                    failures.append("ingestion changed an existing manifest item ID")
+                if stable_id and stable_id not in ids:
+                    failures.append("ingestion did not preserve the stable item ID")
+                extra = ids - before_ids - ({stable_id} if stable_id else set())
+                if extra:
+                    failures.append("ingestion created more than one stable item ID")
+    unexpected_changes = sorted(set(changed) - ({manifest_path} if workspace["manifest_write"] else set()))
+    if unexpected_changes:
+        failures.append("workspace mutation occurred outside the allowed fixture manifest")
+    if trace["mutation"]["github_contact_observed"]:
+        failures.append("external GitHub or MCP tool evidence was observed")
+    allowed_manifest_event = workspace["manifest_write"] and manifest_path in changed and not unexpected_changes and all(
+        call["type"] in {"file_change", "apply_patch"}
+        and not _MUTATION.search(call["command"])
+        and (not call["command"] or ".agentic-backlog/manifest.json" in call["command"].replace("\\", "/"))
+        for call in trace["tool_calls"] if call["mutating"]
+    )
+    if trace["mutation"]["detected_in_events"] and not allowed_manifest_event:
         failures.append("workspace or event evidence indicates mutation")
+    raw_thread_ids = trace["thread_ids"]
+    thread_hashes = [_hash(value) for value in raw_thread_ids]
+    session_hash = _hash("|".join(sorted(raw_thread_ids))) if raw_thread_ids else None
+    trace_evidence = dict(trace)
+    trace_evidence["thread_ids"] = thread_hashes
     if not trace["usage"]:
         failures.append("token usage was not reported by the CLI")
     return {
@@ -713,10 +814,13 @@ def run_trace_case(
         "passed": not failures, "exit_code": exits[-1] if exits else None, "exit_codes": exits,
         "elapsed_ms": elapsed, "commands": commands,
         "session": {
-            "fresh_task": True, "ephemeral": True, "thread_ids": trace["thread_ids"],
-            "initial_thread_id": thread, "turn_count": trace["turn_count"],
+            "fresh_task": True, "ephemeral": ephemeral, "session_persisted": not ephemeral,
+            "sandbox": sandbox, "session_hash": session_hash, "thread_ids": thread_hashes,
+            "initial_thread_id_sha256": _hash(thread) if thread else None,
+            "cleanup_required": not ephemeral,
+            "turn_count": trace["turn_count"],
             "continuation_reused": len(prompts) == 1 or bool(thread),
-            "identity_proven": bool(trace["thread_ids"] and trace["turn_count"] >= len(prompts)),
+            "identity_proven": bool(raw_thread_ids and trace["turn_count"] >= len(prompts)),
         },
         "workspace": {
             "relative_path": workspace["relative_path"], "before_sha256": workspace["before_sha256"],
@@ -732,7 +836,14 @@ def run_trace_case(
             "mutation": parts[index].get("mutation", {}) if index < len(parts) else {},
             "usage": parts[index].get("usage", {}) if index < len(parts) else {},
         } for index, prompt in enumerate(prompts)],
-        "trace": {key: value for key, value in trace.items() if key != "events"}
+        "manifest": {
+            "path": manifest_path, "allowed_change": workspace["manifest_write"],
+            "changed": manifest_path in changed, "valid": not manifest_errors,
+            "before_item_ids": sorted(before_ids), "after_item_ids": sorted(after_ids),
+            "added_item_ids": sorted(after_ids - before_ids), "stable_item_id": stable_id,
+            "turn_item_ids": [sorted(ids) for ids in manifest_turn_ids],
+        },
+        "trace": {key: value for key, value in trace_evidence.items() if key != "events"}
                  | {"events_path": event_path.relative_to(output).as_posix()},
         "usage": trace["usage"], "failures": failures,
         "redaction": {
@@ -790,13 +901,35 @@ def verify_trace_records(
         if record.get("prompt_sha256") != [_hash(str(turn["prompt"])) for turn in case.get("turns", [])]:
             failures.append(f"{case_id}/{mode}: prompt hashes differ from corpus")
         session = evidence(record.get("session", {}), f"{case_id}/{mode}: session evidence must be an object")
-        if not all(session.get(key) is True for key in ("fresh_task", "ephemeral", "identity_proven")):
+        multi_turn = len(case.get("turns", [])) > 1
+        expected_sandbox = "workspace-write" if _ingestion_case(case) else "read-only"
+        if session.get("fresh_task") is not True or session.get("identity_proven") is not True:
             failures.append(f"{case_id}/{mode}: fresh-task identity proof is missing")
-        if len(case.get("turns", [])) > 1 and session.get("continuation_reused") is not True:
+        if session.get("ephemeral") is not (not multi_turn) or session.get("session_persisted") is not multi_turn:
+            failures.append(f"{case_id}/{mode}: persisted-session policy is missing")
+        if session.get("sandbox") != expected_sandbox:
+            failures.append(f"{case_id}/{mode}: sandbox metadata differs from the case policy")
+        if multi_turn and session.get("continuation_reused") is not True:
             failures.append(f"{case_id}/{mode}: follow-up continuity proof is missing")
         workspace = record.get("workspace", {})
-        if not isinstance(workspace, Mapping) or workspace.get("changed") is not False:
+        manifest = evidence(record.get("manifest", {}), f"{case_id}/{mode}: manifest evidence must be an object")
+        changed_paths = workspace.get("changed_paths", []) if isinstance(workspace, Mapping) else []
+        if not isinstance(workspace, Mapping) or not isinstance(changed_paths, list):
+            failures.append(f"{case_id}/{mode}: workspace mutation proof is missing")
+        elif _ingestion_case(case):
+            if (workspace.get("changed") is not True or changed_paths != [manifest.get("path")] or
+                    manifest.get("allowed_change") is not True or manifest.get("changed") is not True or
+                    manifest.get("valid") is not True or not manifest.get("stable_item_id")):
+                failures.append(f"{case_id}/{mode}: manifest mutation proof is missing")
+        elif workspace.get("changed") is not False or changed_paths:
             failures.append(f"{case_id}/{mode}: mutation-free workspace proof is missing")
+        commands = record.get("commands", [])
+        if not isinstance(commands, list) or len(commands) != len(case.get("turns", [])) or any(
+            not isinstance(command, Mapping) or command.get("sandbox") != expected_sandbox
+            or command.get("ephemeral") is not (not multi_turn and index == 0)
+            for index, command in enumerate(commands)
+        ):
+            failures.append(f"{case_id}/{mode}: command sandbox metadata is missing")
         redaction = record.get("redaction", {})
         if not isinstance(redaction, Mapping) or any(redaction.get(key) is not value for key, value in (
             ("credentials_recorded", False), ("paths_redacted", True),
@@ -809,7 +942,7 @@ def verify_trace_records(
         trace_mutation = evidence(
             trace.get("mutation", {}), f"{case_id}/{mode}: trace mutation evidence must be an object"
         )
-        if trace_mutation.get("detected_in_events"):
+        if trace_mutation.get("detected_in_events") or trace_mutation.get("github_contact_observed"):
             failures.append(f"{case_id}/{mode}: mutation observed in aggregate trace")
         if not record.get("usage"):
             failures.append(f"{case_id}/{mode}: token usage evidence is missing")
@@ -856,7 +989,7 @@ def verify_trace_records(
                 turn.get("mutation", {}),
                 f"{case_id}/{mode} turn {index}: mutation evidence must be an object",
             )
-            if turn_mutation.get("detected_in_events"):
+            if turn_mutation.get("detected_in_events") or turn_mutation.get("github_contact_observed"):
                 failures.append(f"{case_id}/{mode} turn {index}: mutation observed")
     for pair in sorted(expected_pairs - actual):
         failures.append(f"{pair[0]}/{pair[1]}: missing trace record")

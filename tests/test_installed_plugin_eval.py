@@ -355,6 +355,15 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         )
         return "".join(json.dumps(event) + "\n" for event in events)
 
+    def _append_trace_manifest_item(self, cwd: str, item_id: str = "STORY-0003") -> None:
+        path = Path(cwd) / ".agentic-backlog" / "manifest.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not any(item.get("id") == item_id for item in data["items"]):
+            item = copy.deepcopy(next(item for item in data["items"] if item["id"] == "STORY-0002"))
+            item.update({"id": item_id, "title": "Export the filtered backlog as CSV"})
+            data["items"].append(item)
+            path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
     def test_seed_trace_workspace_is_compact_and_hashes_each_corpus_turn(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             suite = self._trace_suite(temporary)
@@ -369,6 +378,8 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
             self.assertEqual(2, len(workspace["prompt_sha256"]))
             self.assertTrue(workspace["before_sha256"])
             self.assertFalse(any(path.name == "SKILL.md" for path in workspace["path"].rglob("*")))
+            self.assertEqual("workspace-write", workspace["sandbox"])
+            self.assertIn("only the fixture manifest", (workspace["path"] / "AGENTS.md").read_text().lower())
 
     def test_parse_trace_jsonl_redacts_paths_and_tokens_and_keeps_usage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -434,6 +445,8 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
         def runner(command, **kwargs):
             calls.append({"command": list(command), **kwargs})
+            if "resume" not in command:
+                self._append_trace_manifest_item(kwargs["cwd"])
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -464,16 +477,26 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
             ],
             record["prompt_sha256"],
         )
-        self.assertIn("--ephemeral", calls[0]["command"])
-        self.assertIn("--ephemeral", calls[1]["command"])
+        self.assertNotIn("--ephemeral", calls[0]["command"])
+        self.assertNotIn("--ephemeral", calls[1]["command"])
+        self.assertEqual("workspace-write", calls[0]["command"][calls[0]["command"].index("-s") + 1])
+        self.assertNotIn("-s", calls[1]["command"])
         self.assertIn("model_reasoning_effort=max", calls[0]["command"])
-        self.assertEqual("thread-trace-1", record["commands"][1]["thread_id"])
+        self.assertEqual("workspace-write", record["commands"][1]["sandbox"])
+        self.assertFalse(record["session"]["ephemeral"])
+        self.assertEqual(64, len(record["commands"][1]["thread_id_sha256"]))
+        self.assertNotIn("thread-trace-1", json.dumps(record))
+        self.assertTrue(record["manifest"]["valid"])
+        self.assertEqual("STORY-0003", record["manifest"]["stable_item_id"])
+        self.assertEqual(record["manifest"]["stable_item_id"], record["manifest"]["added_item_ids"][0])
         self.assertEqual(200, record["usage"]["input_tokens"])
         self.assertEqual(40, record["usage"]["output_tokens"])
 
     def test_run_trace_case_rejects_follow_up_without_thread_identity(self) -> None:
         def runner(command, **kwargs):
             resumed = "resume" in command
+            if not resumed:
+                self._append_trace_manifest_item(kwargs["cwd"])
             return subprocess.CompletedProcess(
                 command, 0,
                 stdout=self._fake_trace_output(
@@ -505,6 +528,7 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
     def test_trace_runner_fails_closed_on_mutation_and_malformed_jsonl(self) -> None:
         def runner(command, **kwargs):
+            self._append_trace_manifest_item(kwargs["cwd"])
             output = self._fake_trace_output(mutation=True) + "not-json\n"
             return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
@@ -562,6 +586,66 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertFalse(report["passed"])
         self.assertTrue(any("complete JSONL evidence" in value for value in report["failures"]))
 
+    def test_ingestion_rejects_invalid_fixture_manifest(self) -> None:
+        def runner(command, **kwargs):
+            path = Path(kwargs["cwd"]) / ".agentic-backlog" / "manifest.json"
+            path.write_text("{}\n", encoding="utf-8")
+            return subprocess.CompletedProcess(
+                command, 0, stdout=self._fake_trace_output(), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("manifest validation" in value for value in record["failures"]))
+
+    def test_trace_runner_rejects_external_tool_evidence_for_local_ingestion(self) -> None:
+        def runner(command, **kwargs):
+            self._append_trace_manifest_item(kwargs["cwd"])
+            events = [json.loads(line) for line in self._fake_trace_output().splitlines()]
+            events[1]["item"]["type"] = "mcp_tool_call"
+            return subprocess.CompletedProcess(
+                command, 0, stdout="".join(json.dumps(event) + "\n" for event in events), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("external" in value for value in record["failures"]))
+
+    def test_trace_runner_allows_manifest_file_change_evidence_for_local_ingestion(self) -> None:
+        def runner(command, **kwargs):
+            self._append_trace_manifest_item(kwargs["cwd"])
+            events = [json.loads(line) for line in self._fake_trace_output().splitlines()]
+            events[1]["item"].update({
+                "type": "file_change",
+                "command": ["apply_patch", ".agentic-backlog/manifest.json"],
+            })
+            return subprocess.CompletedProcess(
+                command, 0, stdout="".join(json.dumps(event) + "\n" for event in events), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertTrue(record["passed"], record["failures"])
+        self.assertTrue(record["trace"]["mutation"]["detected_in_events"])
+        self.assertEqual([".agentic-backlog/manifest.json"], record["workspace"]["changed_paths"])
+
     def test_trace_runner_requires_confirmation_and_mcp_proof(self) -> None:
         def runner(command, **kwargs):
             return subprocess.CompletedProcess(
@@ -610,6 +694,7 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
     def test_trace_runner_detects_empty_directory_mutation(self) -> None:
         def runner(command, **kwargs):
+            self._append_trace_manifest_item(kwargs["cwd"])
             Path(kwargs["cwd"], "unexpected-directory").mkdir()
             return subprocess.CompletedProcess(
                 command, 0, stdout=self._fake_trace_output(), stderr=""
@@ -630,7 +715,12 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertTrue(any("mutation" in value for value in record["failures"]))
 
     def test_run_traces_supports_selected_pairs_and_reports_full_corpus_remainder(self) -> None:
+        calls: list[list[str]] = []
+
         def runner(command, **kwargs):
+            if not calls:
+                self._append_trace_manifest_item(kwargs["cwd"])
+            calls.append(list(command))
             return subprocess.CompletedProcess(
                 command,
                 0,
