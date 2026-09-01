@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation and one confirmed GH Project creation; API Project apply aborted before write on drift",
+            "confirmed repository creation, two confirmed Project creations, and one confirmed GH scaffold apply; no API scaffold, iteration lifecycle, or item writes",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -573,17 +573,35 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(gh_labels["scaffold_plan"]["fresh_post_create_snapshot"])
         self.assertTrue(gh_labels["scaffold_plan"]["validated"])
         self.assertEqual(17, gh_labels["scaffold_plan"]["action_count"])
+        self.assertEqual("completed", gh_labels["scaffold_apply"]["status"])
+        self.assertEqual(17, gh_labels["scaffold_apply"]["applied_actions"])
+        self.assertEqual(
+            "refresh_failed_closed", gh_labels["scaffold_verification"]["status"]
+        )
+        self.assertFalse(gh_labels["scaffold_verification"]["zero_action_convergence"])
+        self.assertIsNone(gh_labels["scaffold_verification"]["residual_digest"])
         api_labels = next(
             scenario
             for scenario in audit["scenarios"]
             if (scenario["backend"], scenario["variant"]) == ("api", "labels")
         )
-        self.assertTrue(api_labels["project_absence_verified"])
+        self.assertFalse(api_labels["project_absence_verified"])
         self.assertEqual("aborted_before_write", api_labels["bootstrap_apply"]["status"])
         self.assertEqual(0, api_labels["bootstrap_apply"]["applied_actions"])
         self.assertTrue(api_labels["replacement_bootstrap_plan"]["fresh_discovery"])
         self.assertTrue(api_labels["replacement_bootstrap_plan"]["validated"])
         self.assertEqual(1, api_labels["replacement_bootstrap_plan"]["action_count"])
+        self.assertEqual(5, api_labels["project"]["number"])
+        self.assertTrue(api_labels["project"]["repository_link_verified"])
+        self.assertEqual(
+            "completed", api_labels["replacement_bootstrap_apply"]["status"]
+        )
+        self.assertEqual(
+            5, api_labels["replacement_bootstrap_apply"]["manifest_project_number"]
+        )
+        self.assertTrue(api_labels["scaffold_plan"]["fresh_post_create_snapshot"])
+        self.assertTrue(api_labels["scaffold_plan"]["validated"])
+        self.assertEqual(17, api_labels["scaffold_plan"]["action_count"])
         self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
         self.assertTrue(
             audit["local_capabilities"]["direct_api_transport_read_passed"]
