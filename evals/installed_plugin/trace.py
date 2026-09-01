@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -198,6 +199,8 @@ def probe_plugin_catalog(
     )
     if error:
         return {"status": "blocked", "plugin": None, "reason": error}
+    if getattr(completed, "returncode", 1) != 0:
+        return {"status": "failed", "plugin": None, "reason": "plugin catalog probe failed"}
     try:
         data = json.loads(str(getattr(completed, "stdout", "") or ""))
     except (TypeError, ValueError) as exc:
@@ -237,7 +240,14 @@ def probe_codex_mcp(
         return {"status": "failed", "github_mcp": None, "reason": "mcp list failed"}
     lines = [line.strip() for line in str(getattr(completed, "stdout", "") or "").splitlines() if line.strip()]
     github = [line for line in lines if re.search(r"(?i)\bgithub\b", line)]
-    available = bool(github) and not any(re.search(r"(?i)\b(?:disabled|unsupported|failed|error)\b", line) for line in github)
+    available_markers = re.compile(r"(?i)\b(?:enabled|connected|available|running|ready)\b")
+    unavailable_markers = re.compile(
+        r"(?i)\b(?:disabled|unsupported|failed|error|unavailable|disconnected|"
+        r"not[ -]?configured|not[ -]?found|unreachable|offline)\b"
+    )
+    available = bool(github) and any(available_markers.search(line) for line in github) and not any(
+        unavailable_markers.search(line) for line in github
+    )
     return {
         "status": "passed", "github_mcp": available,
         "configured_names": [_redact(line.split()[0], limit=80) for line in lines[:64]],
@@ -256,10 +266,110 @@ def _command(executable: str, workspace: Path, model: str, effort: str, thread: 
             "read-only", "--skip-git-repo-check", "-C", str(workspace), "-"]
 
 
-def _invoke(
-    runner: Callable[..., Any], command: Sequence[str], workspace: Path, prompt: str, timeout: float
+def _invoke_subprocess(
+    command: Sequence[str], workspace: Path, prompt: str, timeout: float, max_output_bytes: int
 ) -> tuple[str, int | None, str, str, int]:
     started = time.monotonic()
+    process = subprocess.Popen(
+        list(command), cwd=str(workspace), stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_env()
+    )
+    lock = threading.Lock()
+    total = 0
+    exceeded = False
+    outputs = {"stdout": bytearray(), "stderr": bytearray()}
+
+    def read(name: str, stream: Any) -> None:
+        nonlocal total, exceeded
+        try:
+            while True:
+                chunk = stream.read(8192)
+                if not chunk:
+                    return
+                with lock:
+                    if exceeded:
+                        return
+                    total += len(chunk)
+                    remaining = max_output_bytes - sum(len(value) for value in outputs.values())
+                    if remaining > 0:
+                        outputs[name].extend(chunk[:remaining])
+                    if total > max_output_bytes:
+                        exceeded = True
+                        return
+        except Exception:  # noqa: BLE001 - the process/pipe may have been terminated
+            return
+
+    readers = [
+        threading.Thread(target=read, args=(name, getattr(process, name)), daemon=True)
+        for name in ("stdout", "stderr")
+    ]
+    for reader in readers:
+        reader.start()
+    try:
+        if process.stdin is not None:
+            process.stdin.write((prompt + "\n").encode("utf-8"))
+            process.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+
+    status = "completed"
+    deadline = started + timeout
+    while process.poll() is None:
+        with lock:
+            limit_hit = exceeded
+        if limit_hit:
+            status = "output_limit_exceeded"
+            break
+        if time.monotonic() >= deadline:
+            status = "timed_out"
+            break
+        time.sleep(0.01)
+    if status != "completed":
+        try:
+            process.terminate()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            process.wait(timeout=1)
+        except Exception:  # noqa: BLE001
+            try:
+                process.kill()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                process.wait(timeout=1)
+            except Exception:  # noqa: BLE001
+                pass
+    return_code = process.poll() if status != "timed_out" else None
+    for reader in readers:
+        reader.join(timeout=0.2)
+    with lock:
+        if exceeded and status == "completed":
+            status = "output_limit_exceeded"
+    for stream in (process.stdin, process.stdout, process.stderr):
+        try:
+            if stream is not None:
+                stream.close()
+        except Exception:  # noqa: BLE001
+            pass
+    return (
+        status, return_code,
+        bytes(outputs["stdout"]).decode("utf-8", errors="replace"),
+        bytes(outputs["stderr"]).decode("utf-8", errors="replace"),
+        int((time.monotonic() - started) * 1000),
+    )
+
+
+def _invoke(
+    runner: Callable[..., Any] | None, command: Sequence[str], workspace: Path,
+    prompt: str, timeout: float, max_output_bytes: int,
+) -> tuple[str, int | None, str, str, int]:
+    started = time.monotonic()
+    if runner is None:
+        try:
+            return _invoke_subprocess(command, workspace, prompt, timeout, max_output_bytes)
+        except Exception as exc:  # noqa: BLE001 - traces must fail closed
+            return "blocked", None, "", _redact(exc), int((time.monotonic() - started) * 1000)
     try:
         result = runner(list(command), cwd=str(workspace), input=prompt + "\n",
                         capture_output=True, text=True, timeout=timeout, check=False, env=_env())
@@ -444,8 +554,8 @@ def _mode_reason(case: Mapping[str, Any], mode: str, catalog: Mapping[str, Any] 
     github = catalog.get("github_mcp")
     if mode == "mcp_available" and github is not True:
         return "mcp_available was not proven by an enabled GitHub MCP row"
-    if mode == "mcp_unavailable" and github is True:
-        return "mcp_unavailable cannot be proven while GitHub MCP is available"
+    if mode == "mcp_unavailable" and github is not False:
+        return "mcp_unavailable was not proven by an unavailable GitHub MCP row"
     return None
 
 
@@ -513,7 +623,7 @@ def run_trace_case(
                         workspace, model, reasoning_effort)
     prompts = [str(turn["prompt"]) for turn in case.get("turns", [])]
     expected = [value for value in case.get("expected_turns", []) if isinstance(value, Mapping)]
-    process = runner or subprocess.run
+    process = runner
     parts: list[dict[str, Any]] = []
     statuses: list[str] = []
     exits: list[int | None] = []
@@ -526,14 +636,17 @@ def run_trace_case(
             failures.append("follow-up could not reuse an observed fresh-task thread")
             break
         command = _command(str(candidate or executable), workspace["path"], model, reasoning_effort, thread)
-        status, exit_code, stdout, stderr, duration = _invoke(process, command, workspace["path"], prompt, timeout_seconds)
+        status, exit_code, stdout, stderr, duration = _invoke(
+            process, command, workspace["path"], prompt, timeout_seconds, max_output_bytes
+        )
         statuses.append(status); exits.append(exit_code); elapsed += duration
         size = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
         part = parse_trace_jsonl(stdout, stderr, case={"expected_turns": [expected[index]]},
                                  mode=mode, workspace=workspace["path"],
-                                 output_truncated=size > max_output_bytes)
+                                 output_truncated=(status == "output_limit_exceeded" or size > max_output_bytes))
         parts.append(part)
         commands.append({"kind": "follow_up" if index else "fresh",
+                         "thread_id": thread,
                          "args": ["--ask-for-approval", "never", "exec",
                                   "resume" if index else "--json", "--ephemeral",
                                   "--model", model, "-c",
@@ -541,8 +654,8 @@ def run_trace_case(
         observed = part["thread_ids"]
         if index == 0:
             thread = observed[0] if observed else None
-        elif observed and thread not in observed:
-            failures.append("follow-up returned a different thread identity")
+        elif not observed or thread not in observed:
+            failures.append("follow-up did not return the reused thread identity")
     events = [event for part in parts for event in part["events"]]
     exceeded = len(events) > TRACE_MAX_RETAINED_EVENTS
     events = events[:TRACE_MAX_RETAINED_EVENTS]
@@ -640,6 +753,13 @@ def verify_trace_records(
     expected_pairs = {(case_id, mode) for case_id in cases for mode in modes}
     case_map = {str(value.get("id")): value for value in suite.get("cases", []) if isinstance(value, Mapping)}
     failures: list[str] = []
+
+    def evidence(value: Any, message: str) -> Mapping[str, Any]:
+        if isinstance(value, Mapping):
+            return value
+        failures.append(message)
+        return {}
+
     actual: set[tuple[str, str]] = set()
     for case_id in cases:
         if case_id not in case_map:
@@ -669,8 +789,8 @@ def verify_trace_records(
             failures.append(f"{case_id}/{mode}: model/reasoning metadata is missing")
         if record.get("prompt_sha256") != [_hash(str(turn["prompt"])) for turn in case.get("turns", [])]:
             failures.append(f"{case_id}/{mode}: prompt hashes differ from corpus")
-        session = record.get("session", {})
-        if not isinstance(session, Mapping) or not all(session.get(key) is True for key in ("fresh_task", "ephemeral", "identity_proven")):
+        session = evidence(record.get("session", {}), f"{case_id}/{mode}: session evidence must be an object")
+        if not all(session.get(key) is True for key in ("fresh_task", "ephemeral", "identity_proven")):
             failures.append(f"{case_id}/{mode}: fresh-task identity proof is missing")
         if len(case.get("turns", [])) > 1 and session.get("continuation_reused") is not True:
             failures.append(f"{case_id}/{mode}: follow-up continuity proof is missing")
@@ -683,10 +803,13 @@ def verify_trace_records(
             ("raw_stdout_retained", False), ("raw_stderr_retained", False),
         )):
             failures.append(f"{case_id}/{mode}: redaction contract failed")
-        trace = record.get("trace", {})
-        if not isinstance(trace, Mapping) or trace.get("jsonl_valid") is not True or trace.get("event_limit_exceeded"):
+        trace = evidence(record.get("trace", {}), f"{case_id}/{mode}: trace evidence must be an object")
+        if trace.get("jsonl_valid") is not True or trace.get("event_limit_exceeded") or trace.get("output_truncated"):
             failures.append(f"{case_id}/{mode}: complete JSONL evidence is missing")
-        if isinstance(trace, Mapping) and trace.get("mutation", {}).get("detected_in_events"):
+        trace_mutation = evidence(
+            trace.get("mutation", {}), f"{case_id}/{mode}: trace mutation evidence must be an object"
+        )
+        if trace_mutation.get("detected_in_events"):
             failures.append(f"{case_id}/{mode}: mutation observed in aggregate trace")
         if not record.get("usage"):
             failures.append(f"{case_id}/{mode}: token usage evidence is missing")
@@ -698,7 +821,14 @@ def verify_trace_records(
                 failures.append(f"{case_id}/{mode} turn {index}: observation is missing"); continue
             if turn.get("prompt_sha256") != _hash(str(case["turns"][index - 1]["prompt"])):
                 failures.append(f"{case_id}/{mode} turn {index}: prompt hash differs from corpus")
-            activation, refs = turn.get("activation", {}), turn.get("references", {})
+            activation = evidence(
+                turn.get("activation", {}),
+                f"{case_id}/{mode} turn {index}: activation evidence must be an object",
+            )
+            refs = evidence(
+                turn.get("references", {}),
+                f"{case_id}/{mode} turn {index}: reference evidence must be an object",
+            )
             if expectation.get("activated") is True:
                 if activation.get("proved") is not True:
                     failures.append(f"{case_id}/{mode} turn {index}: activation is unproven")
@@ -706,7 +836,14 @@ def verify_trace_records(
                     failures.append(f"{case_id}/{mode} turn {index}: references are unproven")
             elif activation.get("unsupported_mentions"):
                 failures.append(f"{case_id}/{mode} turn {index}: unsupported activation observed")
-            confirmation, authorization = turn.get("confirmation", {}), turn.get("authorization", {})
+            confirmation = evidence(
+                turn.get("confirmation", {}),
+                f"{case_id}/{mode} turn {index}: confirmation evidence must be an object",
+            )
+            authorization = evidence(
+                turn.get("authorization", {}),
+                f"{case_id}/{mode} turn {index}: authorization evidence must be an object",
+            )
             if expectation.get("requires_confirmation") and confirmation.get("requested") is not True:
                 failures.append(f"{case_id}/{mode} turn {index}: confirmation request missing")
             if expectation.get("authorization") == "deny_without_confirmation" and authorization.get("denial_evidence") is not True:
@@ -715,7 +852,11 @@ def verify_trace_records(
                 confirmation.get("provided") is True and confirmation.get("exact_digest_observed") is True
             ):
                 failures.append(f"{case_id}/{mode} turn {index}: exact digest evidence missing")
-            if turn.get("mutation", {}).get("detected_in_events"):
+            turn_mutation = evidence(
+                turn.get("mutation", {}),
+                f"{case_id}/{mode} turn {index}: mutation evidence must be an object",
+            )
+            if turn_mutation.get("detected_in_events"):
                 failures.append(f"{case_id}/{mode} turn {index}: mutation observed")
     for pair in sorted(expected_pairs - actual):
         failures.append(f"{pair[0]}/{pair[1]}: missing trace record")

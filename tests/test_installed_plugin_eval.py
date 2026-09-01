@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -156,6 +157,31 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
         self.assertEqual("blocked", result["status"])
         self.assertIn("denied", result["reason"].lower())
+
+    def test_plugin_catalog_probe_rejects_valid_json_from_failed_process(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command,
+                7,
+                stdout=json.dumps({"installed": [{
+                    "name": "agentic-backlog-kit", "installed": True, "enabled": True,
+                    "source": {"source": "local"},
+                }]}),
+                stderr="catalog failed",
+            )
+
+        result = self.harness.probe_plugin_catalog(executable="codex.cmd", runner=runner)
+        self.assertEqual("failed", result["status"])
+        self.assertIsNone(result["plugin"])
+
+    def test_mcp_probe_does_not_treat_unavailable_row_as_available(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, 0, stdout="github MCP unavailable\n", stderr=""
+            )
+
+        result = self.harness.probe_codex_mcp(executable="codex.cmd", runner=runner)
+        self.assertFalse(result["github_mcp"])
 
     def test_diagnostics_keeps_static_pass_separate_from_blocked_cli_probe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -408,11 +434,10 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
         def runner(command, **kwargs):
             calls.append({"command": list(command), **kwargs})
-            resumed = "resume" in command
             return subprocess.CompletedProcess(
                 command,
                 0,
-                stdout=self._fake_trace_output(thread_id=None if resumed else "thread-trace-1"),
+                stdout=self._fake_trace_output(thread_id="thread-trace-1"),
                 stderr="",
             )
 
@@ -442,8 +467,41 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertIn("--ephemeral", calls[0]["command"])
         self.assertIn("--ephemeral", calls[1]["command"])
         self.assertIn("model_reasoning_effort=max", calls[0]["command"])
+        self.assertEqual("thread-trace-1", record["commands"][1]["thread_id"])
         self.assertEqual(200, record["usage"]["input_tokens"])
         self.assertEqual(40, record["usage"]["output_tokens"])
+
+    def test_run_trace_case_rejects_follow_up_without_thread_identity(self) -> None:
+        def runner(command, **kwargs):
+            resumed = "resume" in command
+            return subprocess.CompletedProcess(
+                command, 0,
+                stdout=self._fake_trace_output(
+                    thread_id=None if resumed else "thread-trace-1"
+                ),
+                stderr="",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="follow-up-ingest-show",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("thread identity" in value for value in record["failures"]))
+
+    def test_default_trace_invocation_bounds_combined_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            from evals.installed_plugin import trace
+            status, _, stdout, stderr, _ = trace._invoke_subprocess(
+                [sys.executable, "-c", "import sys; sys.stdout.write('x' * 1000000)"],
+                Path(temporary), "", 5, 4096,
+            )
+
+        self.assertEqual("output_limit_exceeded", status)
+        self.assertLessEqual(len(stdout.encode() + stderr.encode()), 4096)
 
     def test_trace_runner_fails_closed_on_mutation_and_malformed_jsonl(self) -> None:
         def runner(command, **kwargs):
@@ -463,6 +521,46 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertFalse(record["passed"])
         self.assertTrue(any("JSONL" in failure for failure in record["failures"]))
         self.assertTrue(any("mutation" in failure for failure in record["failures"]))
+
+    def test_trace_verifier_fails_closed_on_malformed_nested_evidence(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, 0, stdout=self._fake_trace_output(), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+            record["trace"]["mutation"] = "malformed"
+            report = self.harness.verify_trace_records(
+                suite, [record], selected_cases=["direct-ingest"],
+                selected_modes=["mcp_unavailable"],
+            )
+        self.assertFalse(report["passed"])
+        self.assertTrue(any("mutation evidence" in value for value in report["failures"]))
+
+    def test_trace_verifier_rejects_truncated_output(self) -> None:
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command, 0, stdout=self._fake_trace_output(), stderr=""
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+            record["trace"]["output_truncated"] = True
+            report = self.harness.verify_trace_records(
+                suite, [record], selected_cases=["direct-ingest"],
+                selected_modes=["mcp_unavailable"],
+            )
+        self.assertFalse(report["passed"])
+        self.assertTrue(any("complete JSONL evidence" in value for value in report["failures"]))
 
     def test_trace_runner_requires_confirmation_and_mcp_proof(self) -> None:
         def runner(command, **kwargs):
@@ -493,12 +591,22 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
                 mode="mcp_available",
                 executable="codex.cmd",
             )
+            uncertain = self.harness.run_trace_case(
+                suite,
+                Path(temporary) / "uncertain-catalog",
+                case_id="direct-init",
+                mode="mcp_unavailable",
+                executable="codex.cmd",
+                catalog={"github_mcp": None},
+            )
 
         self.assertFalse(record["passed"])
         self.assertTrue(any("confirmation" in value for value in record["failures"]))
         self.assertTrue(any("denial" in value for value in record["failures"]))
         self.assertEqual("blocked", blocked["status"])
         self.assertIn("MCP availability", blocked["failures"][0])
+        self.assertEqual("blocked", uncertain["status"])
+        self.assertIn("not proven", uncertain["failures"][0])
 
     def test_trace_runner_detects_empty_directory_mutation(self) -> None:
         def runner(command, **kwargs):
