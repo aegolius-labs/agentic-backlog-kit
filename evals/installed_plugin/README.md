@@ -67,19 +67,27 @@ matrix. Use a new output directory for each invocation:
     python scripts/installed_plugin_eval.py trace-verify --suite .agentic-backlog/evals/installed-plugin/r06-local/suite.json --results .agentic-backlog/evals/installed-plugin/r06-trace/trace-results.ndjson --case direct-ingest --mode mcp_unavailable
 
 Each selected case gets an isolated fixture workspace containing the manifest,
-a compact scaffold snapshot, prompt hashes, and a local AGENTS.md policy. The
+a compact scaffold snapshot, and a local AGENTS.md policy. Prompt hashes and
+runner metadata remain outside the agent workspace. The
 runner uses read-only sandboxing for every non-ingestion case; cases that
-activate backlog-ingest alone use workspace-write and may change only the
-fixture manifest. The local policy forbids GitHub, MCP, network, and external
-writes. Single-turn runs use exec --json --ephemeral; multi-turn runs use a
+activate backlog-ingest alone use workspace-write and may persist only the
+fixture manifest; temporary item inputs under `.agentic-backlog/cache` must be
+gone at completion. The local policy forbids GitHub, MCP, network, and external
+writes. Local `item-add`/`item-update` operations are authorized only when the
+final manifest is valid, stable IDs are preserved, and no other persistent
+workspace change exists. Single-turn runs use exec --json --ephemeral; multi-turn runs use a
 disposable persisted session so exec resume can reuse the observed thread.
 Remove that persisted session after retaining the redacted evidence. JSONL
 events are bounded and retained only after path/credential redaction; raw
 prompts, stdout, stderr, executable paths, and session IDs are not retained.
 Workspace hashes, tool/mutation observations, activation and bundled-reference
 evidence, confirmation/authorization evidence, model, effort, session hash,
-and reported token usage are retained. Missing, malformed, truncated, or
-ambiguous evidence fails closed.
+and reported token usage are retained. Known plugin skill/reference suffixes
+are canonicalized before path redaction. A failed or incomplete turn stops the
+case before any follow-up; a successful follow-up must reuse the exact session
+and a prior result identifier. Same-skill activation/reference proof may be
+inherited only across that proven continuation. Missing, malformed, truncated,
+or ambiguous evidence fails closed.
 
 The six default representative cases are direct-ingest,
 indirect-prioritize, follow-up-ingest-show, negative-weather,

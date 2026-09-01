@@ -379,7 +379,9 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
             self.assertTrue(workspace["before_sha256"])
             self.assertFalse(any(path.name == "SKILL.md" for path in workspace["path"].rglob("*")))
             self.assertEqual("workspace-write", workspace["sandbox"])
-            self.assertIn("only the fixture manifest", (workspace["path"] / "AGENTS.md").read_text().lower())
+            self.assertIn("only persistent change", (workspace["path"] / "AGENTS.md").read_text().lower())
+            self.assertFalse((workspace["path"] / ".r06-trace.json").exists())
+            self.assertTrue((Path(temporary) / "traces" / workspace["metadata_path"]).is_file())
 
     def test_parse_trace_jsonl_redacts_paths_and_tokens_and_keeps_usage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -439,6 +441,32 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         )
         self.assertTrue(confirmed["confirmation"]["provided"])
         self.assertTrue(confirmed["confirmation"]["exact_digest_observed"])
+        self.assertFalse(confirmed["mutation"]["external_contact_observed"])
+
+    def test_parse_trace_recognizes_absolute_reference_before_path_redaction(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = self._fake_trace_output(
+                reference=(
+                    "C:/Users/test/.codex/plugins/cache/personal/agentic-backlog-kit/"
+                    "0.1.0/skills/backlog-ingest/references/item-contract.md"
+                )
+            )
+            parsed = self.harness.parse_trace_jsonl(
+                output,
+                "",
+                case={"expected_turns": [{
+                    "activated": True,
+                    "skill": "backlog-ingest",
+                    "required_references": [
+                        "skills/backlog-ingest/references/item-contract.md"
+                    ],
+                }]},
+                mode="mcp_unavailable",
+                workspace=Path(temporary),
+            )
+
+        self.assertTrue(parsed["references"]["all_observed"])
+        self.assertNotIn("C:/Users/test", json.dumps(parsed))
 
     def test_run_trace_case_preserves_prompt_hash_and_follow_up_thread(self) -> None:
         calls: list[dict] = []
@@ -447,12 +475,23 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
             calls.append({"command": list(command), **kwargs})
             if "resume" not in command:
                 self._append_trace_manifest_item(kwargs["cwd"])
-            return subprocess.CompletedProcess(
-                command,
-                0,
-                stdout=self._fake_trace_output(thread_id="thread-trace-1"),
-                stderr="",
-            )
+                output = self._fake_trace_output(
+                    thread_id="thread-trace-1", authorization="STORY-0003"
+                )
+            else:
+                events = [
+                    {"type": "thread.started", "thread_id": "thread-trace-1"},
+                    {"type": "item.completed", "item": {
+                        "type": "agent_message",
+                        "text": "STORY-0003 is still an idea and is not ready for scheduling.",
+                    }},
+                    {"type": "turn.completed", "usage": {
+                        "input_tokens": 100, "cached_input_tokens": 60,
+                        "output_tokens": 20, "reasoning_output_tokens": 5,
+                    }},
+                ]
+                output = "".join(json.dumps(event) + "\n" for event in events)
+            return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
         with tempfile.TemporaryDirectory() as temporary:
             suite = self._trace_suite(temporary)
@@ -489,8 +528,16 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertTrue(record["manifest"]["valid"])
         self.assertEqual("STORY-0003", record["manifest"]["stable_item_id"])
         self.assertEqual(record["manifest"]["stable_item_id"], record["manifest"]["added_item_ids"][0])
+        self.assertTrue(record["turns"][1]["activation"]["inherited_from_reused_session"])
+        self.assertTrue(record["turns"][1]["references"]["inherited_from_reused_session"])
+        self.assertTrue(record["turns"][1]["continuity"]["identifier_reused"])
         self.assertEqual(200, record["usage"]["input_tokens"])
         self.assertEqual(40, record["usage"]["output_tokens"])
+        report = self.harness.verify_trace_records(
+            suite, [record], selected_cases=["follow-up-ingest-show"],
+            selected_modes=["mcp_unavailable"],
+        )
+        self.assertTrue(report["passed"], report["failures"])
 
     def test_run_trace_case_rejects_follow_up_without_thread_identity(self) -> None:
         def runner(command, **kwargs):
@@ -514,6 +561,48 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
 
         self.assertFalse(record["passed"])
         self.assertTrue(any("thread identity" in value for value in record["failures"]))
+
+    def test_run_trace_case_never_resumes_an_incomplete_first_turn(self) -> None:
+        calls: list[list[str]] = []
+
+        def runner(command, **kwargs):
+            calls.append(list(command))
+            raise subprocess.TimeoutExpired(command, timeout=1, output="")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="follow-up-ingest-show",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertEqual(1, len(calls))
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("later prompts were not sent" in value for value in record["failures"]))
+
+    def test_follow_up_requires_a_reused_result_identifier(self) -> None:
+        calls = 0
+
+        def runner(command, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                self._append_trace_manifest_item(kwargs["cwd"])
+            return subprocess.CompletedProcess(
+                command, 0,
+                stdout=self._fake_trace_output(thread_id="thread-trace-1"),
+                stderr="",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="follow-up-ingest-show",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertTrue(any("identifier continuity" in value for value in record["failures"]))
 
     def test_default_trace_invocation_bounds_combined_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -627,10 +716,19 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         def runner(command, **kwargs):
             self._append_trace_manifest_item(kwargs["cwd"])
             events = [json.loads(line) for line in self._fake_trace_output().splitlines()]
+            reference_read = copy.deepcopy(events[1])
             events[1]["item"].update({
                 "type": "file_change",
                 "command": ["apply_patch", ".agentic-backlog/manifest.json"],
             })
+            events.insert(1, reference_read)
+            events.insert(3, {"type": "item.completed", "item": {
+                "type": "command_execution",
+                "command": [
+                    "python", "C:/installed/agentic-backlog-kit/scripts/backlog.py",
+                    "item-add", "--input", ".agentic-backlog/cache/item.json",
+                ],
+            }})
             return subprocess.CompletedProcess(
                 command, 0, stdout="".join(json.dumps(event) + "\n" for event in events), stderr=""
             )
@@ -645,6 +743,11 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertTrue(record["passed"], record["failures"])
         self.assertTrue(record["trace"]["mutation"]["detected_in_events"])
         self.assertEqual([".agentic-backlog/manifest.json"], record["workspace"]["changed_paths"])
+        report = self.harness.verify_trace_records(
+            suite, [record], selected_cases=["direct-ingest"],
+            selected_modes=["mcp_unavailable"],
+        )
+        self.assertTrue(report["passed"], report["failures"])
 
     def test_trace_runner_requires_confirmation_and_mcp_proof(self) -> None:
         def runner(command, **kwargs):

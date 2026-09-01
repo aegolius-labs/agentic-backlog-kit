@@ -76,6 +76,16 @@ _DIGEST = re.compile(
     r"(?i)(?:plan[_ -]?digest|reviewed[_ -]?digest|confirmed[_ -]?digest)"
     r"[^0-9a-f]{0,32}[0-9a-f]{64}"
 )
+_ITEM_IDENTIFIER = re.compile(r"(?i)\b(?:INIT|EPIC|FEAT|STORY|BUG|TASK)-\d{4,}\b")
+_RESULT_DIGEST_IDENTIFIER = re.compile(
+    r"(?i)(?:plan[_ -]?digest|reviewed[_ -]?digest|confirmed[_ -]?digest|[\"']digest[\"'])"
+    r"[^0-9a-f]{0,32}([0-9a-f]{64})"
+)
+_EXTERNAL_CONTACT = re.compile(
+    r"(?i)(?:\bgh\s+(?:api|issue|project|repo|label|pr)\b|api\.github\.com|"
+    r"github\.com/|https?://|\bcurl\b|\bwget\b|"
+    r"invoke-(?:webrequest|restmethod))"
+)
 
 
 def _hash(prompt: str) -> str:
@@ -145,12 +155,15 @@ def seed_trace_workspace(
         + ("Remove the disposable persisted session after retaining redacted evidence.\n"
            if len(case.get("turns", [])) > 1 else "")
         + "Never contact GitHub, call MCP, use a network, or make external writes.\n"
-        + ("Only the fixture manifest may change: .agentic-backlog/manifest.json.\n"
+        + ("The only persistent change may be .agentic-backlog/manifest.json. "
+           "Temporary item inputs may exist under .agentic-backlog/cache only while "
+           "the local engine runs and must be removed before completion.\n"
            if write_manifest else "No files may change during this trace.\n"),
         encoding="utf-8",
     )
     hashes = [_hash(str(turn["prompt"])) for turn in case.get("turns", [])]
-    _write_json(workspace / ".r06-trace.json", {
+    metadata_path = output / "metadata" / f"{_slug(case_id)}--{_slug(mode)}.json"
+    _write_json(metadata_path, {
         "schema_version": TRACE_SCHEMA_VERSION, "case_id": case_id, "mode": mode,
         "fresh_task": True, "prompt_sha256": hashes,
         "fixture_manifest_sha256": _sha256_file(source),
@@ -164,6 +177,7 @@ def seed_trace_workspace(
         "manifest_path": ".agentic-backlog/manifest.json",
         "manifest_ids": sorted(str(item["id"]) for item in manifest["items"]),
         "manifest_write": write_manifest,
+        "metadata_path": metadata_path.relative_to(output).as_posix(),
     }
 
 
@@ -432,6 +446,35 @@ def _cmd(item: Mapping[str, Any]) -> str:
     return " ".join(map(str, value)) if isinstance(value, (list, tuple)) else str(value or "")
 
 
+def _recognized_paths(command: str, required: Sequence[str], skills: Sequence[str]) -> list[str]:
+    """Return only known plugin-relative suffixes, never arbitrary source paths."""
+
+    normalized = command.replace("\\", "/").lower()
+    candidates = [*required, *(f"skills/{skill}/SKILL.md" for skill in skills)]
+    return sorted({
+        candidate
+        for candidate in candidates
+        if candidate.replace("\\", "/").lower() in normalized
+    })
+
+
+def _local_backlog_operation(command: str) -> str | None:
+    normalized = command.replace("\\", "/").lower()
+    if "scripts/backlog.py" not in normalized:
+        return None
+    match = re.search(r"(?:^|\s)(item-add|item-update)(?:\s|$)", normalized)
+    return match.group(1) if match else None
+
+
+def _local_backlog_item_id(command: str) -> str | None:
+    normalized = command.replace("\\", "/")
+    match = re.search(
+        r"(?i)(?:^|\s)item-update\s+((?:INIT|EPIC|FEAT|STORY|BUG|TASK)-\d{4,})(?:\s|$)",
+        normalized,
+    )
+    return match.group(1).upper() if match else None
+
+
 def parse_trace_jsonl(
     stdout: str,
     stderr: str,
@@ -452,6 +495,11 @@ def parse_trace_jsonl(
     event_types: set[str] = set()
     tool_calls: list[dict[str, Any]] = []
     turns = 0
+    expected = [value for value in case.get("expected_turns", []) if isinstance(value, Mapping)]
+    skills = sorted({str(value.get("skill")) for value in expected if value.get("skill")})
+    active = any(value.get("activated") is True for value in expected)
+    required = sorted({str(ref) for value in expected for ref in value.get("required_references", [])})
+    recognized_paths: set[str] = set()
     for number, line in enumerate(str(stdout or "").splitlines(), 1):
         if not line.strip():
             continue
@@ -490,12 +538,18 @@ def parse_trace_jsonl(
         item_type = str(item.get("type", "")).lower()
         if item_type in {"command_execution", "mcp_tool_call", "file_change", "apply_patch", "tool_call"}:
             command = _cmd(item)
-            mutating = item_type in {"file_change", "apply_patch"} or bool(
-                _MUTATION.search(command + " " + _canonical(item))
-            )
+            safe_paths = _recognized_paths(command, required, skills)
+            recognized_paths.update(safe_paths)
+            forbidden_operation = bool(_MUTATION.search(command + " " + _canonical(item)))
+            mutating = item_type in {"file_change", "apply_patch"} or forbidden_operation
             tool_calls.append({
                 "type": item_type, "name": _redact(item.get("name", ""), root=workspace, limit=160),
                 "command": _redact(command, root=workspace, limit=800), "mutating": mutating,
+                "recognized_paths": safe_paths,
+                "local_backlog_operation": _local_backlog_operation(command),
+                "local_backlog_item_id": _local_backlog_item_id(command),
+                "forbidden_operation": forbidden_operation,
+                "external_contact": bool(item_type == "mcp_tool_call" or _EXTERNAL_CONTACT.search(command)),
             })
     evidence = []
     for event in raw_events:
@@ -509,11 +563,7 @@ def parse_trace_jsonl(
             }))
     raw = "\n".join(evidence)
     normalized = raw.replace("\\", "/").lower()
-    expected = [value for value in case.get("expected_turns", []) if isinstance(value, Mapping)]
-    skills = sorted({str(value.get("skill")) for value in expected if value.get("skill")})
-    active = any(value.get("activated") is True for value in expected)
-    required = sorted({str(ref) for value in expected for ref in value.get("required_references", [])})
-    observed = sorted({ref for ref in required if ref.replace("\\", "/").lower() in normalized})
+    observed = sorted(set(required) & recognized_paths)
     plugin_seen = PLUGIN_NAME.lower() in normalized
     skill_seen = [skill for skill in skills if skill.lower() in normalized]
     unsupported = sorted(({PLUGIN_NAME} if plugin_seen else set()) |
@@ -527,6 +577,10 @@ def parse_trace_jsonl(
         "event_types": sorted(event_types), "events": events,
         "thread_ids": sorted(set(thread_ids)), "turn_count": turns, "usage": usage,
         "tool_calls": tool_calls,
+        "result_identifiers": sorted(
+            {value.upper() for value in _ITEM_IDENTIFIER.findall(raw)}
+            | {value.lower() for value in _RESULT_DIGEST_IDENTIFIER.findall(raw)}
+        ),
         "activation": {
             "plugin_mentioned": plugin_seen, "skills_mentioned": skill_seen,
             "skill_file_mentioned": "skill.md" in normalized, "expected_skills": skills,
@@ -546,9 +600,10 @@ def parse_trace_jsonl(
         "mutation": {
             "detected_in_events": bool(mutation), "tool_call_count": len(tool_calls),
             "github_contact_observed": any(
-                call["type"] == "mcp_tool_call" or re.search(r"(?i)\bgithub\b|\bgh\s+", call["command"])
+                call["type"] == "mcp_tool_call" or call["external_contact"]
                 for call in tool_calls
             ),
+            "external_contact_observed": any(call["external_contact"] for call in tool_calls),
         },
         "stderr": _redact(stderr, root=workspace),
         "stdout_sha256": hashlib.sha256(str(stdout or "").encode("utf-8")).hexdigest(),
@@ -640,6 +695,9 @@ def _merge(parts: Sequence[Mapping[str, Any]], events: Sequence[Mapping[str, Any
             "detected_in_events": any(part["mutation"]["detected_in_events"] for part in parts),
             "tool_call_count": len(tools),
             "github_contact_observed": any(part["mutation"]["github_contact_observed"] for part in parts),
+            "external_contact_observed": any(
+                part["mutation"].get("external_contact_observed") for part in parts
+            ),
         },
     }
 
@@ -677,6 +735,7 @@ def run_trace_case(
     failures: list[str] = []
     manifest_turn_ids: list[set[str]] = []
     manifest_errors: list[str] = []
+    continuation_proven: list[bool] = []
     elapsed = 0
     thread: str | None = None
     for index, prompt in enumerate(prompts):
@@ -716,8 +775,60 @@ def run_trace_case(
         observed = part["thread_ids"]
         if index == 0:
             thread = observed[0] if observed else None
+            continuation_proven.append(False)
         elif not observed or thread not in observed:
             failures.append("follow-up did not return the reused thread identity")
+            continuation_proven.append(False)
+        else:
+            continuation_proven.append(True)
+        turn_complete = (
+            status == "completed"
+            and exit_code == 0
+            and part["jsonl_valid"]
+            and not part["output_truncated"]
+            and not part["event_limit_exceeded"]
+            and part["turn_count"] > 0
+        )
+        if not turn_complete:
+            failures.append(
+                f"turn {index + 1} was incomplete; later prompts were not sent"
+            )
+            break
+
+    previous_skill: str | None = None
+    previous_activation = False
+    previous_references: set[str] = set()
+    for index, part in enumerate(parts):
+        expectation = expected[index]
+        skill = str(expectation.get("skill") or "") or None
+        activation = part["activation"]
+        references = part["references"]
+        direct_activation = activation.get("proved") is True
+        direct_references = references.get("all_observed") is True
+        inherited = bool(
+            index > 0
+            and continuation_proven[index]
+            and skill is not None
+            and skill == previous_skill
+            and previous_activation
+        )
+        inherited_references = bool(
+            inherited
+            and set(references.get("required", [])) <= previous_references
+        )
+        activation["directly_proved"] = direct_activation
+        activation["inherited_from_reused_session"] = inherited and not direct_activation
+        activation["proved"] = direct_activation or inherited
+        references["directly_observed"] = direct_references
+        references["inherited_from_reused_session"] = (
+            inherited_references and not direct_references
+        )
+        if inherited_references:
+            references["observed"] = sorted(set(references.get("required", [])))
+            references["all_observed"] = True
+        previous_skill = skill
+        previous_activation = activation["proved"] is True
+        previous_references = set(references.get("observed", []))
     events = [event for part in parts for event in part["events"]]
     exceeded = len(events) > TRACE_MAX_RETAINED_EVENTS
     events = events[:TRACE_MAX_RETAINED_EVENTS]
@@ -766,6 +877,11 @@ def run_trace_case(
     before_ids = set(workspace["manifest_ids"])
     after_ids = manifest_turn_ids[-1] if manifest_turn_ids else before_ids
     stable_id: str | None = None
+    local_operations = {
+        str(call.get("local_backlog_operation"))
+        for call in trace["tool_calls"]
+        if call.get("local_backlog_operation")
+    }
     if workspace["manifest_write"]:
         if manifest_path not in changed:
             failures.append("ingestion did not update the fixture manifest")
@@ -773,7 +889,20 @@ def run_trace_case(
             failures.extend(f"manifest validation failed: {error}" for error in manifest_errors)
         if manifest_turn_ids:
             added = manifest_turn_ids[0] - before_ids
-            if len(added) != 1:
+            update_only = local_operations == {"item-update"}
+            if update_only:
+                updated_ids = {
+                    str(call["local_backlog_item_id"])
+                    for call in trace["tool_calls"]
+                    if call.get("local_backlog_item_id")
+                }
+                if manifest_turn_ids[-1] != before_ids:
+                    failures.append("ingestion update changed manifest item identities")
+                elif len(updated_ids) != 1 or not updated_ids <= before_ids:
+                    failures.append("ingestion update did not bind one existing stable item ID")
+                else:
+                    stable_id = next(iter(updated_ids))
+            elif len(added) != 1:
                 failures.append("ingestion did not create exactly one stable item ID")
             else:
                 stable_id = next(iter(added))
@@ -785,19 +914,66 @@ def run_trace_case(
                 extra = ids - before_ids - ({stable_id} if stable_id else set())
                 if extra:
                     failures.append("ingestion created more than one stable item ID")
+
+    prior_identifiers: set[str] = set()
+    for index, expectation in enumerate(expected):
+        current_identifiers = (
+            set(parts[index].get("result_identifiers", []))
+            if index < len(parts) else set()
+        )
+        reused = sorted(prior_identifiers & current_identifiers)
+        if (
+            expectation.get("requires_prior_identifier")
+            and workspace["manifest_write"]
+            and stable_id
+            and stable_id not in reused
+        ):
+            reused = []
+        if expectation.get("requires_prior_identifier") and not reused:
+            failures.append(f"turn {index + 1}: prior result identifier continuity was not proven")
+        if index < len(parts):
+            parts[index]["continuity"] = {
+                "requires_prior_identifier": bool(expectation.get("requires_prior_identifier")),
+                "identifier_reused": bool(reused),
+                "reused_identifiers": reused,
+            }
+        prior_identifiers.update(current_identifiers)
+
     unexpected_changes = sorted(set(changed) - ({manifest_path} if workspace["manifest_write"] else set()))
     if unexpected_changes:
         failures.append("workspace mutation occurred outside the allowed fixture manifest")
-    if trace["mutation"]["github_contact_observed"]:
-        failures.append("external GitHub or MCP tool evidence was observed")
-    allowed_manifest_event = workspace["manifest_write"] and manifest_path in changed and not unexpected_changes and all(
-        call["type"] in {"file_change", "apply_patch"}
-        and not _MUTATION.search(call["command"])
-        and (not call["command"] or ".agentic-backlog/manifest.json" in call["command"].replace("\\", "/"))
-        for call in trace["tool_calls"] if call["mutating"]
+    if (
+        trace["mutation"]["github_contact_observed"]
+        or trace["mutation"].get("external_contact_observed")
+    ):
+        failures.append("external GitHub, MCP, or network tool evidence was observed")
+    allowed_manifest_event = (
+        workspace["manifest_write"]
+        and manifest_path in changed
+        and not unexpected_changes
+        and not manifest_errors
+        and stable_id is not None
+        and all(
+            (
+                call["type"] in {"file_change", "apply_patch"}
+                and not call.get("forbidden_operation")
+            )
+            or (
+                call["type"] == "command_execution"
+                and call.get("local_backlog_operation") in {"item-add", "item-update"}
+            )
+            for call in trace["tool_calls"] if call["mutating"]
+        )
     )
     if trace["mutation"]["detected_in_events"] and not allowed_manifest_event:
         failures.append("workspace or event evidence indicates mutation")
+    trace["mutation"]["authorized_local_manifest_mutation"] = bool(
+        trace["mutation"]["detected_in_events"] and allowed_manifest_event
+    )
+    for part in parts:
+        part["mutation"]["authorized_local_manifest_mutation"] = bool(
+            part["mutation"]["detected_in_events"] and allowed_manifest_event
+        )
     raw_thread_ids = trace["thread_ids"]
     thread_hashes = [_hash(value) for value in raw_thread_ids]
     session_hash = _hash("|".join(sorted(raw_thread_ids))) if raw_thread_ids else None
@@ -809,7 +985,12 @@ def run_trace_case(
         "schema_version": TRACE_SCHEMA_VERSION, "suite": suite.get("suite"),
         **_expected_record(case, mode), "plugin": suite.get("plugin", {}).get("name", PLUGIN_NAME),
         "model": model, "reasoning_effort": reasoning_effort,
-        "status": "completed" if statuses and all(value == "completed" for value in statuses)
+        "status": "completed" if (
+            len(parts) == len(prompts)
+            and statuses
+            and all(value == "completed" for value in statuses)
+            and all(value == 0 for value in exits)
+        )
                   else ("timed_out" if "timed_out" in statuses else "blocked"),
         "passed": not failures, "exit_code": exits[-1] if exits else None, "exit_codes": exits,
         "elapsed_ms": elapsed, "commands": commands,
@@ -819,7 +1000,14 @@ def run_trace_case(
             "initial_thread_id_sha256": _hash(thread) if thread else None,
             "cleanup_required": not ephemeral,
             "turn_count": trace["turn_count"],
-            "continuation_reused": len(prompts) == 1 or bool(thread),
+            "continuation_reused": (
+                len(prompts) == 1
+                or (
+                    len(parts) == len(prompts)
+                    and len(continuation_proven) == len(prompts)
+                    and all(continuation_proven[1:])
+                )
+            ),
             "identity_proven": bool(raw_thread_ids and trace["turn_count"] >= len(prompts)),
         },
         "workspace": {
@@ -833,6 +1021,7 @@ def run_trace_case(
             "references": parts[index].get("references", {}) if index < len(parts) else {},
             "confirmation": parts[index].get("confirmation", {}) if index < len(parts) else {},
             "authorization": parts[index].get("authorization", {}) if index < len(parts) else {},
+            "continuity": parts[index].get("continuity", {}) if index < len(parts) else {},
             "mutation": parts[index].get("mutation", {}) if index < len(parts) else {},
             "usage": parts[index].get("usage", {}) if index < len(parts) else {},
         } for index, prompt in enumerate(prompts)],
@@ -942,7 +1131,15 @@ def verify_trace_records(
         trace_mutation = evidence(
             trace.get("mutation", {}), f"{case_id}/{mode}: trace mutation evidence must be an object"
         )
-        if trace_mutation.get("detected_in_events") or trace_mutation.get("github_contact_observed"):
+        authorized_local = (
+            _ingestion_case(case)
+            and trace_mutation.get("authorized_local_manifest_mutation") is True
+        )
+        if (
+            (trace_mutation.get("detected_in_events") and not authorized_local)
+            or trace_mutation.get("github_contact_observed")
+            or trace_mutation.get("external_contact_observed")
+        ):
             failures.append(f"{case_id}/{mode}: mutation observed in aggregate trace")
         if not record.get("usage"):
             failures.append(f"{case_id}/{mode}: token usage evidence is missing")
@@ -985,11 +1182,28 @@ def verify_trace_records(
                 confirmation.get("provided") is True and confirmation.get("exact_digest_observed") is True
             ):
                 failures.append(f"{case_id}/{mode} turn {index}: exact digest evidence missing")
+            continuity = evidence(
+                turn.get("continuity", {}),
+                f"{case_id}/{mode} turn {index}: continuity evidence must be an object",
+            )
+            if (
+                expectation.get("requires_prior_identifier")
+                and continuity.get("identifier_reused") is not True
+            ):
+                failures.append(f"{case_id}/{mode} turn {index}: prior identifier reuse is unproven")
             turn_mutation = evidence(
                 turn.get("mutation", {}),
                 f"{case_id}/{mode} turn {index}: mutation evidence must be an object",
             )
-            if turn_mutation.get("detected_in_events") or turn_mutation.get("github_contact_observed"):
+            turn_authorized_local = (
+                _ingestion_case(case)
+                and turn_mutation.get("authorized_local_manifest_mutation") is True
+            )
+            if (
+                (turn_mutation.get("detected_in_events") and not turn_authorized_local)
+                or turn_mutation.get("github_contact_observed")
+                or turn_mutation.get("external_contact_observed")
+            ):
                 failures.append(f"{case_id}/{mode} turn {index}: mutation observed")
     for pair in sorted(expected_pairs - actual):
         failures.append(f"{pair[0]}/{pair[1]}: missing trace record")
