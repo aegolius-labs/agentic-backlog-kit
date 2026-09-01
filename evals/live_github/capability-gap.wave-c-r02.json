@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-01T00:25:51Z",
+  "refreshed_at_utc": "2026-09-01T00:45:35Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -93,7 +93,14 @@
       "repository_absent": false,
       "repository_present_verified": true,
       "project_title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [labels]",
-      "project_absence_verified": true,
+      "project_absence_verified": false,
+      "project": {
+        "number": 4,
+        "owner": "aegolius-labs",
+        "repository_link_verified": true,
+        "title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [labels]",
+        "url": "https://github.com/orgs/aegolius-labs/projects/4"
+      },
       "resource_create_digest": "0d9d663fdca2e44d82fd5fb3637f8544c166a9461b49197bb864a2c28b1d69d4",
       "resource_create": {
         "recorded_at_utc": "2026-09-01T00:25:51Z",
@@ -107,6 +114,26 @@
         "action_kinds": ["project.create"],
         "digest": "59cbce716c843c26260100db38d714b8144735eb1789ca1ce84e5a77720bc93f",
         "fresh_discovery": true,
+        "validated": true
+      },
+      "bootstrap_apply": {
+        "applied_actions": 1,
+        "confirmed_digest": "59cbce716c843c26260100db38d714b8144735eb1789ca1ce84e5a77720bc93f",
+        "fresh_discovery_drift_check": "passed",
+        "manifest_project_number": 4,
+        "status": "completed",
+        "transport": "gh"
+      },
+      "scaffold_plan": {
+        "action_count": 17,
+        "actions_by_kind": {
+          "project.field.create": 6,
+          "project.field.update_options": 1,
+          "project.view.create": 4,
+          "repository.label.create": 6
+        },
+        "digest": "2b3bb8788d9e3f60a84b4624d37c012b40cc0dca986ef8e710ee16eaf7a1cdfa",
+        "fresh_post_create_snapshot": true,
         "validated": true
       },
       "preflight_passed": true,
@@ -146,6 +173,21 @@
         "action_kinds": ["project.create"],
         "digest": "aada840054e62e78a3b8c8764bb1d7fcb6931725d9169d350dc2e56c7f1b1534",
         "fresh_discovery": true,
+        "validated": true
+      },
+      "bootstrap_apply": {
+        "applied_actions": 0,
+        "confirmed_digest": "aada840054e62e78a3b8c8764bb1d7fcb6931725d9169d350dc2e56c7f1b1534",
+        "fresh_discovery_drift_check": "failed",
+        "status": "aborted_before_write",
+        "transport": "api"
+      },
+      "replacement_bootstrap_plan": {
+        "action_count": 1,
+        "action_kinds": ["project.create"],
+        "digest": "900772ffe9578dc34854fcb5af69bfd7038487d35049e2bf5b81f103c892948f",
+        "fresh_discovery": true,
+        "project_absent": true,
         "validated": true
       },
       "preflight_passed": true,
@@ -189,6 +231,6 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation only; Projects not created",
+  "mutation_scope": "confirmed repository creation and one confirmed GH Project creation; API Project apply aborted before write on drift",
   "credentials_recorded": false
 }
