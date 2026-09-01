@@ -233,6 +233,30 @@ class GitHubServiceTests(unittest.TestCase):
 
         self.assertEqual(1, len(self.transport.calls))
 
+    def test_iteration_field_creation_does_not_assume_empty_configuration_initializes_schedule(self) -> None:
+        self.transport.responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "id": "PROJECT_1",
+                        "fields": {"nodes": []},
+                    }
+                }
+            },
+            {},
+        ]
+
+        self.service.create_project_field(
+            {
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "start_date": "2026-09-07",
+                "duration_days": 14,
+            }
+        )
+
+        self.assertNotIn("iterationConfiguration", self.transport.calls[1][1]["input"])
+
     def test_scaffold_executor_updates_single_select_options(self) -> None:
         action = ScaffoldAction(
             "project.field.update_options",

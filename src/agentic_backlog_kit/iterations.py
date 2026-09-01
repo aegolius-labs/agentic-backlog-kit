@@ -158,32 +158,51 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
         configuration.get("duration_days", configuration.get("duration")),
         f"Project iteration field '{name}' duration_days",
     )
+    raw_active = configuration.get("iterations", [])
+    if raw_active is None:
+        raw_active = []
+    if not isinstance(raw_active, list):
+        raise ManifestError(
+            f"Project iteration field '{name}' iterations must be an array"
+        )
+    raw_completed = configuration.get(
+        "completed_iterations", configuration.get("completedIterations", [])
+    )
+    if raw_completed is None:
+        raw_completed = []
+    if not isinstance(raw_completed, list):
+        raise ManifestError(
+            f"Project iteration field '{name}' completed iterations must be an array"
+        )
     active = [
         _entry(item, completed=False, index=index)
-        for index, item in enumerate(configuration.get("iterations") or [])
+        for index, item in enumerate(raw_active)
     ]
     completed = [
         _entry(item, completed=True, index=index)
-        for index, item in enumerate(
-            configuration.get(
-                "completed_iterations", configuration.get("completedIterations")
-            )
-            or []
-        )
+        for index, item in enumerate(raw_completed)
     ]
     _validate_entries([*active, *completed])
     active.sort(key=lambda item: (item["start_date"], item["title"], item["id"]))
     completed.sort(key=lambda item: (item["start_date"], item["title"], item["id"]))
 
     start = configuration.get("start_date", configuration.get("startDate"))
-    if start is None:
-        known = [*active, *completed]
+    known = [*active, *completed]
+    if start is None and not known:
+        # GitHub can create the field while ignoring an empty iteration
+        # configuration.  Preserve that observed absence instead of deriving
+        # a schedule from the local manifest or fabricating an iteration ID.
+        start_value: str | None = None
+    else:
+        if start is None:
+            start = min(item["start_date"] for item in known)
+        start_value = _parse_date(
+            start, f"Project iteration field '{name}' start_date"
+        ).isoformat()
         if not known:
             raise ManifestError(
-                f"Project iteration field '{name}' has no schedule start or iterations"
+                f"Project iteration field '{name}' has a schedule start but no iterations"
             )
-        start = min(item["start_date"] for item in known)
-    start_value = _parse_date(start, f"Project iteration field '{name}' start_date")
 
     database_id = raw_field.get("database_id")
     if database_id is None:
@@ -202,7 +221,7 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
         "name": name.strip(),
         "data_type": "ITERATION",
         "iteration_configuration": {
-            "start_date": start_value.isoformat(),
+            "start_date": start_value,
             "duration_days": duration,
             "iterations": active,
             "completed_iterations": completed,
@@ -293,6 +312,66 @@ def _new_entry(title: str, start: date, duration: int) -> dict[str, Any]:
     }
 
 
+def _initialization_entries(
+    *,
+    field_name: str,
+    start: date,
+    duration: int,
+    target: str,
+    as_of: date,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Derive a first schedule only from explicit manifest and target inputs.
+
+    An empty GitHub iteration field has no server-owned title or ID to use as
+    an anchor.  Explicit titles therefore initialize exactly that title at the
+    manifest's configured start.  Aliases use the deterministic ``<field> 1``
+    sequence, but only while the manifest anchor can identify the requested
+    current/next interval without inventing completed server state.
+    """
+
+    if target not in {"@current", "@next"}:
+        entry = _new_entry(target, start, duration)
+        return [entry], entry
+
+    if as_of < start:
+        if target == "@current":
+            raise ManifestError(
+                "Cannot deterministically initialize @current before the manifest schedule start"
+            )
+        target_index = 0
+    else:
+        elapsed_days = (as_of - start).days
+        interval_index = elapsed_days // duration
+        if target == "@current":
+            # Once the first interval has elapsed GitHub may classify its
+            # definition as completed.  Without a server-owned schedule that
+            # lifecycle state cannot be inferred safely during initialization.
+            if interval_index > 0:
+                raise ManifestError(
+                    "Cannot deterministically initialize @current after the first interval; "
+                    "use an explicit title or initialize at the manifest schedule start"
+                )
+            target_index = 0
+        else:
+            target_index = interval_index + 1
+            if target_index > 1:
+                raise ManifestError(
+                    "Cannot deterministically initialize @next after the first interval; "
+                    "use an explicit title or initialize at the manifest schedule start"
+                )
+
+    seed_title = f"{field_name} 1"
+    entries = [
+        _new_entry(
+            _increment_title(seed_title, index),
+            start + timedelta(days=duration * index),
+            duration,
+        )
+        for index in range(target_index + 1)
+    ]
+    return entries, entries[target_index]
+
+
 def _digest(
     *,
     target: str,
@@ -317,6 +396,40 @@ def _digest(
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _iteration_plan(
+    *,
+    data: dict[str, Any],
+    project_snapshot: dict[str, Any],
+    target: str,
+    as_of: date,
+    resolved: dict[str, Any],
+    actions: list[IterationAction],
+) -> IterationPlan:
+    manifest_fingerprint = state_fingerprint(data)
+    snapshot_fingerprint = state_fingerprint(project_snapshot)
+    as_of_value = as_of.isoformat()
+    resolved_id = resolved.get("id")
+    digest = _digest(
+        target=target,
+        as_of=as_of_value,
+        resolved_title=resolved["title"],
+        resolved_iteration_id=resolved_id,
+        actions=actions,
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+    )
+    return IterationPlan(
+        target=target,
+        as_of=as_of_value,
+        resolved_title=resolved["title"],
+        resolved_iteration_id=resolved_id,
+        actions=actions,
+        digest=digest,
+        manifest_fingerprint=manifest_fingerprint,
+        snapshot_fingerprint=snapshot_fingerprint,
+    )
 
 
 def build_iteration_plan(
@@ -347,6 +460,44 @@ def build_iteration_plan(
 
     active = configuration["iterations"]
     completed = configuration["completed_iterations"]
+    if not active and not completed:
+        initialization_start = _parse_date(
+            desired["start_date"], "workflow.iteration.start_date"
+        )
+        additions, resolved = _initialization_entries(
+            field_name=field["name"],
+            start=initialization_start,
+            duration=desired_duration,
+            target=target,
+            as_of=selected_date,
+        )
+        replacement = {
+            "start_date": initialization_start.isoformat(),
+            "duration_days": desired_duration,
+            "iterations": additions,
+            "completed_iterations": [],
+        }
+        actions = [
+            IterationAction(
+                "project.field.update_iterations",
+                {
+                    "name": field["name"],
+                    "field_id": field["id"],
+                    "iteration_configuration": replacement,
+                },
+                {"field": field},
+            )
+        ]
+
+        return _iteration_plan(
+            data=data,
+            project_snapshot=project_snapshot,
+            target=target,
+            as_of=selected_date,
+            resolved=resolved,
+            actions=actions,
+        )
+
     completed_matches = [item for item in completed if item["title"] == target]
     if completed_matches:
         raise ManifestError(f"Iteration target '{target}' is completed")
@@ -424,28 +575,13 @@ def build_iteration_plan(
             )
         ]
 
-    manifest_fingerprint = state_fingerprint(data)
-    snapshot_fingerprint = state_fingerprint(project_snapshot)
-    as_of_value = selected_date.isoformat()
-    resolved_id = resolved.get("id")
-    digest = _digest(
+    return _iteration_plan(
+        data=data,
+        project_snapshot=project_snapshot,
         target=target,
-        as_of=as_of_value,
-        resolved_title=resolved["title"],
-        resolved_iteration_id=resolved_id,
+        as_of=selected_date,
+        resolved=resolved,
         actions=actions,
-        manifest_fingerprint=manifest_fingerprint,
-        snapshot_fingerprint=snapshot_fingerprint,
-    )
-    return IterationPlan(
-        target=target,
-        as_of=as_of_value,
-        resolved_title=resolved["title"],
-        resolved_iteration_id=resolved_id,
-        actions=actions,
-        digest=digest,
-        manifest_fingerprint=manifest_fingerprint,
-        snapshot_fingerprint=snapshot_fingerprint,
     )
 
 
@@ -562,6 +698,32 @@ def verify_iteration_apply(
                 "Iteration update plan omitted the reviewed field precondition"
             )
         refreshed_field = _find_field(refreshed_snapshot, previous_field["name"])
+        action_payload = plan.actions[0].payload
+        if (
+            action_payload.get("field_id") != previous_field.get("id")
+            or action_payload.get("name") != previous_field.get("name")
+        ):
+            raise IterationAuthorizationError(
+                "Iteration update plan changed its reviewed field identity"
+            )
+        if (
+            refreshed_field["id"] != previous_field.get("id")
+            or refreshed_field["database_id"] != previous_field.get("database_id")
+        ):
+            raise IterationAuthorizationError(
+                "GitHub changed the reviewed iteration field identity during the configuration update"
+            )
+        expected_configuration = action_payload.get("iteration_configuration") or {}
+        refreshed_configuration = refreshed_field["iteration_configuration"]
+        if (
+            refreshed_configuration["duration_days"]
+            != expected_configuration.get("duration_days")
+            or refreshed_configuration["start_date"]
+            != expected_configuration.get("start_date")
+        ):
+            raise IterationAuthorizationError(
+                "GitHub changed the reviewed iteration schedule identity during the configuration update"
+            )
         for list_name in ("iterations", "completed_iterations"):
             previous_entries = previous_field["iteration_configuration"][list_name]
             refreshed_entries = refreshed_field["iteration_configuration"][list_name]
@@ -572,6 +734,31 @@ def verify_iteration_apply(
                         f"GitHub changed or removed reviewed iteration identity "
                         f"'{entry['title']}' during the configuration update"
                     )
+        refreshed_active_by_title = {
+            entry["title"]: entry
+            for entry in refreshed_configuration["iterations"]
+        }
+        for expected in expected_configuration.get("iterations") or []:
+            if expected.get("id") is not None:
+                continue
+            actual = refreshed_active_by_title.get(expected.get("title"))
+            if (
+                actual is None
+                or not isinstance(actual.get("id"), str)
+                or not actual["id"]
+                or {
+                    key: actual.get(key)
+                    for key in ("title", "start_date", "duration_days", "completed")
+                }
+                != {
+                    key: expected.get(key)
+                    for key in ("title", "start_date", "duration_days", "completed")
+                }
+            ):
+                raise IterationAuthorizationError(
+                    f"GitHub did not preserve the planned iteration definition "
+                    f"'{expected.get('title')}' or assign a server identity"
+                )
     if not verified.resolved_iteration_id:
         raise IterationAuthorizationError(
             "Resolved iteration has no refreshed GitHub identity; do not assign items"

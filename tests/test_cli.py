@@ -166,6 +166,94 @@ class CliTests(unittest.TestCase):
             self.assertTrue(json.loads(output.getvalue())["verified"])
             self.assertEqual("completed", json.loads(receipt_path.read_text())["status"])
 
+    def test_iteration_apply_initializes_empty_field_and_verifies_server_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            plan_path = root / "iteration-plan.json"
+            receipt_path = root / "iteration-receipt.json"
+            data = manifest()
+            data["workflow"]["iteration"] = {
+                "field": "Sprint",
+                "start_date": "2026-09-07",
+                "duration_days": 14,
+            }
+            empty_field = {
+                "id": "FIELD_SPRINT",
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "iteration_configuration": {
+                    "start_date": None,
+                    "duration_days": 14,
+                    "iterations": [],
+                    "completed_iterations": [],
+                },
+            }
+            before = {"fields": [empty_field], "views": [], "labels": []}
+            after = {
+                "fields": [
+                    {
+                        **empty_field,
+                        "iteration_configuration": {
+                            "start_date": "2026-09-07",
+                            "duration_days": 14,
+                            "iterations": [
+                                {
+                                    "id": "ITER_SERVER_1",
+                                    "title": "Sprint 1",
+                                    "start_date": "2026-09-07",
+                                    "duration_days": 14,
+                                    "completed": False,
+                                }
+                            ],
+                            "completed_iterations": [],
+                        },
+                    }
+                ],
+                "views": [],
+                "labels": [],
+            }
+            plan = build_iteration_plan(
+                data, before, target="Sprint 1", as_of="2026-09-07"
+            )
+            manifest_path.write_text(json.dumps(data), encoding="utf-8")
+            plan_path.write_text(json.dumps(plan.as_dict()), encoding="utf-8")
+            reader = Mock()
+            reader.return_value.read.side_effect = [before, after]
+            executed = []
+
+            with (
+                patch("agentic_backlog_kit.cli._transport", return_value=object()),
+                patch("agentic_backlog_kit.cli.GitHubScaffoldSnapshotReader", reader),
+                patch("agentic_backlog_kit.cli.GitHubService"),
+                patch(
+                    "agentic_backlog_kit.cli.GitHubScaffoldExecutor",
+                    return_value=executed.append,
+                ),
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                result = main(
+                    [
+                        "iteration-apply",
+                        "--manifest",
+                        str(manifest_path),
+                        "--plan",
+                        str(plan_path),
+                        "--confirm",
+                        plan.digest,
+                        "--receipt",
+                        str(receipt_path),
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            self.assertEqual(2, reader.return_value.read.call_count)
+            self.assertEqual(1, len(executed))
+            payload = json.loads(output.getvalue())
+            self.assertTrue(payload["verified"])
+            self.assertEqual("ITER_SERVER_1", payload["resolved_iteration_id"])
+            self.assertEqual("completed", json.loads(receipt_path.read_text())["status"])
+
     def test_init_apply_captures_created_number_and_emits_fresh_scaffold_plan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -309,6 +309,48 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
 
 
 class ScaffoldSnapshotReaderTests(unittest.TestCase):
+    def test_reads_empty_github_iteration_configuration_without_fabricating_schedule(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_SPRINT",
+                                    "databaseId": 103,
+                                    "name": "Sprint",
+                                    "dataType": "ITERATION",
+                                    "configuration": {
+                                        "duration": 14,
+                                        "iterations": [],
+                                        "completedIterations": [],
+                                    },
+                                }
+                            ]
+                        },
+                        "views": {"nodes": []},
+                    }
+                }
+            }
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        snapshot = GitHubScaffoldSnapshotReader(
+            transport,
+            owner="aegolius-labs",
+            repository="example",
+            project_number=1,
+        ).read()
+
+        field = snapshot["fields"][0]
+        self.assertEqual("FIELD_SPRINT", field["id"])
+        self.assertIsNone(field["iteration_configuration"]["start_date"])
+        self.assertEqual([], field["iteration_configuration"]["iterations"])
+
     def test_reads_complete_view_configuration_with_field_identities(self) -> None:
         transport = RoutedTransport()
         status = {

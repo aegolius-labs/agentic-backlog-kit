@@ -109,6 +109,39 @@ class ScaffoldPlanningTests(unittest.TestCase):
 
         self.assertEqual([], second.actions)
 
+    def test_existing_uninitialized_iteration_field_is_not_recreated(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        empty_iteration = {
+            "id": "FIELD_SPRINT",
+            "database_id": 1042,
+            "name": "Sprint",
+            "data_type": "ITERATION",
+            "iteration_configuration": {
+                "start_date": None,
+                "duration_days": 14,
+                "iterations": [],
+                "completed_iterations": [],
+            },
+        }
+
+        plan = build_scaffold_plan(
+            data,
+            {"fields": [empty_iteration], "views": [], "labels": []},
+        )
+
+        self.assertFalse(
+            any(
+                action.kind == "project.field.create"
+                and action.payload["name"] == "Sprint"
+                for action in plan.actions
+            )
+        )
+
     def test_supported_same_name_view_drift_produces_reviewed_update(self) -> None:
         data = manifest()
         data["workflow"]["iteration"] = {

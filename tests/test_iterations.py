@@ -67,6 +67,29 @@ def project_snapshot(field: dict | None = None) -> dict:
 
 
 class IterationNormalizationTests(unittest.TestCase):
+    def test_normalizes_github_empty_iteration_configuration(self) -> None:
+        # Exact shape returned after GitHub creates an ITERATION field while
+        # ignoring the requested empty iterationConfiguration.
+        normalized = normalize_iteration_field(
+            {
+                "id": "FIELD_SPRINT",
+                "databaseId": 42,
+                "name": "Sprint",
+                "dataType": "ITERATION",
+                "configuration": {
+                    "duration": 14,
+                    "iterations": [],
+                    "completedIterations": [],
+                },
+            }
+        )
+
+        configuration = normalized["iteration_configuration"]
+        self.assertIsNone(configuration["start_date"])
+        self.assertEqual(14, configuration["duration_days"])
+        self.assertEqual([], configuration["iterations"])
+        self.assertEqual([], configuration["completed_iterations"])
+
     def test_normalizes_raw_graphql_configuration_with_completion_state(self) -> None:
         normalized = normalize_iteration_field(
             {
@@ -114,6 +137,107 @@ class IterationNormalizationTests(unittest.TestCase):
 
 
 class IterationPlanningTests(unittest.TestCase):
+    def test_initializes_empty_field_from_explicit_title_and_manifest_schedule(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        empty = iteration_field(active=[], completed=[])
+        empty["iteration_configuration"]["start_date"] = None
+
+        plan = build_iteration_plan(
+            data, project_snapshot(empty), target="Sprint 1", as_of="2026-09-07"
+        )
+
+        self.assertEqual("Sprint 1", plan.resolved_title)
+        self.assertIsNone(plan.resolved_iteration_id)
+        self.assertFalse(plan.ready)
+        self.assertEqual(["project.field.update_iterations"], [action.kind for action in plan.actions])
+        action = plan.actions[0]
+        self.assertEqual(
+            {
+                "id": "FIELD_SPRINT",
+                "database_id": 42,
+                "name": "Sprint",
+                "data_type": "ITERATION",
+                "iteration_configuration": {
+                    "start_date": None,
+                    "duration_days": 14,
+                    "iterations": [],
+                    "completed_iterations": [],
+                },
+            },
+            action.precondition["field"],
+        )
+        self.assertEqual(
+            {
+                "start_date": "2026-09-07",
+                "duration_days": 14,
+                "iterations": [
+                    {
+                        "id": None,
+                        "title": "Sprint 1",
+                        "start_date": "2026-09-07",
+                        "duration_days": 14,
+                        "completed": False,
+                    }
+                ],
+                "completed_iterations": [],
+            },
+            action.payload["iteration_configuration"],
+        )
+
+    def test_initializes_empty_field_for_deterministic_current_and_next_aliases(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        empty = iteration_field(active=[], completed=[])
+        empty["iteration_configuration"]["start_date"] = None
+
+        current = build_iteration_plan(
+            data, project_snapshot(empty), target="@current", as_of="2026-09-07"
+        )
+        next_plan = build_iteration_plan(
+            data, project_snapshot(empty), target="@next", as_of="2026-09-07"
+        )
+
+        self.assertEqual("Sprint 1", current.resolved_title)
+        self.assertEqual("Sprint 2", next_plan.resolved_title)
+        self.assertEqual(
+            ["Sprint 1"],
+            [
+                entry["title"]
+                for entry in current.actions[0].payload["iteration_configuration"]["iterations"]
+            ],
+        )
+        self.assertEqual(
+            ["Sprint 1", "Sprint 2"],
+            [
+                entry["title"]
+                for entry in next_plan.actions[0].payload["iteration_configuration"]["iterations"]
+            ],
+        )
+
+    def test_empty_field_with_partial_schedule_fails_closed(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        partial = iteration_field(active=[], completed=[])
+        partial["iteration_configuration"]["start_date"] = "2026-09-07"
+
+        with self.assertRaisesRegex(ManifestError, "start.*no iterations"):
+            build_iteration_plan(
+                data, project_snapshot(partial), target="Sprint 1", as_of="2026-09-07"
+            )
+
     def test_resolves_current_next_and_explicit_active_titles(self) -> None:
         data = manifest()
         data["workflow"]["iteration"] = {
@@ -218,6 +342,51 @@ class IterationPlanningTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(IterationAuthorizationError, "identity"):
             verify_iteration_apply(plan, data, changed_identity)
+
+    def test_initialization_converges_only_after_server_assigns_target_identity(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        empty = iteration_field(active=[], completed=[])
+        empty["iteration_configuration"]["start_date"] = None
+        plan = build_iteration_plan(
+            data, project_snapshot(empty), target="Sprint 1", as_of="2026-09-07"
+        )
+        after = iteration_field(
+            active=[
+                {
+                    "id": "ITER_SERVER_1",
+                    "title": "Sprint 1",
+                    "start_date": "2026-09-07",
+                    "duration_days": 14,
+                    "completed": False,
+                }
+            ],
+            completed=[],
+        )
+        after["iteration_configuration"]["start_date"] = "2026-09-07"
+
+        verified = verify_iteration_apply(plan, data, project_snapshot(after))
+        self.assertEqual("ITER_SERVER_1", verified.resolved_iteration_id)
+
+        changed = iteration_field(
+            active=[
+                {
+                    "id": "ITER_SERVER_1",
+                    "title": "Sprint 1",
+                    "start_date": "2026-09-08",
+                    "duration_days": 14,
+                    "completed": False,
+                }
+            ],
+            completed=[],
+        )
+        changed["iteration_configuration"]["start_date"] = "2026-09-08"
+        with self.assertRaisesRegex(IterationAuthorizationError, "identity"):
+            verify_iteration_apply(plan, data, project_snapshot(changed))
 
     def test_rollover_derives_new_current_and_next_only_at_exact_boundary(self) -> None:
         data = manifest()

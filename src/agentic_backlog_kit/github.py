@@ -370,11 +370,10 @@ class GitHubService:
                 for index, option in enumerate(payload["options"])
             ]
         elif payload["data_type"] == "ITERATION":
-            input_payload["iterationConfiguration"] = {
-                "startDate": payload["start_date"],
-                "duration": payload["duration_days"],
-                "iterations": [],
-            }
+            # GitHub currently ignores an empty iterationConfiguration during
+            # field creation.  Leave initialization to the separately
+            # reviewed iteration-plan/iteration-apply flow after refresh.
+            pass
         self.transport.graphql(
             """
             mutation CreateField($input: CreateProjectV2FieldInput!) {
@@ -845,9 +844,25 @@ class GitHubScaffoldExecutor:
                 raise ManifestError(
                     "Iteration update requires the reviewed field precondition"
                 )
-            previous = (current.get("iteration_configuration") or {}).get(
-                "iterations"
-            ) or []
+            if (
+                (
+                    current.get("id") is not None
+                    and current.get("id") != action.payload.get("field_id")
+                )
+                or (
+                    current.get("name") is not None
+                    and current.get("name") != action.payload.get("name")
+                )
+            ):
+                raise ManifestError(
+                    "Iteration update does not bind the reviewed field identity"
+                )
+            current_configuration = current.get("iteration_configuration")
+            if not isinstance(current_configuration, dict):
+                raise ManifestError(
+                    "Iteration update requires the reviewed field configuration"
+                )
+            previous = current_configuration.get("iterations") or []
             replacement = configuration.get("iterations") or []
             if replacement[: len(previous)] != previous:
                 raise ManifestError(
