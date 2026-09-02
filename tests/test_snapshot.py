@@ -3,11 +3,14 @@ from __future__ import annotations
 import unittest
 
 from agentic_backlog_kit.github import GitHubApiError
+from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.snapshot import (
     GitHubProjectDiscoveryReader,
     GitHubScaffoldSnapshotReader,
     GitHubSnapshotReader,
 )
+
+from tests.helpers import manifest
 
 
 class RoutedTransport:
@@ -350,6 +353,60 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         self.assertEqual("FIELD_SPRINT", field["id"])
         self.assertIsNone(field["iteration_configuration"]["start_date"])
         self.assertEqual([], field["iteration_configuration"]["iterations"])
+
+    def test_direct_api_zero_duration_snapshot_is_usable_by_scaffold_plan(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "organization": {
+                    "projectV2": {
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "FIELD_SPRINT",
+                                    "databaseId": 103,
+                                    "name": "Sprint",
+                                    "dataType": "ITERATION",
+                                    "configuration": {
+                                        "duration": 0,
+                                        "startDay": 1,
+                                        "iterations": [],
+                                        "completedIterations": [],
+                                    },
+                                }
+                            ]
+                        },
+                        "views": {"nodes": []},
+                    }
+                }
+            }
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/aegolius-labs/example/labels?per_page=100&page=1")
+        ] = []
+
+        snapshot = GitHubScaffoldSnapshotReader(
+            transport,
+            owner="aegolius-labs",
+            repository="example",
+            project_number=1,
+        ).read()
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+
+        plan = build_scaffold_plan(data, snapshot)
+
+        self.assertFalse(
+            any(
+                action.kind == "project.field.create"
+                and action.payload["name"] == "Sprint"
+                for action in plan.actions
+            )
+        )
 
     def test_reads_complete_view_configuration_with_field_identities(self) -> None:
         transport = RoutedTransport()

@@ -154,10 +154,7 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(configuration, dict):
         raise ManifestError(f"Project iteration field '{name}' has no configuration")
 
-    duration = _positive_int(
-        configuration.get("duration_days", configuration.get("duration")),
-        f"Project iteration field '{name}' duration_days",
-    )
+    raw_duration = configuration.get("duration_days", configuration.get("duration"))
     raw_active = configuration.get("iterations", [])
     if raw_active is None:
         raw_active = []
@@ -174,6 +171,25 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
         raise ManifestError(
             f"Project iteration field '{name}' completed iterations must be an array"
         )
+    raw_start = configuration.get("start_date", configuration.get("startDate"))
+    # GitHub's direct API can return duration 0 for a newly-created field
+    # whose schedule is still uninitialized. Preserve that sentinel only when
+    # there is no start and no active or completed server-owned entry.
+    uninitialized = (
+        isinstance(raw_duration, int)
+        and not isinstance(raw_duration, bool)
+        and raw_duration == 0
+        and raw_start is None
+        and not raw_active
+        and not raw_completed
+    )
+    duration = (
+        0
+        if uninitialized
+        else _positive_int(
+            raw_duration, f"Project iteration field '{name}' duration_days"
+        )
+    )
     active = [
         _entry(item, completed=False, index=index)
         for index, item in enumerate(raw_active)
@@ -186,7 +202,7 @@ def normalize_iteration_field(raw_field: dict[str, Any]) -> dict[str, Any]:
     active.sort(key=lambda item: (item["start_date"], item["title"], item["id"]))
     completed.sort(key=lambda item: (item["start_date"], item["title"], item["id"]))
 
-    start = configuration.get("start_date", configuration.get("startDate"))
+    start = raw_start
     known = [*active, *completed]
     if start is None and not known:
         # GitHub can create the field while ignoring an empty iteration
@@ -452,14 +468,20 @@ def build_iteration_plan(
     desired_duration = _positive_int(
         desired["duration_days"], "workflow.iteration.duration_days"
     )
-    if configuration["duration_days"] != desired_duration:
+    active = configuration["iterations"]
+    completed = configuration["completed_iterations"]
+    uninitialized = (
+        configuration["duration_days"] == 0
+        and configuration["start_date"] is None
+        and not active
+        and not completed
+    )
+    if configuration["duration_days"] != desired_duration and not uninitialized:
         raise ManifestError(
             f"Project iteration duration {configuration['duration_days']} does not match "
             f"manifest duration {desired_duration}; refusing an unsafe lifecycle update"
         )
 
-    active = configuration["iterations"]
-    completed = configuration["completed_iterations"]
     if not active and not completed:
         initialization_start = _parse_date(
             desired["start_date"], "workflow.iteration.start_date"

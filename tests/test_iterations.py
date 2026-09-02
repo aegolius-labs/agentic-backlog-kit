@@ -90,6 +90,80 @@ class IterationNormalizationTests(unittest.TestCase):
         self.assertEqual([], configuration["iterations"])
         self.assertEqual([], configuration["completed_iterations"])
 
+    def test_normalizes_direct_api_uninitialized_iteration_with_zero_duration(self) -> None:
+        # The direct GitHub API can report the same newly-created, uninitialized
+        # field with a null start and a zero duration.
+        normalized = normalize_iteration_field(
+            {
+                "id": "FIELD_SPRINT",
+                "databaseId": 42,
+                "name": "Sprint",
+                "dataType": "ITERATION",
+                "configuration": {
+                    "duration": 0,
+                    "startDay": 1,
+                    "iterations": [],
+                    "completedIterations": [],
+                },
+            }
+        )
+
+        configuration = normalized["iteration_configuration"]
+        self.assertIsNone(configuration["start_date"])
+        self.assertEqual(0, configuration["duration_days"])
+        self.assertEqual([], configuration["iterations"])
+        self.assertEqual([], configuration["completed_iterations"])
+
+    def test_rejects_zero_or_negative_duration_outside_uninitialized_state(self) -> None:
+        initialized = {
+            "id": "FIELD_SPRINT",
+            "name": "Sprint",
+            "data_type": "ITERATION",
+            "iteration_configuration": {
+                "start_date": "2026-09-07",
+                "duration_days": 0,
+                "iterations": [],
+                "completed_iterations": [],
+            },
+        }
+        with self.assertRaisesRegex(ManifestError, "duration_days"):
+            normalize_iteration_field(initialized)
+
+        negative = {
+            "id": "FIELD_SPRINT",
+            "name": "Sprint",
+            "data_type": "ITERATION",
+            "iteration_configuration": {
+                "start_date": None,
+                "duration_days": -1,
+                "iterations": [],
+                "completed_iterations": [],
+            },
+        }
+        with self.assertRaisesRegex(ManifestError, "duration_days"):
+            normalize_iteration_field(negative)
+
+        nonempty = {
+            "id": "FIELD_SPRINT",
+            "name": "Sprint",
+            "data_type": "ITERATION",
+            "iteration_configuration": {
+                "start_date": None,
+                "duration_days": 0,
+                "iterations": [
+                    {
+                        "id": "ITER_1",
+                        "title": "Sprint 1",
+                        "start_date": "2026-09-07",
+                        "duration_days": 14,
+                    }
+                ],
+                "completed_iterations": [],
+            },
+        }
+        with self.assertRaisesRegex(ManifestError, "duration_days"):
+            normalize_iteration_field(nonempty)
+
     def test_normalizes_raw_graphql_configuration_with_completion_state(self) -> None:
         normalized = normalize_iteration_field(
             {
@@ -188,6 +262,26 @@ class IterationPlanningTests(unittest.TestCase):
             },
             action.payload["iteration_configuration"],
         )
+
+    def test_initializes_zero_duration_empty_field_with_manifest_duration(self) -> None:
+        data = manifest()
+        data["workflow"]["iteration"] = {
+            "field": "Sprint",
+            "start_date": "2026-09-07",
+            "duration_days": 14,
+        }
+        empty = iteration_field(active=[], completed=[])
+        empty["iteration_configuration"]["start_date"] = None
+        empty["iteration_configuration"]["duration_days"] = 0
+
+        plan = build_iteration_plan(
+            data, project_snapshot(empty), target="Sprint 1", as_of="2026-09-07"
+        )
+
+        configuration = plan.actions[0].payload["iteration_configuration"]
+        self.assertEqual(14, configuration["duration_days"])
+        self.assertEqual([14], [entry["duration_days"] for entry in configuration["iterations"]])
+        self.assertEqual(0, plan.actions[0].precondition["field"]["iteration_configuration"]["duration_days"])
 
     def test_initializes_empty_field_for_deterministic_current_and_next_aliases(self) -> None:
         data = manifest()
