@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, and one confirmed GH residual scaffold apply; no iteration lifecycle, item, synchronization, or cleanup writes",
+            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, and one confirmed GH iteration initialization; no item, synchronization, or cleanup writes",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -596,6 +596,32 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertEqual(
             ["project.field.update_iterations"], iteration["action_kinds"]
         )
+        iteration_apply = gh_labels["iteration_initialization_apply"]
+        self.assertEqual("completed", iteration_apply["status"])
+        self.assertEqual(1, iteration_apply["applied_actions"])
+        self.assertEqual(0, iteration_apply["remaining_action_count"])
+        self.assertEqual("537ff376", iteration_apply["resolved_iteration_id"])
+        local_workflow = gh_labels["local_workflow"]
+        self.assertEqual(8, local_workflow["ingested_item_count"])
+        self.assertTrue(local_workflow["sprint_ready_to_commit"])
+        self.assertEqual(10, local_workflow["sprint_effort"])
+        self.assertEqual(
+            ["TASK-0001", "BUG-0001", "STORY-0001", "TASK-0002"],
+            local_workflow["sprint_selected"],
+        )
+        gh_sync = gh_labels["sync_plan"]
+        self.assertTrue(gh_sync["validated"])
+        self.assertFalse(gh_sync["write_applied"])
+        self.assertEqual(25, gh_sync["action_count"])
+        self.assertEqual(
+            {
+                "issue.add_dependency": 2,
+                "issue.create": 8,
+                "issue.set_parent": 7,
+                "project.add_item": 8,
+            },
+            gh_sync["actions_by_kind"],
+        )
         api_labels = next(
             scenario
             for scenario in audit["scenarios"]
@@ -622,22 +648,24 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertEqual("completed", api_labels["scaffold_apply"]["status"])
         self.assertEqual(17, api_labels["scaffold_apply"]["applied_actions"])
         api_verification = api_labels["scaffold_verification"]
-        self.assertEqual(
-            "refresh_succeeded_with_residual_actions", api_verification["status"]
-        )
-        self.assertFalse(api_verification["zero_action_convergence"])
-        self.assertEqual(3, api_verification["residual_action_count"])
-        self.assertEqual(
-            {"project.view.update": 3},
-            api_verification["residual_actions_by_kind"],
-        )
+        self.assertEqual("completed", api_verification["status"])
+        self.assertTrue(api_verification["zero_action_convergence"])
+        self.assertEqual(3, api_verification["applied_actions"])
+        self.assertEqual(0, api_verification["remaining_action_count"])
         self.assertEqual(
             0, api_verification["observed_uninitialized_iteration"]["duration_days"]
         )
+        api_iteration = api_labels["iteration_initialization_plan"]
+        self.assertEqual("Sprint 1", api_iteration["target"])
+        self.assertEqual("@current", api_iteration["target_alias"])
+        self.assertTrue(api_iteration["minimal_initialization"])
+        self.assertFalse(api_iteration["ready"])
+        self.assertIsNone(api_iteration["resolved_iteration_id"])
+        self.assertEqual(1, api_iteration["action_count"])
         self.assertEqual(
             {
-                "api_scaffold_residual",
-                "gh_iteration_initialization",
+                "api_iteration_initialization",
+                "gh_sync",
             },
             {gate["gate"] for gate in audit["pending_write_gates"]},
         )

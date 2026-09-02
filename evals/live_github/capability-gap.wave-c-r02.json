@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-02T18:04:17Z",
+  "refreshed_at_utc": "2026-09-02T21:14:59Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -179,6 +179,48 @@
         "target_alias": "@current",
         "validated": true
       },
+      "iteration_initialization_apply": {
+        "applied_actions": 1,
+        "confirmed_digest": "31d7201388e5dd2a99bcece010855bc8d1e242ee604cd968031db9d98e56496e",
+        "post_apply_digest": "fcb7d6f9250d99e711bcc00e84ce0e8a26ef8a0e25ab9f675aa8637d4a293633",
+        "remaining_action_count": 0,
+        "resolved_iteration_id": "537ff376",
+        "status": "completed",
+        "target": "Sprint 1",
+        "transport": "gh"
+      },
+      "local_workflow": {
+        "ingested_item_count": 8,
+        "priority_order": [
+          "TASK-0001",
+          "FEAT-0001",
+          "INIT-0001",
+          "BUG-0001",
+          "EPIC-0001",
+          "STORY-0001",
+          "TASK-0002",
+          "STORY-0002"
+        ],
+        "sprint_capacity": 10,
+        "sprint_effort": 10,
+        "sprint_ready_to_commit": true,
+        "sprint_selected": ["TASK-0001", "BUG-0001", "STORY-0001", "TASK-0002"],
+        "validated": true
+      },
+      "sync_plan": {
+        "action_count": 25,
+        "actions_by_kind": {
+          "issue.add_dependency": 2,
+          "issue.create": 8,
+          "issue.set_parent": 7,
+          "project.add_item": 8
+        },
+        "digest": "9f0b5a8899e8f506359456edba855fe625368e65b335c793259e919d7d4cc050",
+        "manifest_fingerprint": "6c3f6469b805d32f74f35e4250c03a465050ffec0327d15470496f900575bd58",
+        "snapshot_fingerprint": "37efab002bf6f4993d8a1e0ec1cff6dbdf7f30cf32719ecf9428156a01a2cb59",
+        "validated": true,
+        "write_applied": false
+      },
       "preflight_passed": true,
       "blockers": []
     },
@@ -271,20 +313,34 @@
         "transport": "api"
       },
       "scaffold_verification": {
+        "applied_actions": 3,
+        "confirmed_residual_digest": "e1b46140fdc0412977eb420dd19b3a4be5a107e160d965727c355dbd7bba15e2",
         "observed_uninitialized_iteration": {
           "active_count": 0,
           "completed_count": 0,
           "duration_days": 0,
           "start_date": null
         },
-        "residual_action_count": 3,
-        "residual_actions_by_kind": {
-          "project.view.update": 3
-        },
-        "residual_digest": "e1b46140fdc0412977eb420dd19b3a4be5a107e160d965727c355dbd7bba15e2",
-        "snapshot_fingerprint": "198fcba2e02dd6496b185601c69ccece9840e847fba21cd1452d57948c13baa2",
-        "status": "refresh_succeeded_with_residual_actions",
-        "zero_action_convergence": false
+        "post_apply_digest": "5e1cc098b181bda573054aa1c468a42b9f4600c31cc6779b41b333c4c7cd6f57",
+        "post_apply_snapshot_fingerprint": "22e95b39f740894d366258026b7661da80150767acdb7b81733fbc324ae68b2c",
+        "remaining_action_count": 0,
+        "status": "completed",
+        "transport": "api",
+        "zero_action_convergence": true
+      },
+      "iteration_initialization_plan": {
+        "action_count": 1,
+        "action_kinds": ["project.field.update_iterations"],
+        "as_of": "2026-09-07",
+        "digest": "9a7a4efd929044306d421ab33e1b452c1dac9d6252656e42043715e1c4b44d4f",
+        "manifest_fingerprint": "5ee46cf96420942f8e5f6c3f55630cbd5c5f931350c49a90df1133e3cadfd19e",
+        "minimal_initialization": true,
+        "ready": false,
+        "resolved_iteration_id": null,
+        "snapshot_fingerprint": "22e95b39f740894d366258026b7661da80150767acdb7b81733fbc324ae68b2c",
+        "target": "Sprint 1",
+        "target_alias": "@current",
+        "validated": true
       },
       "preflight_passed": true,
       "blockers": []
@@ -327,17 +383,17 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, and one confirmed GH residual scaffold apply; no iteration lifecycle, item, synchronization, or cleanup writes",
+  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, and one confirmed GH iteration initialization; no item, synchronization, or cleanup writes",
   "pending_write_gates": [
     {
-      "action_count": 1,
-      "digest": "31d7201388e5dd2a99bcece010855bc8d1e242ee604cd968031db9d98e56496e",
-      "gate": "gh_iteration_initialization"
+      "action_count": 25,
+      "digest": "9f0b5a8899e8f506359456edba855fe625368e65b335c793259e919d7d4cc050",
+      "gate": "gh_sync"
     },
     {
-      "action_count": 3,
-      "digest": "e1b46140fdc0412977eb420dd19b3a4be5a107e160d965727c355dbd7bba15e2",
-      "gate": "api_scaffold_residual"
+      "action_count": 1,
+      "digest": "9a7a4efd929044306d421ab33e1b452c1dac9d6252656e42043715e1c4b44d4f",
+      "gate": "api_iteration_initialization"
     }
   ],
   "credentials_recorded": false
