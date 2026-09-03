@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+import subprocess
 import unittest
+from unittest.mock import patch
 
-from agentic_backlog_kit.github import GitHubApiError
+from agentic_backlog_kit.github import GitHubApiError, GitHubCliTransport
 from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.snapshot import (
     GitHubProjectDiscoveryReader,
@@ -31,6 +34,61 @@ class RoutedTransport:
 
 
 class SnapshotReaderTests(unittest.TestCase):
+    def test_cli_parent_absence_is_read_as_an_unparented_issue(self) -> None:
+        issues_path = "repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
+        parent_path = "repos/aegolius-labs/example/issues/1/parent"
+        dependencies_path = (
+            "repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100"
+        )
+        issue = {
+            "id": 101,
+            "node_id": "NODE_1",
+            "number": 1,
+            "html_url": "issue-1",
+            "title": "Root",
+            "body": "<!-- agentic-backlog-kit:id=T-ROOT;schema=1 -->",
+            "state": "open",
+            "type": {"name": "Task"},
+            "labels": [],
+        }
+        project = {
+            "organization": {
+                "projectV2": {
+                    "items": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        }
+
+        def run(command, **kwargs):
+            path = command[4]
+            if path == issues_path:
+                return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
+            if path == parent_path:
+                return subprocess.CompletedProcess(
+                    command, 1, "", "No parent issue found (HTTP 404)"
+                )
+            if path == dependencies_path:
+                return subprocess.CompletedProcess(command, 0, "[]", "")
+            if path == "graphql":
+                return subprocess.CompletedProcess(
+                    command, 0, json.dumps({"data": project}), ""
+                )
+            raise AssertionError(f"unexpected gh path: {path}")
+
+        with patch("agentic_backlog_kit.github.subprocess.run", side_effect=run):
+            snapshot = GitHubSnapshotReader(
+                GitHubCliTransport("gh"),
+                owner="aegolius-labs",
+                repository="example",
+                project_number=1,
+            ).read()
+
+        self.assertEqual(1, len(snapshot["issues"]))
+        self.assertIsNone(snapshot["issues"][0]["parent_abk_id"])
+
     def test_reads_managed_issues_relationships_and_project_fields(self) -> None:
         transport = RoutedTransport()
         issues_path = "/repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"

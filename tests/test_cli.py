@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -10,6 +11,7 @@ from unittest.mock import Mock, patch
 
 from agentic_backlog_kit.bootstrap import build_bootstrap_plan
 from agentic_backlog_kit.cli import main
+from agentic_backlog_kit.github import GitHubCliTransport
 from agentic_backlog_kit.iterations import build_iteration_plan
 from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.sync import build_sync_plan
@@ -18,6 +20,79 @@ from tests.helpers import item, manifest
 
 
 class CliTests(unittest.TestCase):
+    def test_snapshot_command_succeeds_with_cli_parent_absence(self) -> None:
+        issues_path = "repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
+        parent_path = "repos/aegolius-labs/example/issues/1/parent"
+        dependencies_path = (
+            "repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100"
+        )
+        issue = {
+            "id": 101,
+            "node_id": "NODE_1",
+            "number": 1,
+            "html_url": "issue-1",
+            "title": "Root",
+            "body": "<!-- agentic-backlog-kit:id=T-ROOT;schema=1 -->",
+            "state": "open",
+            "type": {"name": "Task"},
+            "labels": [],
+        }
+        project = {
+            "data": {
+                "organization": {
+                    "projectV2": {
+                        "items": {
+                            "nodes": [],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        }
+                    }
+                }
+            }
+        }
+
+        def run(command, **kwargs):
+            path = command[4]
+            if path == issues_path:
+                return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
+            if path == parent_path:
+                return subprocess.CompletedProcess(
+                    command, 1, "", "No parent issue found (HTTP 404)"
+                )
+            if path == dependencies_path:
+                return subprocess.CompletedProcess(command, 0, "[]", "")
+            if path == "graphql":
+                return subprocess.CompletedProcess(command, 0, json.dumps(project), "")
+            raise AssertionError(f"unexpected gh path: {path}")
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest(item("T-ROOT"))), encoding="utf-8")
+            output = io.StringIO()
+            with (
+                patch(
+                    "agentic_backlog_kit.cli._transport",
+                    return_value=GitHubCliTransport("gh"),
+                ),
+                patch("agentic_backlog_kit.github.subprocess.run", side_effect=run),
+                redirect_stdout(output),
+            ):
+                self.assertEqual(
+                    0,
+                    main(
+                        [
+                            "snapshot",
+                            "--manifest",
+                            str(manifest_path),
+                            "--backend",
+                            "gh",
+                        ]
+                    ),
+                )
+
+        snapshot = json.loads(output.getvalue())
+        self.assertEqual(1, len(snapshot["issues"]))
+        self.assertIsNone(snapshot["issues"][0]["parent_abk_id"])
+
     def test_init_plan_bounds_discovery_for_gh_and_api_backends(self) -> None:
         discovery = {
             "organization": {"login": "aegolius-labs", "id": "ORG_1"},

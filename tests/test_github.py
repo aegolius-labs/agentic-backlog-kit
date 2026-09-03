@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
 from agentic_backlog_kit.github import (
     GitHubApiError,
+    GitHubCliTransport,
     GitHubIssueRef,
     GitHubPlanExecutor,
     GitHubScaffoldExecutor,
@@ -68,6 +71,45 @@ class FakeTransport:
         if isinstance(response, Exception):
             raise response
         return response
+
+
+class GitHubCliTransportTests(unittest.TestCase):
+    def test_parent_absence_exposes_http_404_from_exact_cli_message(self) -> None:
+        result = CompletedProcess(
+            ["gh"], 1, stdout="", stderr="No parent issue found (HTTP 404)\n"
+        )
+        transport = GitHubCliTransport("gh")
+
+        with patch("agentic_backlog_kit.github.subprocess.run", return_value=result):
+            with self.assertRaises(GitHubApiError) as raised:
+                transport.rest(
+                    "GET", "/repos/aegolius-labs/example/issues/1/parent"
+                )
+
+        self.assertEqual(404, raised.exception.status)
+        self.assertEqual("No parent issue found (HTTP 404)", raised.exception.message)
+
+    def test_parent_absence_normalization_fails_closed_for_near_miss_errors(self) -> None:
+        cases = [
+            ("POST", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 404)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1", "No parent issue found (HTTP 404)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 403)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 404): extra detail"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent?verbose=true", "No parent issue found (HTTP 404)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent/", "No parent issue found (HTTP 404)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "authentication required"),
+        ]
+
+        for method, path, message in cases:
+            with self.subTest(method=method, path=path, message=message):
+                result = CompletedProcess(["gh"], 1, stdout="", stderr=message)
+                transport = GitHubCliTransport("gh")
+                with patch(
+                    "agentic_backlog_kit.github.subprocess.run", return_value=result
+                ):
+                    with self.assertRaises(GitHubApiError) as raised:
+                        transport.rest(method, path)
+                self.assertEqual(1, raised.exception.status)
 
 
 class GitHubExecutorTests(unittest.TestCase):
