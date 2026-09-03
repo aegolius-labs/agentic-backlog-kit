@@ -19,6 +19,7 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 - A bounded installed-plugin trace runner with fail-closed multi-turn continuation, safe path canonicalization/redaction, validated local-ingestion mutation proof, and durable Wave C representative evidence.
 - Safe initialization planning for GitHub iteration fields that exist with an empty server configuration.
 - Direct-API compatibility for GitHub's zero-duration sentinel on a null-start, empty iteration field, while preserving positive-duration validation for initialized schedules.
+- GitHub CLI snapshot compatibility for its explicit root-issue parent-absence 404 diagnostic, with unrelated CLI failures remaining fail-closed.
 
 ## [0.1.0] - Unreleased
 

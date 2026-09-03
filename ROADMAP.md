@@ -95,7 +95,7 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R02 - Run live GitHub end-to-end evaluations
 
-- **Status:** Wave C live execution in progress; both label-fallback scaffolds converge at zero actions, GH Sprint 1 is initialized and identity-verified, and the GH 25-action sync plus API Sprint 1 plans await compact exact-digest approval
+- **Status:** Wave C live execution in progress; the GH label-fallback workflow is canonically converged end to end, the API scaffold and Sprint 1 are identity-verified, and only the API 25-action sync plan awaits compact exact-digest approval
 - **Importance:** Critical
 - **Complexity:** Hard
 - **Context:** The local suite and offline evidence verifier cover the workflow contract, but no complete workflow has yet created and reconciled real issues, sub-issues, dependencies, Project fields, iterations, or views. Wave B added deterministic native-type and label-fallback fixtures, GitHub CLI/API/MCP scenario definitions, capability preflights, receipt/redaction checks, full view/iteration oracles, and a separate cleanup gate without contacting GitHub.
@@ -122,7 +122,7 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R05 - Manage the iteration lifecycle
 
-- **Status:** Complete in Wave B; Wave C now handles both GH's null-start/14-day and direct API's null-start/zero-day empty-field representations, GH Sprint 1 is identity-verified, and the minimal API Sprint 1 initialization plan awaits exact-digest apply
+- **Status:** Complete in Wave B and live-verified in Wave C; both GH and direct-API Sprint 1 fields are initialized with stable server identities and zero remaining lifecycle actions
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** Full active/completed iteration definitions and identities are now canonical snapshot state. Sprint planning resolves exact titles, `@current`, and `@next` before commitment and rejects completed, duplicate, overlapping, stale/gapped, duration-mismatched, or otherwise ambiguous schedules.
@@ -236,7 +236,7 @@ Complexity labels describe implementation and validation effort, not importance.
    - Integration retained both full view and iteration configuration in the shared Project queries, aligned the evaluation oracle with the implemented view contract, and added observed iteration state to deterministic sprint expectations.
 
 3. **Wave C - Parallel release-candidate evaluation**
-   - R06 installed-plugin evaluation is complete; R02 live GitHub evaluation remains in progress. Both label-fallback scaffolds converge at zero, GH Sprint 1 is ready with a stable server identity, and the next confirmation gates are GH item synchronization plus API Sprint 1 initialization.
+   - R06 installed-plugin evaluation is complete; R02 live GitHub evaluation remains in progress. The GH label-fallback workflow is canonically converged with eight issues and all Project fields/relationships verified; the API lane is ready at its final 25-action sync gate.
    - Run Linux CI at the same time and rerun R09 measurements on the final behavior.
    - Failures return to the owning Wave A/B lane; do not patch production and evaluation branches independently.
 

@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, and one confirmed GH iteration initialization; no item, synchronization, or cleanup writes",
+            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and one confirmed GH item synchronization; no cleanup writes",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -611,7 +611,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         )
         gh_sync = gh_labels["sync_plan"]
         self.assertTrue(gh_sync["validated"])
-        self.assertFalse(gh_sync["write_applied"])
+        self.assertTrue(gh_sync["write_applied"])
         self.assertEqual(25, gh_sync["action_count"])
         self.assertEqual(
             {
@@ -622,6 +622,13 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
             },
             gh_sync["actions_by_kind"],
         )
+        gh_sync_apply = gh_labels["sync_apply"]
+        self.assertEqual("completed", gh_sync_apply["status"])
+        self.assertEqual(25, gh_sync_apply["applied_actions"])
+        self.assertEqual(0, gh_sync_apply["remaining_action_count"])
+        self.assertEqual(8, gh_sync_apply["managed_issue_count"])
+        self.assertTrue(gh_sync_apply["canonical_reader_used"])
+        self.assertTrue(gh_sync_apply["assertions_passed"])
         api_labels = next(
             scenario
             for scenario in audit["scenarios"]
@@ -662,11 +669,25 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertFalse(api_iteration["ready"])
         self.assertIsNone(api_iteration["resolved_iteration_id"])
         self.assertEqual(1, api_iteration["action_count"])
+        api_iteration_apply = api_labels["iteration_initialization_apply"]
+        self.assertEqual("completed", api_iteration_apply["status"])
+        self.assertEqual(1, api_iteration_apply["applied_actions"])
+        self.assertEqual(0, api_iteration_apply["remaining_action_count"])
+        self.assertEqual("e60f024c", api_iteration_apply["resolved_iteration_id"])
+        api_local_workflow = api_labels["local_workflow"]
+        self.assertEqual(8, api_local_workflow["ingested_item_count"])
+        self.assertTrue(api_local_workflow["sprint_ready_to_commit"])
+        self.assertEqual(10, api_local_workflow["sprint_effort"])
         self.assertEqual(
-            {
-                "api_iteration_initialization",
-                "gh_sync",
-            },
+            ["TASK-0001", "BUG-0001", "STORY-0001", "TASK-0002"],
+            api_local_workflow["sprint_selected"],
+        )
+        api_sync = api_labels["sync_plan"]
+        self.assertTrue(api_sync["validated"])
+        self.assertFalse(api_sync["write_applied"])
+        self.assertEqual(25, api_sync["action_count"])
+        self.assertEqual(
+            {"api_sync"},
             {gate["gate"] for gate in audit["pending_write_gates"]},
         )
         self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
@@ -679,6 +700,11 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(
             audit["gh_and_api_capabilities"][
                 "uninitialized_iteration_duration_zero_supported"
+            ]
+        )
+        self.assertTrue(
+            audit["gh_and_api_capabilities"][
+                "gh_cli_root_parent_absence_404_supported"
             ]
         )
         self.assertEqual(

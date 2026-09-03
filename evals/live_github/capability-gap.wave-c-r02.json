@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-02T21:14:59Z",
+  "refreshed_at_utc": "2026-09-03T13:44:20Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -46,6 +46,7 @@
     "engine_snapshot_query_compatible": true,
     "engine_snapshot_query_blocker": null,
     "uninitialized_iteration_duration_zero_supported": true,
+    "gh_cli_root_parent_absence_404_supported": true,
     "required_native_issue_types": ["Initiative", "Epic", "Feature", "Story", "Bug", "Task"],
     "available_native_issue_types": [
       "Task",
@@ -219,7 +220,18 @@
         "manifest_fingerprint": "6c3f6469b805d32f74f35e4250c03a465050ffec0327d15470496f900575bd58",
         "snapshot_fingerprint": "37efab002bf6f4993d8a1e0ec1cff6dbdf7f30cf32719ecf9428156a01a2cb59",
         "validated": true,
-        "write_applied": false
+        "write_applied": true
+      },
+      "sync_apply": {
+        "applied_actions": 25,
+        "assertions_passed": true,
+        "canonical_reader_used": true,
+        "confirmed_digest": "9f0b5a8899e8f506359456edba855fe625368e65b335c793259e919d7d4cc050",
+        "managed_issue_count": 8,
+        "post_apply_digest": "c7ff56a0d7896a3d001a18fbd300c420e97cb69c1023aa9e60773a2023d8ab88",
+        "remaining_action_count": 0,
+        "status": "completed",
+        "transport": "gh"
       },
       "preflight_passed": true,
       "blockers": []
@@ -342,6 +354,48 @@
         "target_alias": "@current",
         "validated": true
       },
+      "iteration_initialization_apply": {
+        "applied_actions": 1,
+        "confirmed_digest": "9a7a4efd929044306d421ab33e1b452c1dac9d6252656e42043715e1c4b44d4f",
+        "post_apply_digest": "0f58db792bcc6553483fe03b7021412f9ad01fb0e428165948af4d4620c8043b",
+        "remaining_action_count": 0,
+        "resolved_iteration_id": "e60f024c",
+        "status": "completed",
+        "target": "Sprint 1",
+        "transport": "api"
+      },
+      "local_workflow": {
+        "ingested_item_count": 8,
+        "priority_order": [
+          "TASK-0001",
+          "FEAT-0001",
+          "INIT-0001",
+          "BUG-0001",
+          "EPIC-0001",
+          "STORY-0001",
+          "TASK-0002",
+          "STORY-0002"
+        ],
+        "sprint_capacity": 10,
+        "sprint_effort": 10,
+        "sprint_ready_to_commit": true,
+        "sprint_selected": ["TASK-0001", "BUG-0001", "STORY-0001", "TASK-0002"],
+        "validated": true
+      },
+      "sync_plan": {
+        "action_count": 25,
+        "actions_by_kind": {
+          "issue.add_dependency": 2,
+          "issue.create": 8,
+          "issue.set_parent": 7,
+          "project.add_item": 8
+        },
+        "digest": "2fb6c820a50b31ced658b2d8cc7fb6bbe48f5108d55bc28009bc530778fef2ec",
+        "manifest_fingerprint": "4cee420ba700f3bd34ad4c15937872143e4e7baf878969d2de61b304a101d9cc",
+        "snapshot_fingerprint": "d35a51824f733face7498eb3c7c074bf5fd35c79c2a0ec49fb77da6f774e97a1",
+        "validated": true,
+        "write_applied": false
+      },
       "preflight_passed": true,
       "blockers": []
     },
@@ -383,17 +437,12 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, and one confirmed GH iteration initialization; no item, synchronization, or cleanup writes",
+  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and one confirmed GH item synchronization; no cleanup writes",
   "pending_write_gates": [
     {
       "action_count": 25,
-      "digest": "9f0b5a8899e8f506359456edba855fe625368e65b335c793259e919d7d4cc050",
-      "gate": "gh_sync"
-    },
-    {
-      "action_count": 1,
-      "digest": "9a7a4efd929044306d421ab33e1b452c1dac9d6252656e42043715e1c4b44d4f",
-      "gate": "api_iteration_initialization"
+      "digest": "2fb6c820a50b31ced658b2d8cc7fb6bbe48f5108d55bc28009bc530778fef2ec",
+      "gate": "api_sync"
     }
   ],
   "credentials_recorded": false
