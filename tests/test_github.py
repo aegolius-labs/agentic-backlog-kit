@@ -75,19 +75,24 @@ class FakeTransport:
 
 class GitHubCliTransportTests(unittest.TestCase):
     def test_parent_absence_exposes_http_404_from_exact_cli_message(self) -> None:
-        result = CompletedProcess(
-            ["gh"], 1, stdout="", stderr="No parent issue found (HTTP 404)\n"
-        )
-        transport = GitHubCliTransport("gh")
+        for message in (
+            "gh: No parent issue found (HTTP 404)",
+            "No parent issue found (HTTP 404)",
+        ):
+            with self.subTest(message=message):
+                result = CompletedProcess(["gh"], 1, stdout="", stderr=message + "\n")
+                transport = GitHubCliTransport("gh")
 
-        with patch("agentic_backlog_kit.github.subprocess.run", return_value=result):
-            with self.assertRaises(GitHubApiError) as raised:
-                transport.rest(
-                    "GET", "/repos/aegolius-labs/example/issues/1/parent"
-                )
+                with patch(
+                    "agentic_backlog_kit.github.subprocess.run", return_value=result
+                ):
+                    with self.assertRaises(GitHubApiError) as raised:
+                        transport.rest(
+                            "GET", "/repos/aegolius-labs/example/issues/1/parent"
+                        )
 
-        self.assertEqual(404, raised.exception.status)
-        self.assertEqual("No parent issue found (HTTP 404)", raised.exception.message)
+                self.assertEqual(404, raised.exception.status)
+                self.assertEqual(message, raised.exception.message)
 
     def test_parent_absence_normalization_fails_closed_for_near_miss_errors(self) -> None:
         cases = [
@@ -95,6 +100,13 @@ class GitHubCliTransportTests(unittest.TestCase):
             ("GET", "/repos/aegolius-labs/example/issues/1", "No parent issue found (HTTP 404)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 403)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 404): extra detail"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 403)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 404): extra detail"),
+            ("GET", "/repos/aegolius-labs/example/issues/1", "gh: No parent issue found (HTTP 404)"),
+            ("POST", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 404)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: authentication required"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: API rate limit exceeded (HTTP 429)"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: Resource not accessible by integration (HTTP 403)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent?verbose=true", "No parent issue found (HTTP 404)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent/", "No parent issue found (HTTP 404)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent", "authentication required"),

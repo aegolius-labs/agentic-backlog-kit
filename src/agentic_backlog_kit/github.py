@@ -13,7 +13,12 @@ from .sync import SyncAction
 
 
 API_VERSION = "2026-03-10"
-_PARENT_ABSENCE_MESSAGE = "No parent issue found (HTTP 404)"
+_PARENT_ABSENCE_MESSAGES = frozenset(
+    {
+        "No parent issue found (HTTP 404)",
+        "gh: No parent issue found (HTTP 404)",
+    }
+)
 
 
 def _cli_error_status(method: str, path: str, message: str) -> int | None:
@@ -22,14 +27,16 @@ def _cli_error_status(method: str, path: str, message: str) -> int | None:
     ``gh api`` reports the issue-parent endpoint's normal empty relationship as
     exit code 1, even though the diagnostic includes its HTTP 404 status.  The
     snapshot reader already treats a 404 from the direct API as an absent
-    parent, so normalize only this exact endpoint/message combination.  Other
-    CLI failures must retain their exit code and remain fatal to the reader.
+    parent, so normalize only this exact endpoint/message combination.  The
+    ``gh:`` prefix is emitted by current CLI versions; the unprefixed form is
+    retained for compatibility with versions that omit it.  Other CLI failures
+    must retain their exit code and remain fatal to the reader.
     """
 
     if (
         method.upper() == "GET"
         and path.endswith("/parent")
-        and message == _PARENT_ABSENCE_MESSAGE
+        and message in _PARENT_ABSENCE_MESSAGES
     ):
         return 404
     return None

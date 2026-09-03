@@ -68,7 +68,7 @@ class SnapshotReaderTests(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
             if path == parent_path:
                 return subprocess.CompletedProcess(
-                    command, 1, "", "No parent issue found (HTTP 404)"
+                    command, 1, "", "gh: No parent issue found (HTTP 404)"
                 )
             if path == dependencies_path:
                 return subprocess.CompletedProcess(command, 0, "[]", "")
