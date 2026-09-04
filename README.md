@@ -104,6 +104,46 @@ prefix; refresh and create a new reviewed plan to resume safely.
 
 The skills capability-check the host GitHub integration/MCP before using it. The launcher uses an authenticated `gh` session when selected, while `GH_TOKEN` or `GITHUB_TOKEN` enables the equally native direct GraphQL/REST route. Every route must produce the same canonical snapshots, plans, digests, and receipts; an incomplete MCP surface is reported explicitly, and write transports are never silently mixed within an apply. Project creation/linking needs organization Projects write access and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
 
+## Release-candidate support and limitations
+
+Wave C validated the representative end-to-end workflow through an authenticated
+GitHub CLI session and through direct GraphQL/REST. These are peer, supported
+transports over the same plan, digest, apply, receipt, and refresh contract; the
+direct API route is not a reduced fallback. A Codex GitHub integration/GitHub
+MCP is supported only when capability preflight proves every operation and
+identity required by the plan, including repositories, Projects, fields, views,
+iterations, hierarchy, dependencies, issue types, and rate limits. The
+installed generic GitHub MCP evaluated in Wave C exposed repository reads and
+labels, but not that complete surface, so it failed closed before any write.
+
+GitHub organizations do not all expose the same native issue types. If the
+canonical `Story` type is unavailable, native-type mode stops at preflight and
+the kit uses the explicit label-fallback mode instead: each managed issue gets
+its corresponding `type:<lowercase>` label (for example, `type:story`) while
+unrelated labels are preserved.
+
+Project view reconciliation can update layout, filters, and ordered visible
+fields. Drift in horizontal/vertical grouping or sorting fails closed because
+the current GitHub view-update input cannot safely change those settings; fix
+the view in GitHub, refresh, and re-plan. The kit never deletes and recreates a
+same-name view. Project membership can also be eventually consistent: a
+post-apply refresh may temporarily show residual additions. Do not replay the
+old plan; refresh and re-plan after propagation. Wave C's direct-API run
+converged on a later read-only refresh.
+
+The release scope is additive and update-only. It creates or updates managed
+issues, Project membership and fields, parent relationships, and missing
+dependencies. It does not delete issues, remove relationships, archive Project
+items, or automatically close completed issues. Disposable evaluation cleanup
+is a separate, explicitly confirmed destructive operation. The current
+manifest models one repository and one organization Project; cross-repository
+backlogs are outside this release.
+
+The evidence and command-level limits are recorded in
+[docs/validation.md](docs/validation.md),
+[docs/release-checklist.md](docs/release-checklist.md), and the redacted
+[Wave C capability record](evals/live_github/capability-gap.wave-c-r02.json).
+
 ## Plugin UX
 
 The plugin contains five focused skills:

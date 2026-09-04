@@ -6,6 +6,19 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Finalized release-candidate transport support and known-limitations
+  documentation from the Wave C evidence: authenticated GitHub CLI and direct
+  GraphQL/REST are supported peer routes, capability-complete MCP is
+  conditional, and incomplete generic MCP surfaces fail closed.
+- Documented the `type:*` label fallback when native `Story` is unavailable,
+  additive/update-only mutation scope, Project-view update boundaries,
+  eventual Project-membership propagation, and the noncommercial/paid-
+  commercial licensing boundary.
+- Modernized package license metadata to the SPDX PolyForm identifier and
+  include both legal notice files in built distributions.
+
 ### Added
 
 - Fresh-state-bound sync, scaffold, and bootstrap plans with per-action preconditions and atomic partial-execution receipts.

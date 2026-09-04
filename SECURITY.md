@@ -13,3 +13,10 @@ Do not disclose suspected vulnerabilities in a public issue. Include affected ve
 ## Security boundaries
 
 The kit can write GitHub Issues and organization Projects. External mutations require a reviewed plan digest and explicit confirmation. Use the least-privileged GitHub token or MCP connection that provides organization Projects write access, repository Issues write access for issue reconciliation, and repository Contents access when creating or linking a Project.
+
+The release is intentionally additive and update-only: it does not delete
+issues, remove relationships, archive Project items, or automatically close
+issues. A post-apply Project refresh may temporarily lag membership writes; the
+safe response is to refresh and re-plan after propagation rather than replaying
+an earlier digest. See the [release-candidate limitations](README.md#release-candidate-support-and-limitations)
+for the transport and Project-view boundaries.

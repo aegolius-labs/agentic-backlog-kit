@@ -28,6 +28,12 @@ Project scaffolding preserves the IDs, colors, and descriptions of existing sing
 
 Managed views are compared across layout, filter, ordered visible fields, horizontal and vertical grouping, and ordered sorting. Supported differences become reviewed update actions. Grouping and sorting differences fail closed because the current GitHub view-update input cannot change them safely; the kit does not delete and recreate a same-name view.
 
+Project membership writes are subject to GitHub's eventual consistency. A
+fresh read immediately after an apply can temporarily retain residual additions
+even when the journaled actions succeeded. The executor records that state,
+does not replay the old plan, and requires a later refresh and re-plan; the
+Wave C direct-API evaluation converged on that later read.
+
 Iteration lifecycle plans resolve exact titles, `@current`, or `@next` from canonical active/completed state. A schedule can be extended only from a contiguous, cadence-matching numeric title sequence. GitHub-owned iteration IDs and completion state are bound as preconditions and rechecked after refresh before assignment proceeds.
 
 Native GitHub Projects access is a transport invariant, not an MCP-only feature. A compatible Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API are peer execution routes over the same deterministic engine contract. Capability discovery must prove that a route exposes every operation and identity required by a plan. An incomplete MCP surface is reported and the workflow selects one complete route; writes from different transports are never silently mixed within one apply. The same canonical snapshot, plan, digest, receipt, and post-apply verification contract applies regardless of executor.
@@ -60,4 +66,9 @@ Completed items score zero. Blocked or unrefined items are not executable. Sprin
 
 ## Safety boundary
 
-The current release creates and updates managed issues, Project membership and fields, parent relationships, and missing dependencies. It does not delete issues, remove relationships, archive Project items, or automatically close completed issues. Those asymmetric operations are intentionally deferred because an incomplete local manifest must not destroy remote work.
+The current release creates and updates managed issues, Project membership and
+fields, parent relationships, and missing dependencies. It does not delete
+issues, remove relationships, archive Project items, or automatically close
+completed issues. Those asymmetric operations are intentionally deferred
+because an incomplete local manifest must not destroy remote work. The current
+manifest is limited to one repository and one organization Project.

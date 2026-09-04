@@ -24,6 +24,33 @@ identical to the 2026-08-27 baseline, and all budget failures were empty. The
 compact baselines are recorded in
 [benchmarks.md](benchmarks.md).
 
+## Wave C GitHub capability evidence
+
+The redacted [capability record](../evals/live_github/capability-gap.wave-c-r02.json)
+captures the disposable evaluation preflight and apply results:
+
+| Route | Result | Release interpretation |
+| --- | --- | --- |
+| Authenticated GitHub CLI | Label-fallback workflow converged with eight managed issues, Project memberships, relationships, fields, and a zero-action second plan | Supported native route |
+| Direct GraphQL/REST | Same label-fallback convergence and zero-action second plan | Supported peer native route |
+| Capability-complete Codex GitHub integration/MCP | Conditional support; capability preflight must prove the complete operation and identity surface | Supported when complete |
+| Installed generic GitHub MCP | Failed preflight before writes; Projects, fields/views/iterations, hierarchy/dependencies, repository lifecycle, native issue types, and rate-limit capabilities were unavailable | Not a supported complete route |
+
+The organization used for the evaluation did not expose the canonical native
+`Story` issue type (it exposed `User Story` and `Tech Story` instead). Native
+type scenarios therefore stopped at preflight; the label-fallback scenarios
+used the corresponding `type:<lowercase>` labels. The direct-API synchronization
+also recorded temporary residual Project-membership additions on its immediate
+recheck; a later read-only refresh converged, and no old plan was replayed.
+
+The supported mutation boundary is additive and update-only: managed issues,
+Project membership and fields, parent relationships, and missing dependencies
+may be created or updated. Issue deletion, relationship removal, Project-item
+archival, and automatic issue closure are outside the release. Project-view
+grouping and sorting drift likewise fails closed because GitHub's current view
+update input cannot safely change those settings; same-name views are never
+deleted and recreated.
+
 The earlier 2026-08-27 Windows build produced these recorded artifacts; the
 2026-09-04 build/install smoke check also passed, but its disposable artifacts
 were not retained as release evidence:
