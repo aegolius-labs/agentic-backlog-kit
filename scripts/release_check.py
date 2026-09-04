@@ -150,6 +150,19 @@ def _read_wheel_metadata(path: Path, version: str) -> None:
                 raise ReleaseCheckError(
                     f"wheel {path.name} is missing the abk console entry point"
                 )
+            dist_info = metadata_names[0].rsplit("/", 1)[0]
+            required_legal_files = {
+                f"{dist_info}/licenses/LICENSE.md",
+                f"{dist_info}/licenses/COMMERCIAL.md",
+            }
+            missing_legal_files = sorted(
+                required_legal_files.difference(archive.namelist())
+            )
+            if missing_legal_files:
+                raise ReleaseCheckError(
+                    f"wheel {path.name} is missing legal notice files: "
+                    + ", ".join(missing_legal_files)
+                )
     except zipfile.BadZipFile as exc:
         raise ReleaseCheckError(f"wheel {path.name} is not a valid ZIP archive") from exc
 
@@ -174,6 +187,7 @@ def _validate_sdist(path: Path, version: str) -> None:
         f"{expected_root}/pyproject.toml",
         f"{expected_root}/README.md",
         f"{expected_root}/LICENSE.md",
+        f"{expected_root}/COMMERCIAL.md",
         f"{expected_root}/src/agentic_backlog_kit/__init__.py",
     }
     missing = sorted(required.difference(names))

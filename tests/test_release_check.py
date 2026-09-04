@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.1.0"
 
 
-def _write_wheel(path: Path, *, metadata_version: str = VERSION) -> None:
+def _write_wheel(
+    path: Path, *, metadata_version: str = VERSION, include_commercial: bool = True
+) -> None:
     dist_info = f"agentic_backlog_kit-{VERSION}.dist-info"
     metadata = (
         "Metadata-Version: 2.1\n"
@@ -28,9 +30,14 @@ def _write_wheel(path: Path, *, metadata_version: str = VERSION) -> None:
             f"{dist_info}/entry_points.txt",
             "[console_scripts]\nabk = agentic_backlog_kit.cli:main\n",
         )
+        archive.writestr(f"{dist_info}/licenses/LICENSE.md", "License\n")
+        if include_commercial:
+            archive.writestr(
+                f"{dist_info}/licenses/COMMERCIAL.md", "Commercial terms\n"
+            )
 
 
-def _write_sdist(path: Path) -> None:
+def _write_sdist(path: Path, *, include_commercial: bool = True) -> None:
     top = f"agentic_backlog_kit-{VERSION}"
     files = {
         f"{top}/pyproject.toml": b"[project]\nname='agentic-backlog-kit'\n",
@@ -38,6 +45,8 @@ def _write_sdist(path: Path) -> None:
         f"{top}/LICENSE.md": b"License\n",
         f"{top}/src/agentic_backlog_kit/__init__.py": b"__version__ = '0.1.0'\n",
     }
+    if include_commercial:
+        files[f"{top}/COMMERCIAL.md"] = b"Commercial terms\n"
     with tarfile.open(path, "w:gz") as archive:
         for name, content in files.items():
             info = tarfile.TarInfo(name)
@@ -45,12 +54,21 @@ def _write_sdist(path: Path) -> None:
             archive.addfile(info, io.BytesIO(content))
 
 
-def _write_artifacts(directory: Path, *, metadata_version: str = VERSION) -> None:
+def _write_artifacts(
+    directory: Path,
+    *,
+    metadata_version: str = VERSION,
+    include_commercial: bool = True,
+) -> None:
     _write_wheel(
         directory / f"agentic_backlog_kit-{VERSION}-py3-none-any.whl",
         metadata_version=metadata_version,
+        include_commercial=include_commercial,
     )
-    _write_sdist(directory / f"agentic_backlog_kit-{VERSION}.tar.gz")
+    _write_sdist(
+        directory / f"agentic_backlog_kit-{VERSION}.tar.gz",
+        include_commercial=include_commercial,
+    )
 
 
 class ReleaseCheckTests(unittest.TestCase):
@@ -88,6 +106,14 @@ class ReleaseCheckTests(unittest.TestCase):
             _write_artifacts(dist, metadata_version="0.1.1")
 
             with self.assertRaisesRegex(ReleaseCheckError, "metadata version"):
+                validate_release(ROOT, dist, tag="v0.1.0")
+
+    def test_rejects_artifacts_missing_commercial_notice(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            _write_artifacts(dist, include_commercial=False)
+
+            with self.assertRaisesRegex(ReleaseCheckError, "COMMERCIAL.md"):
                 validate_release(ROOT, dist, tag="v0.1.0")
 
 
