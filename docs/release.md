@@ -92,9 +92,12 @@ verification fails.
 8. **Verify the generated GitHub release.** The tag workflow must finish
    successfully. Verify release `v0.1.0` is not a draft or prerelease, points
    to the intended tag, and contains exactly the wheel and sdist named above.
-   Download those assets to a disposable directory, compare SHA-256 digests
-   with the recorded build, install the wheel with dependencies disabled, and
-   run `abk --help`. No PyPI upload is implied or authorized by this plan.
+   Download those assets to a disposable directory, run the release preflight
+   against them, record their SHA-256 digests, install the wheel with
+   dependencies disabled, and run `abk --help`. Build-container timestamps can
+   make archive digests differ from a local build, so digest equality is not a
+   release requirement unless reproducible-build controls were explicitly
+   applied. No PyPI upload is implied or authorized by this plan.
 9. **Verify the public clean-checkout path.** From a fresh clone of
    `https://github.com/aegolius-labs/agentic-backlog-kit` at `v0.1.0`, rerun
    the documented local checks and confirm the plugin manifest resolves
