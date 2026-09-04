@@ -65,18 +65,18 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 ### M5 - Release readiness
 
 - [x] Run plugin and skill validators.
-- [ ] Run the complete test suite on a CI Linux runner; the Windows suite is green locally.
+- [x] Run the complete test suite on a hosted Linux runner and verify the same tagged checkout locally.
 - [x] Add GitHub Actions for tests and package validation.
 - [x] Build and inspect the Python package and add a tag-driven GitHub release workflow.
 - [x] Select the noncommercial/paid-commercial licensing model and add release, support, security, and contribution documentation (R08).
 - [x] Perform realistic dry-run and apply evaluations against disposable repositories and organization Projects (R02).
 - [x] Evaluate the installed plugin and skill activation through Codex (R06).
 - [x] Measure and enforce token-efficiency budgets (R09).
-- [ ] Publish an initial `0.1.0` release and document known limitations.
+- [x] Publish the initial `0.1.0` release and document known limitations.
 
 ## Current checkpoint
 
-Wave C completed on 2026-09-04. All 163 tests pass on Windows and a clean disposable Ubuntu WSL copy, the package build/install smoke checks pass on both platforms, and the 100/1,000/10,000-item byte-budget report remains byte-for-byte stable and within budget. R02 completed the representative label-fallback workflow through both authenticated GitHub CLI and direct GraphQL/REST: each lane created eight issues, eight Project memberships, seven parent relationships, two dependencies, complete planning fields, and a verified zero-action second plan. Native-type scenarios are unsupported because the organization exposes `User Story` rather than the required `Story`; the installed generic GitHub MCP is capability-incomplete for Projects and therefore failed closed before mutation. R06 installed-plugin evaluation is complete. Wave D now owns canonical repository publication, hosted `ubuntu-latest` CI, branch protection, documentation closure, and the `0.1.0` tag/release. Disposable evaluation resource cleanup remains a separately confirmed destructive operation.
+Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E post-release product work is ready to begin.
 
 ## Work items, ranked
 
@@ -140,16 +140,16 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R07 - Publish the repository, run Linux CI, and release `0.1.0`
 
-- **Status:** In progress; local repository/package/release setup completed in Wave A, external publication remains Wave D
+- **Status:** Complete in Wave D; canonical repository, hosted Linux CI, branch protection, tag, release assets, and clean public-checkout verification all passed
 - **Importance:** High
 - **Complexity:** Medium
-- **Context:** Local Git history, package metadata, test/build/benchmark CI, and a tag-driven release workflow now exist and pass on Windows and a disposable Ubuntu WSL copy. No canonical GitHub remote has been created, so the hosted `ubuntu-latest` workflow and branch-protection checks have not executed.
-- **High-level approach:** After Waves B/C pass, create `aegolius-labs/agentic-backlog-kit`, push the initial branch, enable required checks, verify Linux CI from a clean checkout, then tag and publish `0.1.0` with its documented artifacts and limitations.
+- **Context:** The public repository and `v0.1.0` release are live. Hosted Actions validated all 168 tests, CLI help, the package build/install, legal-artifact preflight, and token budgets on the exact release commit. Branch protection requires the successful `test` context and applies to administrators; release assets were downloaded, revalidated, installed, and smoke-tested.
+- **High-level approach:** Completed through an exact identity- and commit-bound publication plan: create one public repository, push only the reviewed candidate, require green hosted CI, protect `main`, publish one annotated tag, verify the generated release and assets, then rerun the checks from a clean public tag clone.
 - **Done when:** Windows and Linux checks are green from a clean checkout, branch protection is active, installation instructions work, and the tagged release contains documented artifacts and limitations.
 
 #### R08 - Select a license and complete public-release documentation
 
-- **Status:** Complete in Wave A
+- **Status:** Complete in Wave D; final licensing metadata, legal artifacts, support boundaries, and Wave C limitations are included in `v0.1.0`
 - **Importance:** High
 - **Complexity:** Easy
 - **Context:** The kit is source-available under PolyForm Noncommercial 1.0.0, with a separate paid license required for any for-profit operational use. Individuals may use it for genuinely noncommercial open-source work; making a project public does not convert commercial use into noncommercial use.
@@ -240,9 +240,10 @@ Complexity labels describe implementation and validation effort, not importance.
    - R06 installed-plugin evaluation is complete, including bounded real Codex traces and the deterministic activation/authorization corpus.
    - The R09 100/1,000/10,000-item release-candidate report is unchanged and within every budget. All 163 tests plus build/install/help/benchmark checks pass in a disposable Ubuntu WSL copy; hosted Linux CI remains a Wave D publication gate.
 
-4. **Wave D - Release closure**
-   - Finalize R08 known limitations and permission documentation using evaluation results.
-   - Complete R07 packaging, tag, and `0.1.0` release only after R02, R06, R09, Linux CI, and documentation gates pass.
+4. **Wave D - Release closure — completed 2026-09-04**
+   - R08 known limitations, transport support, safety boundaries, licensing metadata, and legal artifacts were finalized from Wave C evidence.
+   - R07 published the canonical public repository, passed hosted Linux CI, protected `main`, and released the exact validated `v0.1.0` tag with wheel and source-distribution assets.
+   - The separately approved evaluation cleanup stopped on its first failure after deleting Project #4; no retry or API-target cleanup occurred, and a fresh plan is required for the three remaining resources.
 
 5. **Wave E - Post-release parallel tracks**
    - R10 destructive/reverse reconciliation and R11 import/bulk ingestion may start concurrently after R01, but require isolated branches and a shared authority/conflict contract.
@@ -258,7 +259,7 @@ Complexity labels describe implementation and validation effort, not importance.
     -> R07 tag and publish 0.1.0
 ```
 
-R09's release-candidate rerun is complete and unchanged. R07 local repository, Windows validation, and Linux CI-equivalent checks are green; external repository creation, hosted Linux execution, branch protection, and the final release remain on the critical path.
+The `0.1.0` critical path is complete. R09 remained within budget, R02/R06 passed their supported release gates, R08 documentation is final, and R07 publication, hosted Linux CI, branch protection, tagged assets, and clean-checkout verification are complete.
 
 ### Concurrency operating rule
 

@@ -1,21 +1,20 @@
 # Release-candidate validation evidence
 
-This record includes the final Wave C release-candidate rerun on 2026-09-04.
-The packaged runtime is rooted at commit `2978922`; the concurrent R02 evidence,
-test-expectation, roadmap, and validation-record updates do not alter packaged
-runtime code. The validation run itself made no GitHub or repository writes.
-Approved live GitHub mutations and their non-destructive boundaries are recorded
-separately in the R02 capability evidence.
+This record covers the final Wave C candidate checks and the Wave D `0.1.0`
+publication on 2026-09-04. The tagged release commit is
+`6a14b704d22e27cea693d5b764b2d2027919d939`. Approved GitHub mutations and
+their safety boundaries are recorded explicitly below and in the R02
+capability evidence.
 
 ## Results
 
-| Check | Windows host | Ubuntu WSL |
-| --- | ---: | ---: |
-| Complete test suite | 163 passed | 163 passed |
-| CLI help | passed | passed |
-| R09 benchmark (`100`, `1,000`, `10,000`) | passed | passed |
-| Build sdist and wheel | passed | passed |
-| Reinstall wheel and run `abk --help` | passed | passed |
+| Check | Windows/tag clone | Ubuntu WSL | Hosted `ubuntu-latest` |
+| --- | ---: | ---: | ---: |
+| Complete test suite | 168 passed | 163 passed | 168 passed |
+| CLI help | passed | passed | passed |
+| R09 benchmark (`100`, `1,000`, `10,000`) | passed | passed | passed |
+| Build sdist and wheel | passed | passed | passed |
+| Install wheel and run `abk --help` | passed | passed | passed |
 
 The 2026-09-04 Windows benchmark report is 9,421 bytes with SHA-256
 `0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`.
@@ -23,6 +22,38 @@ A second Windows run and the Linux run produced the same digest; it is also
 identical to the 2026-08-27 baseline, and all budget failures were empty. The
 compact baselines are recorded in
 [benchmarks.md](benchmarks.md).
+
+## Wave D publication evidence
+
+- Public repository: [aegolius-labs/agentic-backlog-kit](https://github.com/aegolius-labs/agentic-backlog-kit),
+  repository ID `1357618080`, node `R_kgDOUOuboA`.
+- `main` and annotated tag `v0.1.0` resolve to release commit `6a14b70`.
+- The exact-commit hosted [test workflow](https://github.com/aegolius-labs/agentic-backlog-kit/actions/runs/33922592690)
+  completed successfully with 168 tests, package smoke testing, release
+  preflight, and token-budget validation.
+- `main` requires the strict `test` status context with administrator
+  enforcement; force pushes and branch deletion are disabled. No pull-request
+  review count was invented for the initial single-maintainer release.
+- The tag-triggered [release workflow](https://github.com/aegolius-labs/agentic-backlog-kit/actions/runs/33922721178)
+  completed successfully and published the non-draft, non-prerelease
+  [`v0.1.0` release](https://github.com/aegolius-labs/agentic-backlog-kit/releases/tag/v0.1.0).
+- A clean public clone at `v0.1.0` reproduced the release commit and passed the
+  full suite, CLI, byte budgets, plugin validator, and all five skill
+  validators.
+
+The published assets were downloaded and independently passed
+`release_check.py`; the wheel was installed without dependencies and reported
+runtime version `0.1.0`:
+
+| Published artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `agentic_backlog_kit-0.1.0-py3-none-any.whl` | 60,792 | `b138e453568eb6aff899e270c0c2c0a0f4e7237bba765b59ce56189ea0b67b51` |
+| `agentic_backlog_kit-0.1.0.tar.gz` | 91,917 | `79243e76f753cd9ddded307d4b2890453362c44a9a4c4d1d3d57b6f43ef07fea` |
+
+Archive timestamps can make a local build's digest differ from the hosted
+build. Release verification therefore checks exact names, metadata, version,
+entry point, legal files, and source structure, and records the authoritative
+published digests rather than claiming byte-for-byte reproducibility.
 
 ## Wave C GitHub capability evidence
 
@@ -51,14 +82,13 @@ grouping and sorting drift likewise fails closed because GitHub's current view
 update input cannot safely change those settings; same-name views are never
 deleted and recreated.
 
-The earlier 2026-08-27 Windows build produced these recorded artifacts; the
-2026-09-04 build/install smoke check also passed, but its disposable artifacts
-were not retained as release evidence:
-
-| Artifact | Bytes | SHA-256 |
-| --- | ---: | --- |
-| `agentic_backlog_kit-0.1.0-py3-none-any.whl` | 56,369 | `02812a3a577ea8ee5afa553a97b3c5a5d97c0e77e399fbc917bff07f52db6352` |
-| `agentic_backlog_kit-0.1.0.tar.gz` | 72,917 | `6dd3d329bd87475d5d74a23b7c445b281056b06f53b9d27f7273fee70a30ebd6` |
+The separately approved evaluation cleanup deleted and verified absence of GH
+Project #4, then stopped on the first failed repository deletion without a
+retry. The GH evaluation repository remains; the API Project #5 and repository
+were untouched. Concurrent creation of the canonical public repository also
+changed a protected plan precondition, so any remaining cleanup requires a new
+identity-bound plan and confirmation. This partial cleanup does not affect the
+preserved evaluation results or the release.
 
 ## Linux route and limits
 
@@ -86,8 +116,6 @@ PYTHONPATH=src /tmp/abk-rc-python311/python/bin/python3.11 -m unittest discover 
 /tmp/abk-rc-python311/python/bin/abk --help
 ```
 
-This is successful local Linux/WSL evidence, not a hosted GitHub Actions
-result. The remaining R07 gate requires authority to publish the canonical
-GitHub repository, push the candidate, and observe `.github/workflows/test.yml`
-on a clean `ubuntu-latest` runner. Until that authority and remote exist, no
-hosted Linux run URL or branch-protection result can be recorded.
+This remains useful local Linux/WSL evidence. Wave D additionally ran the same
+repository workflow on hosted `ubuntu-latest`; the successful run and branch
+protection result are recorded above.

@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and two confirmed item synchronizations; no cleanup writes",
+            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, two confirmed item synchronizations, and one confirmed cleanup Project deletion; cleanup stopped before repository deletion",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -698,6 +698,15 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertEqual(2, api_sync_apply["dependency_relationship_count"])
         self.assertTrue(api_sync_apply["propagation_recheck_required"])
         self.assertEqual([], audit["pending_write_gates"])
+        cleanup = audit["cleanup"]
+        self.assertEqual("aborted_on_first_failure", cleanup["status"])
+        self.assertEqual([1, 2, 3], cleanup["completed_safe_order_sequences"])
+        self.assertEqual(4, cleanup["failed_action"]["sequence"])
+        self.assertEqual("delete_repository", cleanup["failed_action"]["action"])
+        self.assertFalse(cleanup["failed_action"]["retry_attempted"])
+        self.assertFalse(cleanup["api_target_actions_attempted"])
+        self.assertTrue(cleanup["canonical_publication_drift_detected"])
+        self.assertTrue(cleanup["new_plan_required"])
         self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
         self.assertTrue(
             audit["local_capabilities"]["direct_api_transport_read_passed"]

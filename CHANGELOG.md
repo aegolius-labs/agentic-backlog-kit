@@ -6,6 +6,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Documentation
+
+- Recorded the completed Wave D publication, hosted CI, branch protection,
+  published artifact digests, clean-checkout verification, and fail-closed
+  partial disposal of the Wave C evaluation resources.
+
 ## [0.1.0] - 2026-09-04
 
 ### Changed

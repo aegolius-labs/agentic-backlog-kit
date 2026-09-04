@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-04T13:50:47Z",
+  "refreshed_at_utc": "2026-09-04T21:54:53Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -454,7 +454,51 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and two confirmed item synchronizations; no cleanup writes",
+  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, two confirmed item synchronizations, and one confirmed cleanup Project deletion; cleanup stopped before repository deletion",
+  "cleanup": {
+    "api_target_actions_attempted": false,
+    "approved_plan_digest": "cd76b7cff4f650fd9e04da08619f4d0bdbe4e5fe6671b88aa6ac1ca70b80db90",
+    "canonical_publication_drift_detected": true,
+    "completed_safe_order_sequences": [1, 2, 3],
+    "deleted_resources": [
+      {
+        "kind": "project",
+        "node_id": "PVT_kwDOD0x0U84BiD5K",
+        "number": 4,
+        "owner": "aegolius-labs",
+        "title": "ABK Eval wave-c-r02-20260827-gh-26c954aa [labels]"
+      }
+    ],
+    "failed_action": {
+      "action": "delete_repository",
+      "backend": "gh",
+      "endpoint": "DELETE /repos/aegolius-labs/abk-eval-wave-c-r02-20260827-gh-26c954aa-labels",
+      "error_category": "repository_delete_request_failed",
+      "retry_attempted": false,
+      "sequence": 4
+    },
+    "new_plan_required": true,
+    "remaining_resources": [
+      {
+        "kind": "repository",
+        "node_id": "R_kgDOUKTD5Q",
+        "repository": "aegolius-labs/abk-eval-wave-c-r02-20260827-gh-26c954aa-labels"
+      },
+      {
+        "kind": "project",
+        "node_id": "PVT_kwDOD0x0U84BiD-Q",
+        "number": 5,
+        "owner": "aegolius-labs",
+        "title": "ABK Eval wave-c-r02-20260827-api-3f546dc6 [labels]"
+      },
+      {
+        "kind": "repository",
+        "node_id": "R_kgDOUKTEpg",
+        "repository": "aegolius-labs/abk-eval-wave-c-r02-20260827-api-3f546dc6-labels"
+      }
+    ],
+    "status": "aborted_on_first_failure"
+  },
   "pending_write_gates": [],
   "credentials_recorded": false
 }

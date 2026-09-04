@@ -1,8 +1,7 @@
 # Release checklist
 
-This checklist records the documentation and local validation gates for the
-`0.1.0` release candidate. Publication, hosted CI, branch protection, and tag
-creation remain external release-owner actions.
+This checklist records the completed documentation, validation, and publication
+gates for `0.1.0`, released on 2026-09-04.
 
 ## Documentation and licensing
 
@@ -29,13 +28,17 @@ creation remain external release-owner actions.
 - [x] Native-type scenarios stop before writes when `Story` is unavailable.
 - [x] The installed generic GitHub MCP fails capability preflight before
   writes because its Project and repository lifecycle surface is incomplete.
-- [x] Disposable-resource cleanup remains separately confirmed and is not
-  part of normal backlog synchronization.
+- [x] Disposable-resource cleanup ran under a separate exact confirmation,
+  stopped on its first repository-deletion failure, and did not affect the
+  release or untouched API target.
 
 ## External release-owner gates
 
-- [ ] Publish the canonical repository and verify hosted `ubuntu-latest` CI.
-- [ ] Enable and verify required branch protection checks.
-- [ ] Create the `v0.1.0` tag and publish the source distribution and wheel.
-- [ ] Attach the final release notes and this checklist to the published
-  release.
+- [x] Publish the [canonical repository](https://github.com/aegolius-labs/agentic-backlog-kit)
+  and verify hosted `ubuntu-latest` CI on the exact release commit.
+- [x] Enable strict `test` branch protection with administrator enforcement and
+  force-push/deletion disabled.
+- [x] Create the `v0.1.0` tag and publish the validated source distribution and
+  wheel in the [GitHub release](https://github.com/aegolius-labs/agentic-backlog-kit/releases/tag/v0.1.0).
+- [x] Publish generated release notes; this checklist and the complete release
+  documentation are included in the tagged source archive.

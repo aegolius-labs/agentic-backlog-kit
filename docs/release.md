@@ -4,6 +4,22 @@ This is the R07 publication runbook for the first public release. It is
 deliberately limited to the canonical repository and the Python distribution;
 there is no PyPI publishing workflow.
 
+## Execution result
+
+The exact publication plan, digest
+`adfa9a0354010f9b3a4a289acfbe305c469b9c2a71adee5bef00dc5d255db130`,
+was confirmed and completed on 2026-09-04. Public repository
+`aegolius-labs/agentic-backlog-kit`, protected branch `main`, hosted Linux CI,
+annotated tag `v0.1.0`, the generated GitHub release, both distribution assets,
+and a clean public-tag checkout were verified against commit `6a14b70`.
+Authoritative run URLs and published artifact digests are recorded in
+[validation.md](validation.md).
+
+Disposable Wave C resource cleanup used a separate destructive plan. It
+stopped safely after deleting Project #4 when the following repository deletion
+failed; no retry or API-target action occurred. Remaining cleanup requires a
+new plan and is not part of the successful R07 release result.
+
 ## Audit snapshot
 
 The 2026-09-04 audit found:
