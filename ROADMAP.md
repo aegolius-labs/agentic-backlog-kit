@@ -1,6 +1,6 @@
 # Agentic Backlog Kit Roadmap
 
-Last updated: 2026-08-27
+Last updated: 2026-09-04
 
 ## Product goal
 
@@ -69,14 +69,14 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 - [x] Add GitHub Actions for tests and package validation.
 - [x] Build and inspect the Python package and add a tag-driven GitHub release workflow.
 - [x] Select the noncommercial/paid-commercial licensing model and add release, support, security, and contribution documentation (R08).
-- [ ] Perform realistic dry-run and apply evaluations against a disposable repository/project.
-- [ ] Evaluate the installed plugin and skill activation through Codex (R06).
+- [x] Perform realistic dry-run and apply evaluations against disposable repositories and organization Projects (R02).
+- [x] Evaluate the installed plugin and skill activation through Codex (R06).
 - [x] Measure and enforce token-efficiency budgets (R09).
 - [ ] Publish an initial `0.1.0` release and document known limitations.
 
 ## Current checkpoint
 
-Wave B completed on 2026-08-27. All 108 integrated Windows tests pass, including combined full-view and iteration snapshot coverage, and the 100/1,000/10,000-item byte-budget gate remains green. R04 now compares complete view configuration and applies every update exposed by GitHub while failing closed on grouping or sorting drift that the current update API cannot repair. R05 now discovers active/completed iterations, resolves exact titles plus `@current`/`@next`, safely extends contiguous numeric schedules, journals digest-confirmed updates, and blocks assignment until refreshed server identities are verified. R02 now has deterministic offline fixtures, a six-scenario backend/type matrix, an evidence verifier, and separately gated cleanup preparation; its live execution remains Wave C. Remote publication, Linux CI execution, R02 live execution, R06 installed-plugin evaluation, and the final tag/release remain open.
+Wave C completed on 2026-09-04. All 163 tests pass on Windows and a clean disposable Ubuntu WSL copy, the package build/install smoke checks pass on both platforms, and the 100/1,000/10,000-item byte-budget report remains byte-for-byte stable and within budget. R02 completed the representative label-fallback workflow through both authenticated GitHub CLI and direct GraphQL/REST: each lane created eight issues, eight Project memberships, seven parent relationships, two dependencies, complete planning fields, and a verified zero-action second plan. Native-type scenarios are unsupported because the organization exposes `User Story` rather than the required `Story`; the installed generic GitHub MCP is capability-incomplete for Projects and therefore failed closed before mutation. R06 installed-plugin evaluation is complete. Wave D now owns canonical repository publication, hosted `ubuntu-latest` CI, branch protection, documentation closure, and the `0.1.0` tag/release. Disposable evaluation resource cleanup remains a separately confirmed destructive operation.
 
 ## Work items, ranked
 
@@ -95,11 +95,11 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R02 - Run live GitHub end-to-end evaluations
 
-- **Status:** Wave C live execution in progress; the GH label-fallback workflow is canonically converged end to end, the API scaffold and Sprint 1 are identity-verified, and only the API 25-action sync plan awaits compact exact-digest approval
+- **Status:** Complete in Wave C for every supported route; authenticated GitHub CLI and direct GraphQL/REST label-fallback workflows both converged end to end with zero-action second plans
 - **Importance:** Critical
 - **Complexity:** Hard
-- **Context:** The local suite and offline evidence verifier cover the workflow contract, but no complete workflow has yet created and reconciled real issues, sub-issues, dependencies, Project fields, iterations, or views. Wave B added deterministic native-type and label-fallback fixtures, GitHub CLI/API/MCP scenario definitions, capability preflights, receipt/redaction checks, full view/iteration oracles, and a separate cleanup gate without contacting GitHub.
-- **High-level approach:** In Wave C, create approved disposable organization repositories and Projects. Run initialization, scaffolding, ingestion, prioritization, sprint planning, apply, and post-apply convergence across three executors and two issue-type modes. Preserve redacted evidence, verify every second plan is empty, and authorize exact-target cleanup separately.
+- **Context:** The live evaluation exercised approved disposable repositories and organization Projects through the complete initialization, scaffolding, ingestion, prioritization, sprint, and synchronization lifecycle. Both supported native GitHub transports converged with eight managed issues and exact hierarchy, dependency, iteration, view, and planning-field state. The native issue-type variants failed capability preflight because `Story` is unavailable, while the installed generic GitHub MCP lacks the Project surface; neither unsupported route performed writes.
+- **High-level approach:** Completed with fresh-state-bound plans, exact digest confirmations, journaled applies, canonical post-apply snapshots, full state assertions, and zero-action replans. The direct API observation also records eventual Project-membership propagation: the immediate recheck retained eight residual additions, no unconfirmed replay occurred, and a later read-only refresh converged. Exact-target cleanup remains separately gated.
 - **Done when:** Each supported executor completes the representative workflow, the second plan contains zero actions, failure cases are recorded, and the resulting GitHub state matches the manifest and view contracts.
 
 #### R03 - Complete first-run Project creation and discovery
@@ -143,7 +143,7 @@ Complexity labels describe implementation and validation effort, not importance.
 - **Status:** In progress; local repository/package/release setup completed in Wave A, external publication remains Wave D
 - **Importance:** High
 - **Complexity:** Medium
-- **Context:** Local Git history, package metadata, test/build/benchmark CI, and a tag-driven release workflow now exist and pass local audit. No GitHub remote has been created, and the Linux workflows have not executed.
+- **Context:** Local Git history, package metadata, test/build/benchmark CI, and a tag-driven release workflow now exist and pass on Windows and a disposable Ubuntu WSL copy. No canonical GitHub remote has been created, so the hosted `ubuntu-latest` workflow and branch-protection checks have not executed.
 - **High-level approach:** After Waves B/C pass, create `aegolius-labs/agentic-backlog-kit`, push the initial branch, enable required checks, verify Linux CI from a clean checkout, then tag and publish `0.1.0` with its documented artifacts and limitations.
 - **Done when:** Windows and Linux checks are green from a clean checkout, branch protection is active, installation instructions work, and the tagged release contains documented artifacts and limitations.
 
@@ -158,7 +158,7 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R09 - Measure and enforce token-efficiency targets
 
-- **Status:** Complete in Wave A; rerun on the release candidate in Wave C
+- **Status:** Complete; the Wave C release-candidate rerun is deterministic and within every budget at 100, 1,000, and 10,000 items
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** Deterministic 100-, 1,000-, and 10,000-item fixtures now measure compact and pretty JSON for `summary`, `show`, `next`, prioritization, sprint planning, snapshots, and cold sync plans. Byte budgets are enforced in CI, with tokenizer-free estimates reported for planning.
@@ -235,10 +235,10 @@ Complexity labels describe implementation and validation effort, not importance.
    - Lane C: R02 disposable live-evaluation preparation — GPT-5.6 Sol, medium reasoning, isolated `wave-b/r02-prep` worktree; no live GitHub mutations were authorized or performed.
    - Integration retained both full view and iteration configuration in the shared Project queries, aligned the evaluation oracle with the implemented view contract, and added observed iteration state to deterministic sprint expectations.
 
-3. **Wave C - Parallel release-candidate evaluation**
-   - R06 installed-plugin evaluation is complete; R02 live GitHub evaluation remains in progress. The GH label-fallback workflow is canonically converged with eight issues and all Project fields/relationships verified; the API lane is ready at its final 25-action sync gate.
-   - Run Linux CI at the same time and rerun R09 measurements on the final behavior.
-   - Failures return to the owning Wave A/B lane; do not patch production and evaluation branches independently.
+3. **Wave C - Parallel release-candidate evaluation — completed 2026-09-04**
+   - R02 completed through both supported native GitHub transports. The GH CLI and direct-API label-fallback lanes each converge with eight issues, all Project fields/relationships verified, and zero-action second plans; unsupported native-type and generic-MCP routes fail capability preflight before writes.
+   - R06 installed-plugin evaluation is complete, including bounded real Codex traces and the deterministic activation/authorization corpus.
+   - The R09 100/1,000/10,000-item release-candidate report is unchanged and within every budget. All 163 tests plus build/install/help/benchmark checks pass in a disposable Ubuntu WSL copy; hosted Linux CI remains a Wave D publication gate.
 
 4. **Wave D - Release closure**
    - Finalize R08 known limitations and permission documentation using evaluation results.
@@ -258,7 +258,7 @@ Complexity labels describe implementation and validation effort, not importance.
     -> R07 tag and publish 0.1.0
 ```
 
-R09 now has a recorded baseline and should run again on the release candidate. R07 local repository and CI setup are complete; external repository creation, Linux execution, and the final release remain on the critical path.
+R09's release-candidate rerun is complete and unchanged. R07 local repository, Windows validation, and Linux CI-equivalent checks are green; external repository creation, hosted Linux execution, branch protection, and the final release remain on the critical path.
 
 ### Concurrency operating rule
 

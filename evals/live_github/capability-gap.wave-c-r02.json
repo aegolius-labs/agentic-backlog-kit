@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "observed_at": "2026-08-27",
-  "refreshed_at_utc": "2026-09-03T13:44:20Z",
+  "refreshed_at_utc": "2026-09-04T13:50:47Z",
   "owner": "aegolius-labs",
   "authenticated_login": "MustacheMushroom",
   "redactions_confirmed": true,
@@ -394,7 +394,24 @@
         "manifest_fingerprint": "4cee420ba700f3bd34ad4c15937872143e4e7baf878969d2de61b304a101d9cc",
         "snapshot_fingerprint": "d35a51824f733face7498eb3c7c074bf5fd35c79c2a0ec49fb77da6f774e97a1",
         "validated": true,
-        "write_applied": false
+        "write_applied": true
+      },
+      "sync_apply": {
+        "applied_actions": 25,
+        "assertions_passed": true,
+        "canonical_reader_used": true,
+        "confirmed_digest": "2fb6c820a50b31ced658b2d8cc7fb6bbe48f5108d55bc28009bc530778fef2ec",
+        "dependency_relationship_count": 2,
+        "immediate_recheck_digest": "7c974ff2459881200f12821f6d39ac42b71374c58202d3bdc50452bc900e4b01",
+        "immediate_recheck_residual_action_count": 8,
+        "managed_issue_count": 8,
+        "parent_relationship_count": 7,
+        "post_apply_digest": "29f097ff50fb1269be6eeefe2ae71ab7cc78e5e4c32efa52fa5317aa58b3a151",
+        "project_membership_count": 8,
+        "propagation_recheck_required": true,
+        "remaining_action_count": 0,
+        "status": "completed",
+        "transport": "api"
       },
       "preflight_passed": true,
       "blockers": []
@@ -437,13 +454,7 @@
     }
   ],
   "mutation_attempted": true,
-  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and one confirmed GH item synchronization; no cleanup writes",
-  "pending_write_gates": [
-    {
-      "action_count": 25,
-      "digest": "2fb6c820a50b31ced658b2d8cc7fb6bbe48f5108d55bc28009bc530778fef2ec",
-      "gate": "api_sync"
-    }
-  ],
+  "mutation_scope": "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and two confirmed item synchronizations; no cleanup writes",
+  "pending_write_gates": [],
   "credentials_recorded": false
 }

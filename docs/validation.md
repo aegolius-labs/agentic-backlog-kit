@@ -1,28 +1,32 @@
 # Release-candidate validation evidence
 
-This record covers the Wave C release-candidate checks run against the source
-state at commit `577c207` on 2026-08-27. The follow-up changes that add this
-record and refresh the R09 table are documentation-only; the package smoke
-check was rerun after those changes. No GitHub repository, remote, issue,
-Project, or release was created or changed.
+This record includes the final Wave C release-candidate rerun on 2026-09-04.
+The packaged runtime is rooted at commit `2978922`; the concurrent R02 evidence,
+test-expectation, roadmap, and validation-record updates do not alter packaged
+runtime code. The validation run itself made no GitHub or repository writes.
+Approved live GitHub mutations and their non-destructive boundaries are recorded
+separately in the R02 capability evidence.
 
 ## Results
 
 | Check | Windows host | Ubuntu WSL |
 | --- | ---: | ---: |
-| Complete test suite | 108 passed | 108 passed |
+| Complete test suite | 163 passed | 163 passed |
 | CLI help | passed | passed |
 | R09 benchmark (`100`, `1,000`, `10,000`) | passed | passed |
 | Build sdist and wheel | passed | passed |
 | Reinstall wheel and run `abk --help` | passed | passed |
 
-The Windows benchmark report is 9,421 bytes with SHA-256
+The 2026-09-04 Windows benchmark report is 9,421 bytes with SHA-256
 `0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`.
-A second Windows run and the Linux run produced the same digest, and all
-budget failures were empty. The refreshed compact baselines are recorded in
+A second Windows run and the Linux run produced the same digest; it is also
+identical to the 2026-08-27 baseline, and all budget failures were empty. The
+compact baselines are recorded in
 [benchmarks.md](benchmarks.md).
 
-The Windows build produced these artifacts:
+The earlier 2026-08-27 Windows build produced these recorded artifacts; the
+2026-09-04 build/install smoke check also passed, but its disposable artifacts
+were not retained as release evidence:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

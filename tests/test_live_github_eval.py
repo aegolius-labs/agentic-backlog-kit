@@ -509,7 +509,7 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         self.assertTrue(audit["redactions_confirmed"])
         self.assertTrue(audit["mutation_attempted"])
         self.assertEqual(
-            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and one confirmed GH item synchronization; no cleanup writes",
+            "confirmed repository creation, two confirmed Project creations, two confirmed initial scaffold applies, two confirmed residual scaffold applies, two confirmed iteration initializations, and two confirmed item synchronizations; no cleanup writes",
             audit["mutation_scope"],
         )
         self.assertFalse(audit["credentials_recorded"])
@@ -684,12 +684,20 @@ class LiveGitHubEvaluationTests(unittest.TestCase):
         )
         api_sync = api_labels["sync_plan"]
         self.assertTrue(api_sync["validated"])
-        self.assertFalse(api_sync["write_applied"])
+        self.assertTrue(api_sync["write_applied"])
         self.assertEqual(25, api_sync["action_count"])
-        self.assertEqual(
-            {"api_sync"},
-            {gate["gate"] for gate in audit["pending_write_gates"]},
-        )
+        api_sync_apply = api_labels["sync_apply"]
+        self.assertEqual("completed", api_sync_apply["status"])
+        self.assertEqual(25, api_sync_apply["applied_actions"])
+        self.assertEqual(0, api_sync_apply["remaining_action_count"])
+        self.assertEqual(8, api_sync_apply["managed_issue_count"])
+        self.assertTrue(api_sync_apply["canonical_reader_used"])
+        self.assertTrue(api_sync_apply["assertions_passed"])
+        self.assertEqual(8, api_sync_apply["project_membership_count"])
+        self.assertEqual(7, api_sync_apply["parent_relationship_count"])
+        self.assertEqual(2, api_sync_apply["dependency_relationship_count"])
+        self.assertTrue(api_sync_apply["propagation_recheck_required"])
+        self.assertEqual([], audit["pending_write_gates"])
         self.assertTrue(audit["local_capabilities"]["gh_cli_authenticated"])
         self.assertTrue(
             audit["local_capabilities"]["direct_api_transport_read_passed"]
