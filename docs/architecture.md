@@ -1,5 +1,16 @@
 # Architecture
 
+## Known correctness gaps and approved direction
+
+The current implementation still treats manifest Status/Sprint as desired remote
+values and can reselect previously assigned sprint work. The user approved fresh
+GitHub authority for existing work; that behavior is proposed in
+[R15/R16](remediation-plan.md#r15-operational-authority-f3), not implemented yet.
+New items retain manifest defaults; changes to existing operational values will
+require explicit reviewed transitions. The zero completed-score rule below is
+also the intended contract; R18 fixes dependency boosts that currently violate it.
+R17 addresses recursion sensitivity on deep dependency graphs.
+
 ## Authority and state
 
 GitHub Issues and an organization-owned GitHub Project are the operational system of record. The tracked `.agentic-backlog/manifest.json` holds only:

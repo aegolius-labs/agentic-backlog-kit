@@ -43,14 +43,37 @@ gates for `0.1.0`, released on 2026-09-04.
 - [x] Publish generated release notes; this checklist and the complete release
   documentation are included in the tagged source archive.
 
-## Post-`0.1.0` automation
+## Post-`0.1.0` automation - R14 remediation gates
 
-- [x] Delegate semantic version calculation, tagging, and GitHub Release
-  creation to the versioned `aegolius-labs/.github` reusable workflow.
-- [x] Compute the prospective tag in dry-run mode and validate aligned package,
-  runtime, plugin, changelog, licensing, wheel, and sdist state before the
-  organization workflow can create a real release.
-- [x] Carry the validated artifacts between jobs, attach them to the generated
-  release, download them again, and rerun the release validator.
-- [x] Preserve `default-bump: false`: only `feat`, `fix`, or breaking
-  Conventional Commits authorize an automated release.
+The corrected caller and shared implementation pass local contract/failure tests
+and workflow syntax validation. Hosted and external acceptance gates remain open.
+See [the remediation proposal](remediation-plan.md#r14-repair-shared-release-integration-f1f2).
+
+- [x] Implement a separate read-only compute workflow and draft-first shared publisher.
+- [x] Pass effective-permission, exact-artifact, drift, partial-failure, and no-op recovery tests locally.
+- [x] Pin caller/source to the same full shared commit; verify actual local YAML contracts and actionlint syntax.
+- [x] Independently read both repositories' enabled, owner-enforced immutability settings.
+- [ ] Publish a validated organization interface for read-only version computation
+  and asset-aware draft publication; pin the ABK caller to that version.
+- [ ] Verify effective permissions and no writes for no-bump/compute-only cases,
+  including an untagged fixture without bootstrap mutation.
+- [ ] Bind tests, versions, candidate SHA/tag, and exact wheel/sdist hashes before
+  the first release write; reject mismatch or drift.
+- [ ] Create the draft, attach and verify both assets, then publish and verify
+  immutability and the exact final inventory.
+- [ ] Prove recovery after draft/partial upload failure without replacement of
+  unrelated, mismatched, or already published state.
+- [ ] Preserve no-bump behavior and organization ownership of releases; require
+  no secondary event-triggered workflow or PyPI publication.
+- [ ] Record hosted no-bump and authorized immutable-release run evidence before
+  protected-branch delivery is marked complete.
+
+## Corrective product delivery
+
+- [ ] R15: GitHub operational authority and explicit transitions verified.
+- [ ] R16: retained capacity/status and reviewed carryover verified.
+- [ ] R17: deep graph and controlled-cycle regressions pass.
+- [ ] R18: completed final scores are zero across dependency cases.
+- [ ] R19: public main status matches verified delivery after publication.
+
+R20 disposable cleanup remains separately confirmed and is not a product gate.

@@ -119,3 +119,50 @@ PYTHONPATH=src /tmp/abk-rc-python311/python/bin/python3.11 -m unittest discover 
 This remains useful local Linux/WSL evidence. Wave D additionally ran the same
 repository workflow on hosted `ubuntu-latest`; the successful run and branch
 protection result are recorded above.
+
+
+## R14 corrective implementation local evidence
+
+The corrected ABK caller pins the new shared compute/publisher workflows and
+publisher source to local commit `194c01743a7a41d75c41e1434d8ca02b3702a586` in
+`aegolius-labs/.github`. This commit has not yet been published. ABK's original
+R14 publication Plan F is superseded; replacement Plan G proposes exact branch
+pushes and draft PRs only.
+
+Checks performed on the local corrective working tree:
+
+- Final full ABK suite: 182 passed in 79.964 seconds; focused final
+  contract/inventory suite: 14 passed.
+- Shared suite: 18 passed, including actual compute-script execution with fake
+  read responses, drift, draft/partial-upload recovery, foreign assets, and a
+  lost publication response.
+- ABK package inventory -> shared publisher fake-transport integration: passed.
+- CLI help, 100/1,000/10,000-item byte budgets, build, release metadata/asset
+  preflight, and a clean temporary wheel install with abk --help: passed.
+- Bundled plugin validator: passed. No skills changed.
+- Actual caller/callee YAML contract check using existing local PyYAML: passed.
+  CI additionally fetches the pinned public shared workflow files and compares
+  them with the fixtures. That remote check awaits shared commit publication.
+- actionlint 1.7.12 passed on both new shared workflows, their test workflow,
+  and both ABK workflows. Optional ShellCheck/Pyflakes integrations were not run.
+  The official Windows archive SHA-256 was verified as
+  `6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9`.
+
+The local build produced a wheel of 60,995 bytes, SHA-256
+`4a0458a98f408148f5dcce1a8642cf0a81109e8a9d929bb0b3bca15b0b14af9e`, and sdist of
+95,168 bytes, SHA-256
+`c012efa45b1168d7a2873d663ab6c154b9efc7063947dffe6712da8ca277d3a4`.
+These are smoke-test artifacts, not replacements for immutable v0.1.0 assets.
+
+Read-only GitHub checks confirmed owner-enforced immutable releases in both
+repositories. ABK main remains `6a14b70` with strict test protection. Organization
+main remains `c7380d9`, with a PR/code-owner approval requirement, squash-only
+merge, conversation resolution, and CodeQL rules. Both proposed branches are
+absent and have no open PR duplicates. No external writes occurred.
+
+Hosted parser/CI proof, no-bump execution on main, and a separately authorized
+immutable-release evaluation remain outstanding. Local fake transports and
+syntax validation do not satisfy those gates. Record their exact commits and
+run/release URLs before closing R14.
+
+R14 benchmark report SHA-256: `0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`; all budgets passed.

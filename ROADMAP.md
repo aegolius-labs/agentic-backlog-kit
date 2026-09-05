@@ -76,7 +76,9 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 
 ## Current checkpoint
 
-Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E post-release product work is ready to begin.
+Continuation ownership and prior-plan status: [active task handoff](docs/task-handoff.md).
+
+Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E is in remediation planning. R14 permission and immutable-asset fixes are implemented and locally validated; shared/caller draft publication and hosted gates remain; R15-R18 address operational planning and graph/scoring correctness. See [the remediation proposal](docs/remediation-plan.md) for evidence, acceptance criteria, and decisions. R19 tracks public documentation closure; R20 tracks remaining cleanup independently.
 
 ## Work items, ranked
 
@@ -202,12 +204,66 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R14 - Adopt organization-managed semantic releases
 
-- **Status:** Ready for review in Wave E; local implementation and validation complete, protected-branch publication pending
+- **Status:** Corrective implementation locally validated; ready for draft review. Shared commit `194c01743a7a41d75c41e1434d8ca02b3702a586` and the corrected ABK caller await publication, hosted no-bump proof, and an authorized immutable-release evaluation.
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
-- **High-level approach:** Call the versioned organization Conventional Release workflow first in dry-run mode, fail closed unless the computed tag agrees with package, runtime, plugin, changelog, licensing, and distribution state, then call the same workflow for the real release and attach/re-download the validated artifacts in downstream caller jobs.
-- **Done when:** The caller is merged to protected `main`, a hosted non-release run proves the no-bump path, and the next release-bearing Conventional Commit produces one centrally versioned tag and release with exactly the validated wheel and sdist.
+- **High-level approach:** Added organization-owned `compute-release.yml` with read-only permission and `publish-release-assets.yml` with a draft-first publisher, preserving the existing no-asset workflow. Bind preflight to the candidate SHA/tag and exact distributions; create a draft, attach and verify assets, then publish. Preserve organization ownership of tagging and releases. See [R14 design and reference-project comparison](docs/remediation-plan.md#r14-repair-shared-release-integration-f1f2).
+- **Done when:** The shared interface and caller pass permission/identity/recovery contract tests; hosted no-bump and separately authorized immutable-release evaluations pass; then protected publication and exact asset verification are recorded. Local test success alone is insufficient.
+
+### Wave E corrective work
+
+The [remediation proposal](docs/remediation-plan.md) owns detailed acceptance
+criteria and decision records for these items. They are proposed work, not
+implemented fixes or synchronized GitHub issues.
+
+#### R15 - Respect GitHub operational status and sprint authority
+
+- **Status:** Proposed; user approved GitHub authority for existing work (D1).
+- **Importance:** High
+- **Complexity:** Hard
+- **Approach:** Compose fresh operational state for planning; preserve existing Status/Sprint during ordinary sync; represent changes as explicit digest-bound transitions. Document legacy-manifest migration and offline-preview limits.
+- **Done when:** Remote completion/assignment survives stale local intent, planning uses fresh operational state, and explicit transitions fail safely on drift. See R15 acceptance cases in the proposal.
+
+#### R16 - Preserve sprint commitments and review carryover
+
+- **Status:** Proposed; carryover policy A approved (D2); implementation depends on R15.
+- **Importance:** Medium
+- **Complexity:** Medium
+- **Approach:** Account for retained target-sprint work once, preserve ongoing statuses, and handle work assigned elsewhere through explicit carryover review.
+- **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state.
+
+#### R17 - Support deep dependency graphs without recursion failure
+
+- **Status:** Proposed
+- **Importance:** Medium
+- **Complexity:** Medium
+- **Approach:** Replace recursive graph traversal/scoring with deterministic iterative algorithms; retain cycle diagnostics, score semantics, and output limits.
+- **Done when:** 1,200/10,000-node chains and deep cycles have controlled results across validation and planning; existing mathematical and byte-budget checks remain valid.
+
+#### R18 - Enforce zero final scores for completed work
+
+- **Status:** Proposed
+- **Importance:** Low
+- **Complexity:** Easy
+- **Approach:** Zero completed final scores and stop boost propagation through completed nodes; use effective status from R15 in operational mode.
+- **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct.
+
+#### R19 - Publish accurate release and remediation status
+
+- **Status:** Proposed; local Wave D closure exists, public documentation publication remains.
+- **Importance:** Medium
+- **Complexity:** Easy
+- **Approach:** Prepare documentation separately from unresolved R14 code; publish through the protected-branch process after applicable authorization.
+- **Done when:** Public main documents the completed v0.1.0 release and outstanding corrective work; readback at the published SHA is recorded. Do not rewrite the release tag.
+
+#### R20 - Resolve remaining disposable evaluation resources
+
+- **Status:** Pending fresh identity discovery and separately confirmed cleanup plan.
+- **Importance:** Low; not a release blocker
+- **Complexity:** Easy, subject to permissions
+- **Approach:** Refresh exact identities from the prior receipt, confirm absence of Project #4, plan only remaining resources, and stop/journal on first failure.
+- **Done when:** Remaining resources are verified absent or the owner explicitly elects retention. No deletion is authorized by this proposal.
 
 ## Concurrency and dependency plan
 
@@ -224,11 +280,17 @@ Complexity labels describe implementation and validation effort, not importance.
 | R07 | Repository creation has no code prerequisite; release waits for R02, R06, R08, and R09 | R01, R03-R05, R08, R09 | Low for repository setup; medium for packaging/version files |
 | R08 | License choice from the owner | All engineering and evaluation work | Low, except package metadata and README edits |
 | R09 | None | R01, R03-R08 | Low if benchmarks are isolated; rerun after behavior changes |
-| R10 | R01 safety/journaling contract and an explicit product policy | R11 in isolated branches | High with R11 in sync, mutation, and CLI code |
-| R11 | Stable manifest contract; preferably R01 | R10 in isolated branches, R13 evaluation | Medium to high in manifest, mutation, sync, and CLI code |
+| R10 | R01, R15/R16 operational correctness, and explicit destructive policy | R11 in isolated branches | High with R11 in sync, mutation, and CLI code |
+| R11 | R15/R16 authority and commitment contract; stable manifest migration | R10 in isolated branches, R13 evaluation | Medium to high in manifest, mutation, sync, and CLI code |
 | R12 | Stable `0.1.0`; portfolio authority decision; lessons from R10/R11 | Design work for R13 | High across schema, IDs, discovery, and planning |
 | R13 | Evidence from R02 and R06 | R10/R11 product work after the decision gate | Low if prototyped separately; integration risk is high |
-| R14 | Published `0.1.0`; versioned organization reusable workflow | R10-R13 | Low outside release docs and workflow configuration |
+| R14 | New validated organization compute/publish interface | R15-R18, R19 documentation preparation | Shared release workflow and ABK caller/tests |
+| R15 | Approved D1; R01 freshness contract | R14, R17/R18 with coordinated integration | High across snapshot, CLI, sync, and planning |
+| R16 | R15; approved D2 (A) | R14, R19 | High with R15 in sprint/CLI/skills |
+| R17 | Existing score/ordering contract | R14, R15 with coordinated integration | High with R18 in priority code |
+| R18 | Zero-score rule; integrate with R17 and R15 effective state | R14, R19 | High with R17 in priority code |
+| R19 | Verified Wave D evidence; authorized protected publication | R14-R18 preparation | Documentation conflicts; keep separate from unresolved workflow |
+| R20 | Fresh identities and new destructive digest confirmation | Other work | Separate cleanup evidence; no product runtime changes |
 
 ### Recommended execution waves
 
@@ -256,12 +318,20 @@ Complexity labels describe implementation and validation effort, not importance.
    - The separately approved evaluation cleanup stopped on its first failure after deleting Project #4; no retry or API-target cleanup occurred, and a fresh plan is required for the three remaining resources.
 
 5. **Wave E - Post-release parallel tracks**
-   - R14 organization-managed semantic-release integration is locally implemented and validated; protected-branch publication and hosted no-bump verification remain.
-   - R10 destructive/reverse reconciliation and R11 import/bulk ingestion may start concurrently after R01, but require isolated branches and a shared authority/conflict contract.
+   - R14 local repairs pass 182 ABK tests, 18 shared tests, cross-workflow contract checks, and actionlint. Publish exact shared/caller draft PRs under replacement Plan G, satisfy repository review rules, and then obtain hosted no-bump/immutable-release evidence.
+   - Complete R15 operational authority and R16 commitment/carryover correctness before R10 destructive work or R11 import. R17/R18 graph/scoring fixes may proceed independently with coordinated integration.
+   - Publish accurate status through R19; keep separately confirmed R20 cleanup off the product critical path.
    - Begin R12 only after single-repository behavior and import/reconciliation policies stabilize.
    - Complete R13 transport-parity hardening from R02/R06 evidence, then build a dedicated MCP adapter only if it materially improves capability coverage or token/tool-call efficiency.
 
 ### Critical path
+
+Wave E: validated shared release extension -> repaired R14 caller -> hosted proof;
+D1/D2 approved -> R15/R16 -> R10/R11 -> R12. R17/R18 must pass
+their regression gates before a corrective product release. R19 documentation
+publication is separate; R20 cleanup does not block it.
+
+Historical v0.1.0 delivery path:
 
 ```text
 (R01 safety) + (R03 Project bootstrap -> R04 views + R05 iterations)

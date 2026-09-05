@@ -16,3 +16,7 @@ build/
 .agentic-backlog/evals/
 .agentic-backlog/receipts/
 .agentic-backlog/*.lock
+
+# Release preflight bundles and local publication receipts
+release-bundle/
+release-receipt.json

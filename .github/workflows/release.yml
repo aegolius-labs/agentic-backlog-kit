@@ -2,11 +2,11 @@ name: release
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -14,109 +14,77 @@ concurrency:
 
 jobs:
   compute-version:
-    name: Compute next semantic version
     if: ${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
-    uses: aegolius-labs/.github/.github/workflows/conventional-release.yml@v0.1.1
-    with:
-      tag-prefix: "v"
-      release-branches: "main"
-      default-bump: "false"
-      update-major-tag: false
-      dry-run: true
+    uses: aegolius-labs/.github/.github/workflows/compute-release.yml@194c01743a7a41d75c41e1434d8ca02b3702a586
 
   preflight:
-    name: Validate release candidate
     needs: compute-version
     if: ${{ needs.compute-version.outputs.new-tag != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      artifact-id: ${{ steps.bundle.outputs.artifact-id }}
+      inventory-sha256: ${{ steps.inventory.outputs.inventory-sha256 }}
     env:
+      CANDIDATE_SHA: ${{ needs.compute-version.outputs.candidate-sha }}
       RELEASE_TAG: ${{ needs.compute-version.outputs.new-tag }}
       RELEASE_VERSION: ${{ needs.compute-version.outputs.new-version }}
+      TAG_STATE_SHA256: ${{ needs.compute-version.outputs.tag-state-sha256 }}
+      RELEASE_NOTES: ${{ needs.compute-version.outputs.changelog }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ needs.compute-version.outputs.candidate-sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Validate computed version contract
+          python-version: '3.11'
+      - name: Verify candidate identity and version
         shell: bash
         run: |
-          test -n "$RELEASE_TAG"
+          test "$CANDIDATE_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           test -n "$RELEASE_VERSION"
           test "$RELEASE_TAG" = "v$RELEASE_VERSION"
-      - name: Build distributions
+      - name: Validate release candidate tests and budgets
+        env:
+          PYTHONPATH: src
+        run: |
+          python -B -m unittest discover -s tests -v
+          python -B scripts/backlog.py --help
+          python -B scripts/benchmark.py --check
+      - name: Build and validate distributions
         run: |
           python -m pip install build
           python -m build
-      - name: Validate tag, metadata, and release assets
-        run: python scripts/release_check.py --tag "$RELEASE_TAG" --dist dist
-      - name: Verify source-available licensing files
-        shell: bash
-        run: |
-          test -f LICENSE.md
-          test -f COMMERCIAL.md
-      - name: Preserve validated distributions
+          python scripts/release_check.py --tag "$RELEASE_TAG" --dist dist
+          python -m pip install --force-reinstall dist/*.whl
+          abk --help
+      - name: Bind the exact validated distributions
+        id: inventory
+        run: python scripts/release_inventory.py
+      - name: Preserve the exact bundle for publication and recovery
+        id: bundle
         uses: actions/upload-artifact@v4
         with:
-          name: release-dist-${{ needs.compute-version.outputs.new-tag }}
-          path: dist/*
+          name: release-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-bundle/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   release:
-    name: Create semantic release
     needs: [compute-version, preflight]
     if: ${{ needs.compute-version.outputs.new-tag != '' && needs.preflight.result == 'success' }}
     permissions:
       contents: write
-    uses: aegolius-labs/.github/.github/workflows/conventional-release.yml@v0.1.1
-    with:
-      tag-prefix: "v"
-      release-branches: "main"
-      default-bump: "false"
-      update-major-tag: false
-      dry-run: false
-
-  publish-assets:
-    name: Attach and verify distributions
-    needs: [compute-version, preflight, release]
-    if: ${{ needs.release.outputs.released == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
       actions: read
-      contents: write
-    env:
-      RELEASE_TAG: ${{ needs.release.outputs.new-tag }}
-      COMPUTED_TAG: ${{ needs.compute-version.outputs.new-tag }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.release.outputs.new-tag }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Download validated distributions
-        uses: actions/download-artifact@v4
-        with:
-          name: release-dist-${{ needs.compute-version.outputs.new-tag }}
-          path: dist
-      - name: Verify release identity and distributions
-        shell: bash
-        run: |
-          test "$RELEASE_TAG" = "$COMPUTED_TAG"
-          python scripts/release_check.py --tag "$RELEASE_TAG" --dist dist
-      - name: Attach distributions to GitHub release
-        run: gh release upload "$RELEASE_TAG" dist/*
-      - name: Verify published distributions
-        shell: bash
-        run: |
-          mkdir published
-          gh release download "$RELEASE_TAG" --dir published
-          python scripts/release_check.py --tag "$RELEASE_TAG" --dist published
+    uses: aegolius-labs/.github/.github/workflows/publish-release-assets.yml@194c01743a7a41d75c41e1434d8ca02b3702a586
+    with:
+      automation-sha: 194c01743a7a41d75c41e1434d8ca02b3702a586
+      candidate-sha: ${{ needs.compute-version.outputs.candidate-sha }}
+      tag: ${{ needs.compute-version.outputs.new-tag }}
+      artifact-id: ${{ needs.preflight.outputs.artifact-id }}
+      inventory-sha256: ${{ needs.preflight.outputs.inventory-sha256 }}
