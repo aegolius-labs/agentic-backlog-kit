@@ -12,6 +12,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   published artifact digests, clean-checkout verification, and fail-closed
   partial disposal of the Wave C evaluation resources.
 
+### Changed
+
+- Replaced the repository-specific tag publisher with the versioned Aegolius
+  Labs reusable Conventional Release workflow, guarded by a dry-run version
+  computation, package/plugin preflight, and post-upload asset verification.
+
 ## [0.1.0] - 2026-09-04
 
 ### Changed

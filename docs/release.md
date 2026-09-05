@@ -20,7 +20,39 @@ stopped safely after deleting Project #4 when the following repository deletion
 failed; no retry or API-target action occurred. Remaining cleanup requires a
 new plan and is not part of the successful R07 release result.
 
-## Audit snapshot
+## Ongoing organization-managed releases
+
+Post-`0.1.0` releases are driven by `.github/workflows/release.yml` on pushes to
+protected `main`, with an equivalent manual dispatch available on `main`. The
+caller pins and invokes
+`aegolius-labs/.github/.github/workflows/conventional-release.yml@v0.1.1` in
+two phases:
+
+1. The shared workflow runs with `dry-run: true` and `default-bump: false` to
+   compute the prospective semantic version and tag from Conventional Commits.
+   Commits without `feat`, `fix`, or a breaking marker produce no release.
+2. If a version is proposed, the repository builds the wheel and sdist and
+   runs `release_check.py` against the exact computed tag. This requires
+   `pyproject.toml`, `.codex-plugin/plugin.json`,
+   `src/agentic_backlog_kit/__init__.py`, and the changelog release heading to
+   agree before any tag or GitHub Release is created.
+3. Only after that preflight succeeds does the caller invoke the same shared
+   workflow with `dry-run: false`. The protected merge of the release-bearing
+   Conventional Commit is the explicit authorization for this policy-driven
+   release write.
+4. A final caller job attaches the preflighted distributions to the new GitHub
+   Release, downloads the published assets, and validates them again. The
+   repository-specific workflow never creates a competing release.
+
+The tag and release are created inside the reusable-workflow call. GitHub does
+not start a second workflow for most events created with `GITHUB_TOKEN`, so the
+artifact work intentionally remains in downstream jobs of the same caller.
+If preflight or artifact publication fails, preserve the release state and fix
+the cause. Rerun the failed job only when no partial asset upload occurred;
+otherwise use a separately reviewed remediation plan. Do not automatically
+delete, rewrite, or replace a tag, release, or asset.
+
+## Historical `0.1.0` audit snapshot
 
 The 2026-09-04 audit found:
 
@@ -59,7 +91,7 @@ skills and `.codex-plugin/plugin.json` are delivered by the public repository
 or its tag archive, not by the wheel. This boundary is intentional and avoids
 making a Python installation look like a complete plugin installation.
 
-## Ordered publication plan
+## Historical initial publication plan
 
 Run every step against the exact target `aegolius-labs/agentic-backlog-kit`,
 default branch `main`, and release tag `v0.1.0`. Stop when any precondition or

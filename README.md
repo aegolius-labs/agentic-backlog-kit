@@ -169,6 +169,13 @@ The deterministic payload benchmark and its byte/token budgets are documented in
 Release-candidate Windows and local Linux/WSL validation evidence is recorded in [docs/validation.md](docs/validation.md).
 The offline preparation and evidence contract for disposable live GitHub testing are documented in [evals/live_github/README.md](evals/live_github/README.md).
 
+Pushes to protected `main` use the versioned Aegolius Labs reusable
+Conventional Release workflow. Release-bearing Conventional Commits compute the
+next semantic version centrally, pass repository-specific package and plugin
+preflight checks, create the tag and GitHub Release, and attach only the
+validated wheel and source distribution. See [docs/release.md](docs/release.md)
+for the exact contract.
+
 ## License
 
 Agentic Backlog Kit is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). Personal and other noncommercial uses permitted by that license are free. Any use in or for for-profit operations requires a separate paid license from Aegolius Labs; see [COMMERCIAL.md](COMMERCIAL.md).

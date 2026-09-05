@@ -42,3 +42,15 @@ gates for `0.1.0`, released on 2026-09-04.
   wheel in the [GitHub release](https://github.com/aegolius-labs/agentic-backlog-kit/releases/tag/v0.1.0).
 - [x] Publish generated release notes; this checklist and the complete release
   documentation are included in the tagged source archive.
+
+## Post-`0.1.0` automation
+
+- [x] Delegate semantic version calculation, tagging, and GitHub Release
+  creation to the versioned `aegolius-labs/.github` reusable workflow.
+- [x] Compute the prospective tag in dry-run mode and validate aligned package,
+  runtime, plugin, changelog, licensing, wheel, and sdist state before the
+  organization workflow can create a real release.
+- [x] Carry the validated artifacts between jobs, attach them to the generated
+  release, download them again, and rerun the release validator.
+- [x] Preserve `default-bump: false`: only `feat`, `fix`, or breaking
+  Conventional Commits authorize an automated release.

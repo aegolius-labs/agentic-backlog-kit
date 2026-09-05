@@ -200,6 +200,15 @@ Complexity labels describe implementation and validation effort, not importance.
 - **High-level approach:** Formalize a capability router for three peer transports: compatible host GitHub integration/MCP, authenticated `gh` GraphQL/REST, and direct GraphQL/REST. Every declared-compatible route must emit the same compact canonical snapshots and use the shared deterministic plan, digest, apply, receipt, and verification engine. Select one complete write route per apply and report missing MCP capabilities explicitly. Use R02/R06 call counts and result shapes to decide whether a thin dedicated MCP adapter is justified; do not duplicate planning logic in that server.
 - **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence.
 
+#### R14 - Adopt organization-managed semantic releases
+
+- **Status:** Ready for review in Wave E; local implementation and validation complete, protected-branch publication pending
+- **Importance:** High
+- **Complexity:** Medium
+- **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
+- **High-level approach:** Call the versioned organization Conventional Release workflow first in dry-run mode, fail closed unless the computed tag agrees with package, runtime, plugin, changelog, licensing, and distribution state, then call the same workflow for the real release and attach/re-download the validated artifacts in downstream caller jobs.
+- **Done when:** The caller is merged to protected `main`, a hosted non-release run proves the no-bump path, and the next release-bearing Conventional Commit produces one centrally versioned tag and release with exactly the validated wheel and sdist.
+
 ## Concurrency and dependency plan
 
 ### Dependency matrix
@@ -219,6 +228,7 @@ Complexity labels describe implementation and validation effort, not importance.
 | R11 | Stable manifest contract; preferably R01 | R10 in isolated branches, R13 evaluation | Medium to high in manifest, mutation, sync, and CLI code |
 | R12 | Stable `0.1.0`; portfolio authority decision; lessons from R10/R11 | Design work for R13 | High across schema, IDs, discovery, and planning |
 | R13 | Evidence from R02 and R06 | R10/R11 product work after the decision gate | Low if prototyped separately; integration risk is high |
+| R14 | Published `0.1.0`; versioned organization reusable workflow | R10-R13 | Low outside release docs and workflow configuration |
 
 ### Recommended execution waves
 
@@ -246,6 +256,7 @@ Complexity labels describe implementation and validation effort, not importance.
    - The separately approved evaluation cleanup stopped on its first failure after deleting Project #4; no retry or API-target cleanup occurred, and a fresh plan is required for the three remaining resources.
 
 5. **Wave E - Post-release parallel tracks**
+   - R14 organization-managed semantic-release integration is locally implemented and validated; protected-branch publication and hosted no-bump verification remain.
    - R10 destructive/reverse reconciliation and R11 import/bulk ingestion may start concurrently after R01, but require isolated branches and a shared authority/conflict contract.
    - Begin R12 only after single-repository behavior and import/reconciliation policies stabilize.
    - Complete R13 transport-parity hardening from R02/R06 evidence, then build a dedicated MCP adapter only if it materially improves capability coverage or token/tool-call efficiency.
