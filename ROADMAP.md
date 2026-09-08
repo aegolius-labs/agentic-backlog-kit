@@ -1,6 +1,6 @@
 # Agentic Backlog Kit Roadmap
 
-Last updated: 2026-09-04
+Last updated: 2026-09-08
 
 ## Product goal
 
@@ -78,7 +78,7 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 
 Continuation ownership and prior-plan status: [active task handoff](docs/task-handoff.md).
 
-Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E is in remediation planning. R14 permission and immutable-asset fixes are implemented and locally validated; shared/caller draft publication and hosted gates remain; R15-R18 address operational planning and graph/scoring correctness. See [the remediation proposal](docs/remediation-plan.md) for evidence, acceptance criteria, and decisions. R19 tracks public documentation closure; R20 tracks remaining cleanup independently.
+Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E is in release-activation remediation. Shared PR #4 and ABK PR #1 are merged; main tests passed. The initial ABK release run failed to load its pre-merge shared pin after squash merge and branch deletion. The correction pins the accepted shared revision; hosted no-bump and immutable-release proof remain; R15-R18 address operational planning and graph/scoring correctness. See [the remediation proposal](docs/remediation-plan.md) for evidence, acceptance criteria, and decisions. R19 tracks public documentation closure; R20 tracks remaining cleanup independently.
 
 ## Work items, ranked
 
@@ -204,7 +204,7 @@ Complexity labels describe implementation and validation effort, not importance.
 
 #### R14 - Adopt organization-managed semantic releases
 
-- **Status:** Corrective implementation locally validated; ready for draft review. Shared commit `194c01743a7a41d75c41e1434d8ca02b3702a586` and the corrected ABK caller await publication, hosted no-bump proof, and an authorized immutable-release evaluation.
+- **Status:** Shared and caller PRs merged. Shared main is `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`. Follow-up corrects the caller pin after squash merge; hosted no-bump and an authorized immutable-release evaluation remain required.
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
@@ -318,7 +318,7 @@ implemented fixes or synchronized GitHub issues.
    - The separately approved evaluation cleanup stopped on its first failure after deleting Project #4; no retry or API-target cleanup occurred, and a fresh plan is required for the three remaining resources.
 
 5. **Wave E - Post-release parallel tracks**
-   - R14 local repairs pass 182 ABK tests, 18 shared tests, cross-workflow contract checks, and actionlint. Publish exact shared/caller draft PRs under replacement Plan G, satisfy repository review rules, and then obtain hosted no-bump/immutable-release evidence.
+   - R14 local repairs pass 182 ABK tests, 18 shared tests, cross-workflow contract checks, and actionlint. Plan G published both drafts and the user authorized their merges. Correct the squash-merge pin, then obtain hosted no-bump/immutable-release evidence.
    - Complete R15 operational authority and R16 commitment/carryover correctness before R10 destructive work or R11 import. R17/R18 graph/scoring fixes may proceed independently with coordinated integration.
    - Publish accurate status through R19; keep separately confirmed R20 cleanup off the product critical path.
    - Begin R12 only after single-repository behavior and import/reconciliation policies stabilize.

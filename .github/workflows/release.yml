@@ -17,7 +17,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
-    uses: aegolius-labs/.github/.github/workflows/compute-release.yml@194c01743a7a41d75c41e1434d8ca02b3702a586
+    uses: aegolius-labs/.github/.github/workflows/compute-release.yml@9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
 
   preflight:
     needs: compute-version
@@ -81,9 +81,9 @@ jobs:
     permissions:
       contents: write
       actions: read
-    uses: aegolius-labs/.github/.github/workflows/publish-release-assets.yml@194c01743a7a41d75c41e1434d8ca02b3702a586
+    uses: aegolius-labs/.github/.github/workflows/publish-release-assets.yml@9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
     with:
-      automation-sha: 194c01743a7a41d75c41e1434d8ca02b3702a586
+      automation-sha: 9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
       candidate-sha: ${{ needs.compute-version.outputs.candidate-sha }}
       tag: ${{ needs.compute-version.outputs.new-tag }}
       artifact-id: ${{ needs.preflight.outputs.artifact-id }}

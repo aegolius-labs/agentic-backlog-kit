@@ -123,6 +123,9 @@ protection result are recorded above.
 
 ## R14 corrective implementation local evidence
 
+Historical pre-publication checkpoint. The activation record below supersedes
+its delivery status; these local test results remain historical evidence.
+
 The corrected ABK caller pins the new shared compute/publisher workflows and
 publisher source to local commit `194c01743a7a41d75c41e1434d8ca02b3702a586` in
 `aegolius-labs/.github`. This commit has not yet been published. ABK's original
@@ -166,3 +169,30 @@ syntax validation do not satisfy those gates. Record their exact commits and
 run/release URLs before closing R14.
 
 R14 benchmark report SHA-256: `0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`; all budgets passed.
+
+
+## R14 merge and activation evidence
+
+On 2026-09-08, user-authorized activation merged [shared PR #4](https://github.com/aegolius-labs/.github/pull/4)
+at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9` and [ABK PR #1](https://github.com/aegolius-labs/agentic-backlog-kit/pull/1)
+at `33142d846e4faec7e1d0ed184ac745f4f987c8f5`. The user separately authorized the
+existing organization-admin review bypass for shared PR #4. Protection and
+immutability settings were unchanged. Both squash merge trees matched their
+reviewed candidates; the shared repository automatically deleted its PR branch.
+
+Shared main test/release checks passed with no new tag or release. ABK's
+[main test run](https://github.com/aegolius-labs/agentic-backlog-kit/actions/runs/34179794480)
+passed. Its [release run](https://github.com/aegolius-labs/agentic-backlog-kit/actions/runs/34179794722)
+failed loading `compute-release.yml@194c017...`, before any jobs started. The old
+commit remained raw-readable but diverged from shared main history; GitHub
+reported the workflow was not found. Receipt H stopped after both merges.
+v0.1.0 and its assets remained unchanged; no failed operation was replayed.
+
+The correction pins the accepted shared merge commit and verifies main ancestry
+before comparing file contents. Three added regression cases cover accepted,
+diverged, unmerged, incomplete, and mismatched ancestry responses. The tests first
+failed because the validator did not exist, then all 13 workflow-contract tests
+passed. The corrected live remote contract check passed. The full suite passed
+185 tests in 83.337 seconds; CLI help, actionlint 1.7.12, and patch whitespace
+checks passed. The bundled plugin validator passed using the existing local
+validator dependencies. No skill changed. Hosted activation evidence remains required.

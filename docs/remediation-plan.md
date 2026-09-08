@@ -1,6 +1,6 @@
 # Wave E remediation proposal
 
-Status: R14 implemented and locally validated; other corrective items remain proposed. No external publication performed.
+Status: R14 shared/caller PRs merged; activation pin correction and hosted evidence remain in progress. Other corrective items remain proposed.
 Baseline: `185f31161e0ff87bb30e60b215abded339bf76c3`.
 Roadmap IDs below are delivery identifiers, not newly created GitHub issues.
 
@@ -53,6 +53,13 @@ and [immutable releases](https://docs.github.com/en/code-security/concepts/suppl
 ## R14: repair shared release integration (F1/F2)
 
 ### Implementation and remaining gates
+
+Current checkpoint: shared PR #4 merged at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`
+and ABK PR #1 merged at `33142d846e4faec7e1d0ed184ac745f4f987c8f5`. Main tests
+passed. Correct the pre-merge pin that became unusable after squash merge, then
+complete hosted no-bump/immutable-release proof. The local evidence below is
+historical; [the runbook](release.md#ongoing-organization-managed-releases) records
+the current accepted pin and rollout behavior.
 
 Shared local commit `194c01743a7a41d75c41e1434d8ca02b3702a586` implements
 `compute-release.yml`, `publish-release-assets.yml`, the publisher, and 18 tests.
