@@ -3,7 +3,28 @@
 The user transferred continuation of **Create agentic backlog kit** into
 **Review project roadmap** and approved carryover policy A.
 
-## Recovered source state
+## Current activation checkpoint (2026-09-08)
+
+Shared PR #4 merged at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`; ABK PR #1
+merged at `33142d846e4faec7e1d0ed184ac745f4f987c8f5`. Shared main checks and ABK
+main tests passed. The first ABK release run failed before any jobs or writes
+because its shared PR-head pin became unusable after squash merge and automatic
+branch deletion. The correction pins the merged revision and requires shared
+main ancestry during contract validation. Complete hosted no-bump proof, then
+scoped immutable-release evaluation, before R14 closure. R15 is the next product
+implementation item; D1 and carryover policy A are already approved.
+
+The user authorized both merges and the existing admin bypass for shared PR #4
+only. No protection settings changed. Plan G completed; Plan H stopped after the
+two successful merges. Receipts are in `.agentic-backlog/wave-e`. Do not replay.
+
+The user reports requesting removal of aio-agentic-sdlc's PyPI stage. Remote
+inspection still found it; no change to that repository was included here.
+
+This checkpoint supersedes the pre-publication statements in the historical
+recovery notes below. Preserve existing untracked evaluation/validator artifacts.
+
+## Recovered source state (historical)
 
 - Source task: `01a03696-25b8-79d1-a43f-994535e9638b` (not running when inspected).
 - Continuing task: `01a06f17-93be-7d83-8ef5-819c71b76f70`.

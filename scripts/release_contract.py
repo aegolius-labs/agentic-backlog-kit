@@ -10,6 +10,15 @@ class ContractError(ValueError):
     pass
 
 
+def validate_shared_reference(pin, comparison):
+    """Require a durable accepted revision, not a readable abandoned PR commit."""
+    if (comparison.get('status') not in ('identical', 'ahead')
+        or comparison.get('base_commit', {}).get('sha') != pin
+        or comparison.get('merge_base_commit', {}).get('sha') != pin):
+        raise ContractError('Shared workflow pin must belong to shared main history; '
+                            're-pin after a squash merge')
+
+
 def validate_contract(caller, compute, publisher):
     def require(condition, message):
         if not condition:
@@ -80,7 +89,13 @@ def main():
                  (args.caller, args.shared / 'compute-release.yml', args.shared / 'publish-release-assets.yml')]
     pin = validate_contract(*documents)
     if args.verify_remote:
-        from urllib.request import urlopen
+        import json
+        from urllib.request import Request, urlopen
+        comparison_url = f'https://api.github.com/repos/aegolius-labs/.github/compare/{pin}...main'
+        request = Request(comparison_url, headers={'Accept': 'application/vnd.github+json',
+                                                  'User-Agent': 'agentic-backlog-kit-contract'})
+        with urlopen(request, timeout=30) as response:
+            validate_shared_reference(pin, json.load(response))
         for filename, expected in zip(('compute-release.yml', 'publish-release-assets.yml'), documents[1:]):
             url = f'https://raw.githubusercontent.com/aegolius-labs/.github/{pin}/.github/workflows/{filename}'
             with urlopen(url, timeout=30) as response:

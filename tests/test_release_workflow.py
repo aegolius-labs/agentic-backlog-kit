@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import unittest
 
-from scripts.release_contract import ContractError, validate_contract
+from scripts.release_contract import ContractError, validate_contract, validate_shared_reference
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +16,34 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def validate(self):
         return validate_contract(*(self.example[name] for name in ('caller', 'compute', 'publisher')))
+
+    def test_accepts_shared_pin_on_main_history(self):
+        pin = 'a' * 40
+        for status in ('identical', 'ahead'):
+            with self.subTest(status=status):
+                validate_shared_reference(pin, {
+                    'status': status, 'base_commit': {'sha': pin},
+                    'merge_base_commit': {'sha': pin},
+                })
+
+    def test_rejects_readable_but_unmerged_shared_pin(self):
+        pin = 'a' * 40
+        for status in ('behind', 'diverged'):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(ContractError, 'main history'):
+                    validate_shared_reference(pin, {
+                        'status': status, 'base_commit': {'sha': pin},
+                        'merge_base_commit': {'sha': 'b' * 40},
+                    })
+
+    def test_rejects_ambiguous_or_mismatched_shared_ancestry(self):
+        pin = 'a' * 40
+        for response in ({}, {'status': 'identical'},
+                         {'status': 'identical', 'base_commit': {'sha': 'b' * 40},
+                          'merge_base_commit': {'sha': pin}}):
+            with self.subTest(response=response):
+                with self.assertRaisesRegex(ContractError, 'main history'):
+                    validate_shared_reference(pin, response)
 
     def test_accepts_permission_compatible_preflighted_release_contract(self):
         self.assertEqual(40, len(self.validate()))

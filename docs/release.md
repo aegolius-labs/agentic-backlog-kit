@@ -22,11 +22,14 @@ new plan and is not part of the successful R07 release result.
 
 ## Ongoing organization-managed releases
 
-R14's corrected implementation is local and validated, pending draft publication
-and hosted evidence. ABK pins both new organization workflows and the publisher
-source checkout to `194c01743a7a41d75c41e1434d8ca02b3702a586`. This SHA is a local
-candidate, not an already published shared version. Publish the shared revision
-before pushing the ABK caller; its CI verifies the pinned public workflow files.
+The shared workflows merged in [organization PR #4](https://github.com/aegolius-labs/.github/pull/4)
+at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`; the initial caller merged in
+[ABK PR #1](https://github.com/aegolius-labs/agentic-backlog-kit/pull/1).
+Its first main release run failed to load the pre-merge shared pin after squash
+merge and automatic branch deletion. The corrected caller pins both workflows
+and publisher source to the merged shared commit. CI verifies that the pin is in
+shared main history and that workflow contents match the reviewed fixtures.
+Hosted activation and immutable-release evidence determine R14 completion.
 
 1. `compute-release.yml` runs with contents read permission, computes the
    Conventional Commit version without tagging or bootstrap writes, and binds
@@ -62,12 +65,15 @@ repositories. GITHUB_TOKEN cannot read that admin setting; the publisher checks
 `immutable: true` after publication and preserves state on a failed check. Do not
 change the setting while publishing.
 
-Replacement Plan G publishes the exact shared and ABK branches and creates draft
-PRs only. It does not merge, tag, release, or clean up resources. The shared
-repository requires one approval, code-owner review, resolved conversations,
-squash merge, and CodeQL policy checks. Do not bypass those rules. Keep the pinned
-shared branch while reviewing; if integration changes its source, re-pin and
-revalidate ABK against the resulting exact commit before activation.
+Plan G completed draft publication. The user then authorized both merges and the
+existing organization-admin review bypass for shared PR #4 only. No protection
+settings changed. Activation Plan H recorded both merges and stopped on the first
+ABK release-load failure; recovery uses a new plan, never replays completed merges.
+
+After squash merges, use the accepted shared main commit rather than the old PR
+head. Raw files can remain readable after their branch disappears while Actions
+refuses the reusable workflow reference. Verify ancestry, contents, and hosted
+behavior before closing activation.
 
 [Pending rollout checklist](release-checklist.md#post-010-automation---r14-remediation-gates)
 and [local validation evidence](validation.md#r14-corrective-implementation-local-evidence)
