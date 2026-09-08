@@ -1,7 +1,7 @@
 """Validate package metadata and release artifacts before publication.
 
-The release workflow is intentionally tag-driven, so a bad tag must fail before
-GitHub creates a release.  This module keeps the check dependency-free and
+The release workflow validates its computed tag before publication, so a bad
+version must fail before GitHub creates a release.  This module keeps the check dependency-free and
 also verifies the files that ``python -m build`` places in ``dist``.
 """
 

@@ -1,0 +1,100 @@
+name: Publish verified release assets
+
+on:
+  workflow_call:
+    inputs:
+      automation-sha:
+        description: Exact shared repository commit, matching the caller uses pin.
+        type: string
+        required: true
+      candidate-sha:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      artifact-id:
+        description: Actions artifact ID from this workflow run.
+        type: string
+        required: true
+      inventory-sha256:
+        type: string
+        required: true
+    outputs:
+      released:
+        value: ${{ jobs.publish.outputs.released }}
+      release-id:
+        value: ${{ jobs.publish.outputs.release-id }}
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      released: ${{ steps.publish.outputs.released }}
+      release-id: ${{ steps.publish.outputs.release-id }}
+    env:
+      CANDIDATE_SHA: ${{ inputs.candidate-sha }}
+      AUTOMATION_SHA: ${{ inputs.automation-sha }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      INVENTORY_SHA256: ${{ inputs.inventory-sha256 }}
+      ARTIFACT_ID: ${{ inputs.artifact-id }}
+    steps:
+      - name: Validate bound inputs
+        shell: python
+        run: |
+          import os, re
+          for name in ('CANDIDATE_SHA', 'AUTOMATION_SHA'):
+              if not re.fullmatch(r'[0-9a-f]{40}', os.environ[name]):
+                  raise SystemExit(f'{name} must be a full commit SHA')
+          if os.environ['CANDIDATE_SHA'] != os.environ['GITHUB_SHA']:
+              raise SystemExit('Candidate differs from workflow commit')
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', os.environ['RELEASE_TAG']):
+              raise SystemExit('Invalid stable release tag')
+          if not re.fullmatch(r'[0-9a-f]{64}', os.environ['INVENTORY_SHA256']):
+              raise SystemExit('Invalid inventory fingerprint')
+          if not re.fullmatch(r'[1-9][0-9]*', os.environ['ARTIFACT_ID']):
+              raise SystemExit('Expected one artifact ID from this run')
+      - name: Checkout pinned organization automation
+        uses: actions/checkout@v4
+        with:
+          repository: aegolius-labs/.github
+          ref: ${{ inputs.automation-sha }}
+          persist-credentials: false
+          path: automation
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download the preflighted bundle from this run
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.artifact-id }}
+          merge-multiple: true
+          path: release-bundle
+      - name: Verify draft assets and publish last
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python automation/scripts/release_assets.py
+          --bundle release-bundle
+          --repository "$GITHUB_REPOSITORY"
+          --sha "$CANDIDATE_SHA"
+          --tag "$RELEASE_TAG"
+          --inventory-sha256 "$INVENTORY_SHA256"
+          --receipt release-receipt.json
+      - name: Preserve publication receipt even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-receipt.json
+          if-no-files-found: warn
+          retention-days: 30

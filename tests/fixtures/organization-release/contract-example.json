@@ -1,0 +1,316 @@
+{
+  "caller": {
+    "name": "release",
+    "permissions": {
+      "contents": "read"
+    },
+    "concurrency": {
+      "group": "release-${{ github.ref }}",
+      "cancel-in-progress": false
+    },
+    "jobs": {
+      "compute-version": {
+        "if": "${{ github.ref == 'refs/heads/main' }}",
+        "permissions": {
+          "contents": "read"
+        },
+        "uses": "aegolius-labs/.github/.github/workflows/compute-release.yml@194c01743a7a41d75c41e1434d8ca02b3702a586"
+      },
+      "preflight": {
+        "needs": "compute-version",
+        "if": "${{ needs.compute-version.outputs.new-tag != '' }}",
+        "runs-on": "ubuntu-latest",
+        "permissions": {
+          "contents": "read"
+        },
+        "outputs": {
+          "artifact-id": "${{ steps.bundle.outputs.artifact-id }}",
+          "inventory-sha256": "${{ steps.inventory.outputs.inventory-sha256 }}"
+        },
+        "env": {
+          "CANDIDATE_SHA": "${{ needs.compute-version.outputs.candidate-sha }}",
+          "RELEASE_TAG": "${{ needs.compute-version.outputs.new-tag }}",
+          "RELEASE_VERSION": "${{ needs.compute-version.outputs.new-version }}",
+          "TAG_STATE_SHA256": "${{ needs.compute-version.outputs.tag-state-sha256 }}",
+          "RELEASE_NOTES": "${{ needs.compute-version.outputs.changelog }}"
+        },
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "ref": "${{ needs.compute-version.outputs.candidate-sha }}",
+              "persist-credentials": false
+            }
+          },
+          {
+            "uses": "actions/setup-python@v5",
+            "with": {
+              "python-version": "3.11"
+            }
+          },
+          {
+            "name": "Verify candidate identity and version",
+            "shell": "bash",
+            "run": "test \"$CANDIDATE_SHA\" = \"$GITHUB_SHA\"\ntest \"$(git rev-parse HEAD)\" = \"$CANDIDATE_SHA\"\ntest -n \"$RELEASE_VERSION\"\ntest \"$RELEASE_TAG\" = \"v$RELEASE_VERSION\"\n"
+          },
+          {
+            "name": "Validate release candidate tests and budgets",
+            "env": {
+              "PYTHONPATH": "src"
+            },
+            "run": "python -B -m unittest discover -s tests -v\npython -B scripts/backlog.py --help\npython -B scripts/benchmark.py --check\n"
+          },
+          {
+            "name": "Build and validate distributions",
+            "run": "python -m pip install build\npython -m build\npython scripts/release_check.py --tag \"$RELEASE_TAG\" --dist dist\npython -m pip install --force-reinstall dist/*.whl\nabk --help\n"
+          },
+          {
+            "name": "Bind the exact validated distributions",
+            "id": "inventory",
+            "run": "python scripts/release_inventory.py"
+          },
+          {
+            "name": "Preserve the exact bundle for publication and recovery",
+            "id": "bundle",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "release-bundle-${{ github.run_id }}-${{ github.run_attempt }}",
+              "path": "release-bundle/",
+              "if-no-files-found": "error",
+              "retention-days": 30
+            }
+          }
+        ]
+      },
+      "release": {
+        "needs": [
+          "compute-version",
+          "preflight"
+        ],
+        "if": "${{ needs.compute-version.outputs.new-tag != '' && needs.preflight.result == 'success' }}",
+        "permissions": {
+          "contents": "write",
+          "actions": "read"
+        },
+        "uses": "aegolius-labs/.github/.github/workflows/publish-release-assets.yml@194c01743a7a41d75c41e1434d8ca02b3702a586",
+        "with": {
+          "automation-sha": "194c01743a7a41d75c41e1434d8ca02b3702a586",
+          "candidate-sha": "${{ needs.compute-version.outputs.candidate-sha }}",
+          "tag": "${{ needs.compute-version.outputs.new-tag }}",
+          "artifact-id": "${{ needs.preflight.outputs.artifact-id }}",
+          "inventory-sha256": "${{ needs.preflight.outputs.inventory-sha256 }}"
+        }
+      }
+    },
+    "on": {
+      "push": {
+        "branches": [
+          "main"
+        ]
+      },
+      "workflow_dispatch": null
+    }
+  },
+  "compute": {
+    "name": "Compute release candidate",
+    "permissions": {
+      "contents": "read"
+    },
+    "jobs": {
+      "compute": {
+        "if": "${{ github.ref == 'refs/heads/main' }}",
+        "runs-on": "ubuntu-latest",
+        "permissions": {
+          "contents": "read"
+        },
+        "outputs": {
+          "new-tag": "${{ steps.version.outputs.new_tag }}",
+          "new-version": "${{ steps.version.outputs.new_version }}",
+          "previous-tag": "${{ steps.version.outputs.previous_tag }}",
+          "candidate-sha": "${{ github.sha }}",
+          "tag-state-sha256": "${{ steps.before.outputs.digest }}",
+          "changelog": "${{ steps.version.outputs.changelog }}"
+        },
+        "steps": [
+          {
+            "uses": "actions/setup-python@v5",
+            "with": {
+              "python-version": "3.11"
+            }
+          },
+          {
+            "name": "Capture tag state before computation",
+            "id": "before",
+            "env": {
+              "GH_TOKEN": "${{ github.token }}"
+            },
+            "shell": "python",
+            "run": "import hashlib, json, os, subprocess\npages = json.loads(subprocess.check_output([\n    'gh', 'api', '--paginate', '--slurp',\n    f\"repos/{os.environ['GITHUB_REPOSITORY']}/tags?per_page=100\"\n]))\ntags = sorted([{'name': t['name'], 'sha': t['commit']['sha']}\n               for page in pages for t in page], key=lambda t: t['name'])\ndigest = hashlib.sha256(json.dumps(tags, sort_keys=True, separators=(',', ':')).encode()).hexdigest()\nwith open(os.environ['GITHUB_OUTPUT'], 'a') as output:\n    output.write(f'digest={digest}\\n')\n"
+          },
+          {
+            "name": "Compute Conventional Commit version without writing",
+            "id": "version",
+            "uses": "mathieudutour/github-tag-action@v6.2",
+            "with": {
+              "github_token": "${{ github.token }}",
+              "tag_prefix": "v",
+              "release_branches": "main",
+              "default_bump": "false",
+              "fetch_all_tags": "true",
+              "commit_sha": "${{ github.sha }}",
+              "dry_run": "true"
+            }
+          },
+          {
+            "name": "Reject tag drift during computation",
+            "env": {
+              "GH_TOKEN": "${{ github.token }}",
+              "EXPECTED_TAG_STATE": "${{ steps.before.outputs.digest }}"
+            },
+            "shell": "python",
+            "run": "import hashlib, json, os, subprocess\npages = json.loads(subprocess.check_output([\n    'gh', 'api', '--paginate', '--slurp',\n    f\"repos/{os.environ['GITHUB_REPOSITORY']}/tags?per_page=100\"\n]))\ntags = sorted([{'name': t['name'], 'sha': t['commit']['sha']}\n               for page in pages for t in page], key=lambda t: t['name'])\ndigest = hashlib.sha256(json.dumps(tags, sort_keys=True, separators=(',', ':')).encode()).hexdigest()\nif digest != os.environ['EXPECTED_TAG_STATE']:\n    raise SystemExit('Tag state drifted during version computation')\n"
+          }
+        ]
+      }
+    },
+    "on": {
+      "workflow_call": {
+        "outputs": {
+          "new-tag": {
+            "value": "${{ jobs.compute.outputs.new-tag }}"
+          },
+          "new-version": {
+            "value": "${{ jobs.compute.outputs.new-version }}"
+          },
+          "previous-tag": {
+            "value": "${{ jobs.compute.outputs.previous-tag }}"
+          },
+          "candidate-sha": {
+            "value": "${{ jobs.compute.outputs.candidate-sha }}"
+          },
+          "tag-state-sha256": {
+            "value": "${{ jobs.compute.outputs.tag-state-sha256 }}"
+          },
+          "changelog": {
+            "value": "${{ jobs.compute.outputs.changelog }}"
+          }
+        }
+      }
+    }
+  },
+  "publisher": {
+    "name": "Publish verified release assets",
+    "permissions": {
+      "contents": "write",
+      "actions": "read"
+    },
+    "jobs": {
+      "publish": {
+        "if": "${{ github.ref == 'refs/heads/main' }}",
+        "runs-on": "ubuntu-latest",
+        "permissions": {
+          "contents": "write",
+          "actions": "read"
+        },
+        "outputs": {
+          "released": "${{ steps.publish.outputs.released }}",
+          "release-id": "${{ steps.publish.outputs.release-id }}"
+        },
+        "env": {
+          "CANDIDATE_SHA": "${{ inputs.candidate-sha }}",
+          "AUTOMATION_SHA": "${{ inputs.automation-sha }}",
+          "RELEASE_TAG": "${{ inputs.tag }}",
+          "INVENTORY_SHA256": "${{ inputs.inventory-sha256 }}",
+          "ARTIFACT_ID": "${{ inputs.artifact-id }}"
+        },
+        "steps": [
+          {
+            "name": "Validate bound inputs",
+            "shell": "python",
+            "run": "import os, re\nfor name in ('CANDIDATE_SHA', 'AUTOMATION_SHA'):\n    if not re.fullmatch(r'[0-9a-f]{40}', os.environ[name]):\n        raise SystemExit(f'{name} must be a full commit SHA')\nif os.environ['CANDIDATE_SHA'] != os.environ['GITHUB_SHA']:\n    raise SystemExit('Candidate differs from workflow commit')\nif not re.fullmatch(r'v\\d+\\.\\d+\\.\\d+', os.environ['RELEASE_TAG']):\n    raise SystemExit('Invalid stable release tag')\nif not re.fullmatch(r'[0-9a-f]{64}', os.environ['INVENTORY_SHA256']):\n    raise SystemExit('Invalid inventory fingerprint')\nif not re.fullmatch(r'[1-9][0-9]*', os.environ['ARTIFACT_ID']):\n    raise SystemExit('Expected one artifact ID from this run')\n"
+          },
+          {
+            "name": "Checkout pinned organization automation",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "repository": "aegolius-labs/.github",
+              "ref": "${{ inputs.automation-sha }}",
+              "persist-credentials": false,
+              "path": "automation"
+            }
+          },
+          {
+            "uses": "actions/setup-python@v5",
+            "with": {
+              "python-version": "3.11"
+            }
+          },
+          {
+            "name": "Download the preflighted bundle from this run",
+            "uses": "actions/download-artifact@v4",
+            "with": {
+              "artifact-ids": "${{ inputs.artifact-id }}",
+              "merge-multiple": true,
+              "path": "release-bundle"
+            }
+          },
+          {
+            "name": "Verify draft assets and publish last",
+            "id": "publish",
+            "env": {
+              "GH_TOKEN": "${{ github.token }}"
+            },
+            "run": "python automation/scripts/release_assets.py --bundle release-bundle --repository \"$GITHUB_REPOSITORY\" --sha \"$CANDIDATE_SHA\" --tag \"$RELEASE_TAG\" --inventory-sha256 \"$INVENTORY_SHA256\" --receipt release-receipt.json"
+          },
+          {
+            "name": "Preserve publication receipt even on failure",
+            "if": "${{ always() }}",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "release-receipt-${{ github.run_id }}-${{ github.run_attempt }}",
+              "path": "release-receipt.json",
+              "if-no-files-found": "warn",
+              "retention-days": 30
+            }
+          }
+        ]
+      }
+    },
+    "on": {
+      "workflow_call": {
+        "inputs": {
+          "automation-sha": {
+            "description": "Exact shared repository commit, matching the caller uses pin.",
+            "type": "string",
+            "required": true
+          },
+          "candidate-sha": {
+            "type": "string",
+            "required": true
+          },
+          "tag": {
+            "type": "string",
+            "required": true
+          },
+          "artifact-id": {
+            "description": "Actions artifact ID from this workflow run.",
+            "type": "string",
+            "required": true
+          },
+          "inventory-sha256": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "outputs": {
+          "released": {
+            "value": "${{ jobs.publish.outputs.released }}"
+          },
+          "release-id": {
+            "value": "${{ jobs.publish.outputs.release-id }}"
+          }
+        }
+      }
+    }
+  }
+}

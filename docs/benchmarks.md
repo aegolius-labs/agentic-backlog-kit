@@ -13,6 +13,15 @@ saved for review with `--output path/to/report.json`; the report includes a
 SHA-256 digest for every serialized payload so a byte-count change is easy to
 trace.
 
+## Coverage boundary
+
+The existing shallow-fixture byte budgets do not establish support for deep
+chains or runtime performance. The review reproduced RecursionError on a valid
+1,200-item chain. [R17](remediation-plan.md#r17-remove-dependency-depth-sensitivity-f5)
+proposes iterative traversal and dedicated 1,200/10,000-node correctness tests.
+Those tests are pending and must not be inferred from the existing 10,000-item
+payload benchmark.
+
 ## Method
 
 The fixture uses stable IDs, a fixed iteration date, deterministic status/type

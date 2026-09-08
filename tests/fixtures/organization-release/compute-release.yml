@@ -1,0 +1,81 @@
+name: Compute release candidate
+
+on:
+  workflow_call:
+    outputs:
+      new-tag:
+        value: ${{ jobs.compute.outputs.new-tag }}
+      new-version:
+        value: ${{ jobs.compute.outputs.new-version }}
+      previous-tag:
+        value: ${{ jobs.compute.outputs.previous-tag }}
+      candidate-sha:
+        value: ${{ jobs.compute.outputs.candidate-sha }}
+      tag-state-sha256:
+        value: ${{ jobs.compute.outputs.tag-state-sha256 }}
+      changelog:
+        value: ${{ jobs.compute.outputs.changelog }}
+
+permissions:
+  contents: read
+
+jobs:
+  compute:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      new-tag: ${{ steps.version.outputs.new_tag }}
+      new-version: ${{ steps.version.outputs.new_version }}
+      previous-tag: ${{ steps.version.outputs.previous_tag }}
+      candidate-sha: ${{ github.sha }}
+      tag-state-sha256: ${{ steps.before.outputs.digest }}
+      changelog: ${{ steps.version.outputs.changelog }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capture tag state before computation
+        id: before
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import hashlib, json, os, subprocess
+          pages = json.loads(subprocess.check_output([
+              'gh', 'api', '--paginate', '--slurp',
+              f"repos/{os.environ['GITHUB_REPOSITORY']}/tags?per_page=100"
+          ]))
+          tags = sorted([{'name': t['name'], 'sha': t['commit']['sha']}
+                         for page in pages for t in page], key=lambda t: t['name'])
+          digest = hashlib.sha256(json.dumps(tags, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'digest={digest}\n')
+      - name: Compute Conventional Commit version without writing
+        id: version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          tag_prefix: v
+          release_branches: main
+          default_bump: 'false'
+          fetch_all_tags: 'true'
+          commit_sha: ${{ github.sha }}
+          dry_run: 'true'
+      - name: Reject tag drift during computation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_TAG_STATE: ${{ steps.before.outputs.digest }}
+        shell: python
+        run: |
+          import hashlib, json, os, subprocess
+          pages = json.loads(subprocess.check_output([
+              'gh', 'api', '--paginate', '--slurp',
+              f"repos/{os.environ['GITHUB_REPOSITORY']}/tags?per_page=100"
+          ]))
+          tags = sorted([{'name': t['name'], 'sha': t['commit']['sha']}
+                         for page in pages for t in page], key=lambda t: t['name'])
+          digest = hashlib.sha256(json.dumps(tags, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+          if digest != os.environ['EXPECTED_TAG_STATE']:
+              raise SystemExit('Tag state drifted during version computation')

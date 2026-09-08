@@ -4,7 +4,76 @@ This is the R07 publication runbook for the first public release. It is
 deliberately limited to the canonical repository and the Python distribution;
 there is no PyPI publishing workflow.
 
-## Audit snapshot
+## Execution result
+
+The exact publication plan, digest
+`adfa9a0354010f9b3a4a289acfbe305c469b9c2a71adee5bef00dc5d255db130`,
+was confirmed and completed on 2026-09-04. Public repository
+`aegolius-labs/agentic-backlog-kit`, protected branch `main`, hosted Linux CI,
+annotated tag `v0.1.0`, the generated GitHub release, both distribution assets,
+and a clean public-tag checkout were verified against commit `6a14b70`.
+Authoritative run URLs and published artifact digests are recorded in
+[validation.md](validation.md).
+
+Disposable Wave C resource cleanup used a separate destructive plan. It
+stopped safely after deleting Project #4 when the following repository deletion
+failed; no retry or API-target action occurred. Remaining cleanup requires a
+new plan and is not part of the successful R07 release result.
+
+## Ongoing organization-managed releases
+
+R14's corrected implementation is local and validated, pending draft publication
+and hosted evidence. ABK pins both new organization workflows and the publisher
+source checkout to `194c01743a7a41d75c41e1434d8ca02b3702a586`. This SHA is a local
+candidate, not an already published shared version. Publish the shared revision
+before pushing the ABK caller; its CI verifies the pinned public workflow files.
+
+1. `compute-release.yml` runs with contents read permission, computes the
+   Conventional Commit version without tagging or bootstrap writes, and binds
+   candidate SHA and tag-state fingerprint. No-bump skips remaining jobs.
+2. ABK checks out the exact candidate, runs tests/help/budgets, builds and
+   smoke-tests the package, and uses `release_check.py` to enforce aligned
+   package/runtime/plugin/changelog metadata. `release_inventory.py` binds the
+   exact two files, sizes/hashes, tag, SHA, tag state, and notes. The upload's
+   artifact ID and inventory hash become publisher inputs.
+3. `publish-release-assets.yml` downloads only that artifact from this run,
+   validates every input and file, and rechecks main/tag state before writes.
+   Organization-owned code creates a tag and marked draft, attaches missing
+   matching assets, verifies downloaded bytes, and publishes last. Final
+   verification requires the exact assets, commit, and immutable release.
+4. The released output becomes true only after verified publication. The
+   30-day receipt records completed steps, release identity, and failure state.
+
+Existing `conventional-release.yml` callers and aio-agentic-sdlc's separate PyPI
+path are unchanged. ABK neither publishes to PyPI nor relies on a secondary
+GITHUB_TOKEN-triggered workflow. Runtime dependencies remain unchanged. YAML
+contract validation uses pinned PyYAML only in CI/audit tooling; the complete
+unit suite and packaged engine remain dependency-free.
+
+Keep bundles and receipts for 30 days. Recover by rerunning only the failed
+publisher job with its original bundle and inputs. A matching draft resumes;
+identical published state is a verified no-op. Changed assets, identities, tags,
+or unrelated releases stop for reviewed remediation. Never clobber/delete assets
+or rewrite tags. After bundle expiry, rebuilding is not proof of byte identity.
+
+Before rollout, separately read the immutability setting with the release owner's
+administration-read access. It is currently enabled and owner-enforced in both
+repositories. GITHUB_TOKEN cannot read that admin setting; the publisher checks
+`immutable: true` after publication and preserves state on a failed check. Do not
+change the setting while publishing.
+
+Replacement Plan G publishes the exact shared and ABK branches and creates draft
+PRs only. It does not merge, tag, release, or clean up resources. The shared
+repository requires one approval, code-owner review, resolved conversations,
+squash merge, and CodeQL policy checks. Do not bypass those rules. Keep the pinned
+shared branch while reviewing; if integration changes its source, re-pin and
+revalidate ABK against the resulting exact commit before activation.
+
+[Pending rollout checklist](release-checklist.md#post-010-automation---r14-remediation-gates)
+and [local validation evidence](validation.md#r14-corrective-implementation-local-evidence)
+separate local correctness from hosted proof. Historical Plan F is superseded.
+
+## Historical `0.1.0` audit snapshot
 
 The 2026-09-04 audit found:
 
@@ -43,7 +112,7 @@ skills and `.codex-plugin/plugin.json` are delivered by the public repository
 or its tag archive, not by the wheel. This boundary is intentional and avoids
 making a Python installation look like a complete plugin installation.
 
-## Ordered publication plan
+## Historical initial publication plan
 
 Run every step against the exact target `aegolius-labs/agentic-backlog-kit`,
 default branch `main`, and release tag `v0.1.0`. Stop when any precondition or
