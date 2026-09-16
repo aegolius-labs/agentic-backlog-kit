@@ -196,3 +196,44 @@ passed. The corrected live remote contract check passed. The full suite passed
 185 tests in 83.337 seconds; CLI help, actionlint 1.7.12, and patch whitespace
 checks passed. The bundled plugin validator passed using the existing local
 validator dependencies. No skill changed. Hosted activation evidence remains required.
+
+## R14 hosted activation and immutable publication (2026-09-13)
+
+On 2026-09-13, approved Plan L completed all five actions. The unchanged fixture
+main `1bba7e6790c410631d562227379b269c5dade6f7`, with an explicitly approved
+`v0.0.0` baseline at `55a6dc3e9616a0e8cd446cf84c78d7fa48328428`, passed
+[hosted compute, preflight and publication](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/34781149178). Its
+[immutable v0.1.0 release](https://github.com/aegolius-labs/abk-release-eval-20260908/releases/tag/v0.1.0) contains exactly the preflighted wheel and
+source archive. Downloaded names, sizes and SHA-256 hashes matched; package
+metadata, isolated wheel installation and `abk --help` passed. The publisher
+receipt records draft asset verification before publication and final verification.
+Production main commits, protections, immutability settings and release inventories
+were unchanged. The fixture is retained; no cleanup occurred.
+
+R14 remains ongoing: untagged release-bearing history silently analyzed zero
+commits before baseline setup (R14-F7). Document and enforce the baseline
+prerequisite without automatic tag creation, and separately prove hosted recovery
+after draft creation and partial upload. Local recovery tests alone do not close
+that gate. R15 is the next product implementation item; D1 and carryover policy A
+are approved. This documentation refresh is local and has not been published.
+
+Production no-bump run 34180532203 passed after PR #2. Prior local validation
+recorded 185 tests; this documentation-only turn did not rerun that suite.
+Plan L hosted preflight ran the unchanged suite and package checks successfully.
+The same fixture main test run 34260384360 was freshly confirmed successful.
+
+Publisher release ID: `388026880`. Inventory SHA-256:
+`2167b2f73f5b699a4b41ff795478448ca6fdbf055a35fe08bb639a64a543c833`.
+
+| Published file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| agentic_backlog_kit-0.1.0-py3-none-any.whl | 60948 | 3571e66925e886090b8f71ce116b5a18de936998ad1ed609665de1236e489c13 |
+| agentic_backlog_kit-0.1.0.tar.gz | 94333 | 6e9990d9136cbd7d31de39b86fe66bda199215cd439770a4dffc67f5ac2860cb |
+
+The receipt's completed order is tag creation, draft creation, two asset
+uploads, draft asset verification, publication request, published verification.
+These are evaluation assets, not replacements for the production v0.1.0 assets.
+The first local read-only preflight attempt lacked sandbox network access; it
+made no external write. Its recorded infrastructure failure was followed by an
+authorized network-enabled read-only refresh. The baseline tag and dispatch each
+occurred exactly once. No workflow failure or recovery was injected in Plan L.
