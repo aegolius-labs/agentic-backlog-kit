@@ -46,7 +46,18 @@ Validate every changed skill with the bundled skill validator and validate the p
 For Claude Code, the bundled validator is:
 
 ```powershell
-claude plugin validate .claude-plugin/plugin.json --strict
+claude plugin validate .claude-plugin/plugin.json
 claude plugin validate .claude-plugin/marketplace.json --strict
 claude plugin validate skills --strict
 ```
+
+The plugin manifest is validated without `--strict` because it emits one known,
+accepted warning:
+
+> `root: CLAUDE.md at the plugin root is not loaded as project context.`
+
+That is correct and expected. `CLAUDE.md` here is guidance for contributors
+working *in* this repository, not context shipped to plugin consumers. Everything
+a consumer needs lives in `skills/`. Do not silence the warning by moving
+repository guidance into a skill. The marketplace manifest and `skills/` must
+keep passing `--strict`.
