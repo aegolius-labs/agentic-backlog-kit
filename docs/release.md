@@ -29,7 +29,13 @@ Its first main release run failed to load the pre-merge shared pin after squash
 merge and automatic branch deletion. The corrected caller pins both workflows
 and publisher source to the merged shared commit. CI verifies that the pin is in
 shared main history and that workflow contents match the reviewed fixtures.
-Hosted activation and immutable-release evidence determine R14 completion.
+The corrected caller merged in ABK PR #2. Hosted no-bump and Plan L immutable
+publication passed; missing-baseline handling and hosted failure recovery remain.
+
+A stable version baseline is currently required: untagged feature history can
+silently compute no release (R14-F7). A clear no-write prerequisite guard is
+planned. Do not treat a successful untagged no-op as first-release support or
+create a baseline automatically. Plan L used an explicitly approved fixture tag.
 
 1. `compute-release.yml` runs with contents read permission, computes the
    Conventional Commit version without tagging or bootstrap writes, and binds
@@ -75,7 +81,7 @@ head. Raw files can remain readable after their branch disappears while Actions
 refuses the reusable workflow reference. Verify ancestry, contents, and hosted
 behavior before closing activation.
 
-[Pending rollout checklist](release-checklist.md#post-010-automation---r14-remediation-gates)
+[Remaining rollout checklist](release-checklist.md#post-010-automation---r14-remediation-gates)
 and [local validation evidence](validation.md#r14-corrective-implementation-local-evidence)
 separate local correctness from hosted proof. Historical Plan F is superseded.
 
@@ -209,3 +215,23 @@ repository creation, pushing `main`, applying branch protection, pushing
 `v0.1.0`, creating or editing the GitHub release, changing visibility, and any
 deletion, tag rewrite, force-push, or asset replacement. None of those
 external mutations were performed during this audit.
+
+## Hosted release checkpoint (2026-09-13)
+
+On 2026-09-13, approved Plan L completed all five actions. The unchanged fixture
+main `1bba7e6790c410631d562227379b269c5dade6f7`, with an explicitly approved
+`v0.0.0` baseline at `55a6dc3e9616a0e8cd446cf84c78d7fa48328428`, passed
+[hosted compute, preflight and publication](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/34781149178). Its
+[immutable v0.1.0 release](https://github.com/aegolius-labs/abk-release-eval-20260908/releases/tag/v0.1.0) contains exactly the preflighted wheel and
+source archive. Downloaded names, sizes and SHA-256 hashes matched; package
+metadata, isolated wheel installation and `abk --help` passed. The publisher
+receipt records draft asset verification before publication and final verification.
+Production main commits, protections, immutability settings and release inventories
+were unchanged. The fixture is retained; no cleanup occurred.
+
+R14 remains ongoing: untagged release-bearing history silently analyzed zero
+commits before baseline setup (R14-F7). Document and enforce the baseline
+prerequisite without automatic tag creation, and separately prove hosted recovery
+after draft creation and partial upload. Local recovery tests alone do not close
+that gate. R15 is the next product implementation item; D1 and carryover policy A
+are approved. This documentation refresh is local and has not been published.

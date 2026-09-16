@@ -3,26 +3,45 @@
 The user transferred continuation of **Create agentic backlog kit** into
 **Review project roadmap** and approved carryover policy A.
 
-## Current activation checkpoint (2026-09-08)
+## Current activation checkpoint (2026-09-13)
 
-Shared PR #4 merged at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`; ABK PR #1
-merged at `33142d846e4faec7e1d0ed184ac745f4f987c8f5`. Shared main checks and ABK
-main tests passed. The first ABK release run failed before any jobs or writes
-because its shared PR-head pin became unusable after squash merge and automatic
-branch deletion. The correction pins the merged revision and requires shared
-main ancestry during contract validation. Complete hosted no-bump proof, then
-scoped immutable-release evaluation, before R14 closure. R15 is the next product
-implementation item; D1 and carryover policy A are already approved.
+Shared PR #4 merged at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`.
+ABK PR #2 corrected the shared pin and merged at
+`6d8bcc45197b42bddb3d60476235a36eb772e033`. Production no-bump run
+[34180532203](https://github.com/aegolius-labs/agentic-backlog-kit/actions/runs/34180532203)
+passed with read-only compute and no publication.
 
-The user authorized both merges and the existing admin bypass for shared PR #4
-only. No protection settings changed. Plan G completed; Plan H stopped after the
-two successful merges. Receipts are in `.agentic-backlog/wave-e`. Do not replay.
+On 2026-09-13, approved Plan L completed all five actions. The unchanged fixture
+main `1bba7e6790c410631d562227379b269c5dade6f7`, with an explicitly approved
+`v0.0.0` baseline at `55a6dc3e9616a0e8cd446cf84c78d7fa48328428`, passed
+[hosted compute, preflight and publication](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/34781149178). Its
+[immutable v0.1.0 release](https://github.com/aegolius-labs/abk-release-eval-20260908/releases/tag/v0.1.0) contains exactly the preflighted wheel and
+source archive. Downloaded names, sizes and SHA-256 hashes matched; package
+metadata, isolated wheel installation and `abk --help` passed. The publisher
+receipt records draft asset verification before publication and final verification.
+Production main commits, protections, immutability settings and release inventories
+were unchanged. The fixture is retained; no cleanup occurred.
 
-The user reports requesting removal of aio-agentic-sdlc's PyPI stage. Remote
-inspection still found it; no change to that repository was included here.
+R14 remains ongoing: untagged release-bearing history silently analyzed zero
+commits before baseline setup (R14-F7). Document and enforce the baseline
+prerequisite without automatic tag creation, and separately prove hosted recovery
+after draft creation and partial upload. Local recovery tests alone do not close
+that gate. R15 is the next product implementation item; D1 and carryover policy A
+are approved. This documentation refresh is local and has not been published.
 
-This checkpoint supersedes the pre-publication statements in the historical
-recovery notes below. Preserve existing untracked evaluation/validator artifacts.
+Plan G completed. H/I stopped with completed merges preserved; a read-only
+activation supplement verified I's successful hosted result. J/K created and
+merged the fixture but stopped when untagged history produced no release.
+L completed the explicitly approved baseline and publication continuation.
+Do not replay any completed writes. Exact receipts remain in
+`.agentic-backlog/wave-e`.
+
+The user authorized the existing admin bypass for shared PR #4 only. No protection
+settings changed. The previously observed aio-agentic-sdlc PyPI path was outside
+this work and was not changed or freshly re-audited on 2026-09-13.
+
+This checkpoint supersedes historical recovery notes below. Preserve local
+untracked evaluation and validator artifacts.
 
 ## Recovered source state (historical)
 
@@ -59,14 +78,11 @@ Both product decisions are now approved:
 
 ## Next work
 
-Continue from [R14 in the remediation plan](remediation-plan.md#r14-repair-shared-release-integration-f1f2).
-The permission mismatch and immutable-asset order are repaired locally. Publication
-and hosted evidence remain gated by replacement Plan G and repository reviews. The reference aio-agentic-sdlc workflow confirms organization
-ownership, but its separate PyPI path does not implement ABK's attached-asset
-contract. A shared compute-only path and draft/verify/publish path require a
-validated shared interface and a fresh exact-candidate publication plan.
+Complete R14-F7 baseline handling and a separately planned hosted failure-recovery
+evaluation. Implement R15 operational authority, then R16 commitment/carryover;
+R17/R18 need coordinated graph/scoring regressions before a corrective release.
+Publish this status refresh through R19. R20 requires fresh identity discovery
+and its own cleanup approval. No new product-policy answer is needed for D1/D2.
 
-R15-R18, R19 public documentation, and R20 cleanup remain tracked in the
-[roadmap](../ROADMAP.md). Preserve the current uncommitted remediation documents;
-they are intentional work from this task. Do not treat them or the pre-existing
-untracked evaluation/validator directories as disposable checkout noise.
+See [the full progress report](overall-progress-2026-09-13.md) for all R01-R20
+statuses, evidence, remaining gates and the counting basis.

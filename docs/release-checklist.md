@@ -46,26 +46,28 @@ gates for `0.1.0`, released on 2026-09-04.
 ## Post-`0.1.0` automation - R14 remediation gates
 
 The corrected caller and shared implementation pass local contract/failure tests
-and workflow syntax validation. Hosted and external acceptance gates remain open.
+and workflow syntax validation. Hosted happy-path proof passed on 2026-09-13;
+missing-baseline handling and hosted recovery remain open.
 See [the remediation proposal](remediation-plan.md#r14-repair-shared-release-integration-f1f2).
 
 - [x] Implement a separate read-only compute workflow and draft-first shared publisher.
 - [x] Pass effective-permission, exact-artifact, drift, partial-failure, and no-op recovery tests locally.
 - [x] Pin caller/source to the same full shared commit; verify actual local YAML contracts and actionlint syntax.
 - [x] Independently read both repositories' enabled, owner-enforced immutability settings.
-- [ ] Publish a validated organization interface for read-only version computation
+- [x] Publish a validated organization interface for read-only version computation
   and asset-aware draft publication; pin the ABK caller to that version.
-- [ ] Verify effective permissions and no writes for no-bump/compute-only cases,
+- [x] Verify effective permissions and no writes for no-bump/compute-only cases,
   including an untagged fixture without bootstrap mutation.
-- [ ] Bind tests, versions, candidate SHA/tag, and exact wheel/sdist hashes before
+- [x] Bind tests, versions, candidate SHA/tag, and exact wheel/sdist hashes before
   the first release write; reject mismatch or drift.
-- [ ] Create the draft, attach and verify both assets, then publish and verify
+- [x] Create the draft, attach and verify both assets, then publish and verify
   immutability and the exact final inventory.
+- [ ] Reject missing stable baseline explicitly without writes and test tagged/untagged release intent (R14-F7).
 - [ ] Prove recovery after draft/partial upload failure without replacement of
   unrelated, mismatched, or already published state.
-- [ ] Preserve no-bump behavior and organization ownership of releases; require
+- [x] Preserve no-bump behavior and organization ownership of releases; require
   no secondary event-triggered workflow or PyPI publication.
-- [ ] Record hosted no-bump and authorized immutable-release run evidence before
+- [x] Record hosted no-bump and authorized immutable-release run evidence before
   protected-branch delivery is marked complete.
 
 ## Corrective product delivery
