@@ -19,6 +19,23 @@ GitHub currently supports nested sub-issues, issue dependencies, issue types, Pr
 
 ## Install for local plugin testing
 
+The kit ships one thin manifest per supported host over a single shared
+`skills/` directory.
+
+### Claude Code
+
+```powershell
+claude plugin marketplace add ./agentic-backlog-kit
+claude plugin install agentic-backlog-kit@aegolius-labs-backlog
+```
+
+Skill bodies use Codex's `$skill-name` syntax when one skill references another;
+in Claude Code that means model invocation by description, or an explicit
+`/agentic-backlog-kit:skill-name`. See [CLAUDE.md](CLAUDE.md) for host specifics,
+including why no `.mcp.json` is declared.
+
+### Codex
+
 This repository is the plugin source. Add it to a local marketplace, install it from the Plugins Directory, and start a new task with the plugin enabled, following OpenAI's [complete-plugin test flow](https://developers.openai.com/plugins/deploy/connect-chatgpt#test-the-complete-plugin). A machine-specific personal marketplace entry is intentionally not committed to this public repository.
 
 ## Quick start

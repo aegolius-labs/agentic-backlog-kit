@@ -13,6 +13,25 @@ This repository packages Codex skills and a deterministic Python engine for GitH
 - Preserve stable item IDs and the hidden GitHub issue-body marker.
 - Reject hierarchy and dependency cycles before planning any mutation.
 
+## Organization authority model
+
+- The normative statement of which Aegolius Labs repository owns which kind of
+  truth is `doc/authority-model.md` in `aegolius-labs/aio-agentic-sdlc`.
+- Composed with that framework, this kit is a one-way projection of work onto
+  GitHub for human and team visibility. It does not decide what should be built.
+- Used standalone, GitHub is the system of record outright. Standalone use is a
+  supported configuration, not a degraded mode.
+- Downstream state flows back as evidence, never as intent.
+
+## Supported hosts
+
+- `skills/` is the single source of truth for behavior. Do not fork skill content
+  per host.
+- Each host gets a thin manifest: `.codex-plugin/plugin.json` for Codex,
+  `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` for Claude
+  Code. `tests/test_host_manifest_parity.py` enforces that they agree.
+- Claude Code specifics are in `CLAUDE.md`, which imports this file.
+
 ## Verification
 
 Run:
@@ -23,3 +42,11 @@ python scripts/backlog.py --help
 ```
 
 Validate every changed skill with the bundled skill validator and validate the plugin manifest with the bundled plugin validator before handoff.
+
+For Claude Code, the bundled validator is:
+
+```powershell
+claude plugin validate .claude-plugin/plugin.json --strict
+claude plugin validate .claude-plugin/marketplace.json --strict
+claude plugin validate skills --strict
+```
