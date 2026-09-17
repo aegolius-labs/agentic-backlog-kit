@@ -1,0 +1,17 @@
+{
+  "title": "Half-cent total rounds down instead of half up",
+  "type": "Bug",
+  "description": "The synthetic calculation contradicts the declared rounding rule.\n\nQA session: `q01-fixture`\nQA finding: `F-001`\nTarget revision: `q01-fixture-revision` (dirty: false)\nQuality attribute: `functional-suitability`\nQA severity: `high`; confidence: `high`\n\nExpected:\n10.005 rounds to 10.01 using ROUND_HALF_UP.\n\nActual:\n10.005 rounds to 10.00.\n\nPreconditions:\n- Use the synthetic Q01 fixture\n\nReproduction (always, 1 attempts):\n1. Calculate 10.005\n2. Compare the result with ROUND_HALF_UP\n\nOracle:\nIndependent Decimal quantization using ROUND_HALF_UP.\n\nEvidence:\n- test-output: .agentic-qa/sessions/q01-fixture/evidence/F-001.txt\n\nLimitations:\n- Synthetic fixture; no production data or services\n\nSuspected root cause: unknown",
+  "acceptance_criteria": [
+    "10.005 produces 10.01 under ROUND_HALF_UP"
+  ],
+  "parent": null,
+  "depends_on": [],
+  "impact": 4,
+  "effort": 2,
+  "business_value": 4,
+  "enabler_value": 1,
+  "status": "Ready",
+  "maturity": "ready",
+  "sprint": null
+}
