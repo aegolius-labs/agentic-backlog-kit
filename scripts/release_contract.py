@@ -90,10 +90,18 @@ def main():
     pin = validate_contract(*documents)
     if args.verify_remote:
         import json
+        import os
         from urllib.request import Request, urlopen
         comparison_url = f'https://api.github.com/repos/aegolius-labs/.github/compare/{pin}...main'
-        request = Request(comparison_url, headers={'Accept': 'application/vnd.github+json',
-                                                  'User-Agent': 'agentic-backlog-kit-contract'})
+        headers = {'Accept': 'application/vnd.github+json',
+                   'User-Agent': 'agentic-backlog-kit-contract'}
+        # Unauthenticated api.github.com allows 60 requests per hour per IP, which
+        # shared CI runners exhaust. A token raises that to 5000 and makes this
+        # read-only check deterministic. The check still works without one.
+        token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+        request = Request(comparison_url, headers=headers)
         with urlopen(request, timeout=30) as response:
             validate_shared_reference(pin, json.load(response))
         for filename, expected in zip(('compute-release.yml', 'publish-release-assets.yml'), documents[1:]):

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aegolius-labs-backlog",
+  "description": "Aegolius Labs backlog tooling for Claude Code",
+  "owner": {
+    "name": "Aegolius Labs",
+    "url": "https://github.com/aegolius-labs"
+  },
+  "plugins": [
+    {
+      "name": "agentic-backlog-kit",
+      "displayName": "Agentic Backlog Kit",
+      "version": "0.1.0",
+      "description": "Deterministic GitHub Issues and Projects backlog workflows for agents",
+      "author": {
+        "name": "Aegolius Labs",
+        "url": "https://github.com/aegolius-labs"
+      },
+      "category": "productivity",
+      "keywords": [
+        "agile",
+        "backlog",
+        "github-issues",
+        "github-projects",
+        "sprint-planning"
+      ],
+      "source": "./",
+      "homepage": "https://github.com/aegolius-labs/agentic-backlog-kit"
+    }
+  ]
+}

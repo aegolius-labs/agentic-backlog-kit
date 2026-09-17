@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "agentic-backlog-kit",
+  "displayName": "Agentic Backlog Kit",
+  "version": "0.1.0",
+  "description": "Deterministic GitHub Issues and Projects backlog workflows for agents",
+  "author": {
+    "name": "Aegolius Labs",
+    "url": "https://github.com/aegolius-labs"
+  },
+  "homepage": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "repository": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "agile",
+    "backlog",
+    "github-issues",
+    "github-projects",
+    "sprint-planning"
+  ]
+}
