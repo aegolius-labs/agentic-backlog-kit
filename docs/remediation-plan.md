@@ -1,6 +1,6 @@
 # Wave E remediation proposal
 
-Status: R14 shared/caller PRs merged; activation pin correction and hosted evidence remain in progress. Other corrective items remain proposed.
+Status: R14 merged and hosted happy-path release verified; baseline handling and hosted failure recovery remain. R15-R18 remain proposed; R19 status refresh is local.
 Baseline: `185f31161e0ff87bb30e60b215abded339bf76c3`.
 Roadmap IDs below are delivery identifiers, not newly created GitHub issues.
 
@@ -17,6 +17,7 @@ are approved; policy A governs carryover.
 | F4: existing sprint work selected again | R16 | Medium | R15; carryover policy D2 approved |
 | F5: deep dependency chains raise RecursionError | R17 | Medium | Graph regression tests |
 | F6: completed prerequisites receive nonzero scores | R18 | Low | Scoring contract tests |
+| R14-F7: untagged feature history silently produces no release | R14 | Medium | Explicit baseline prerequisite, no-write guard and tagged regressions |
 | Public roadmap differs from local release record | R19 | Medium | Reviewed protected-branch publication |
 | Partial disposable-resource cleanup | R20 | Low | Fresh discovery and destructive confirmation |
 
@@ -54,25 +55,33 @@ and [immutable releases](https://docs.github.com/en/code-security/concepts/suppl
 
 ### Implementation and remaining gates
 
-Current checkpoint: shared PR #4 merged at `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`
-and ABK PR #1 merged at `33142d846e4faec7e1d0ed184ac745f4f987c8f5`. Main tests
-passed. Correct the pre-merge pin that became unusable after squash merge, then
-complete hosted no-bump/immutable-release proof. The local evidence below is
-historical; [the runbook](release.md#ongoing-organization-managed-releases) records
-the current accepted pin and rollout behavior.
+On 2026-09-13, approved Plan L completed all five actions. The unchanged fixture
+main `1bba7e6790c410631d562227379b269c5dade6f7`, with an explicitly approved
+`v0.0.0` baseline at `55a6dc3e9616a0e8cd446cf84c78d7fa48328428`, passed
+[hosted compute, preflight and publication](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/34781149178). Its
+[immutable v0.1.0 release](https://github.com/aegolius-labs/abk-release-eval-20260908/releases/tag/v0.1.0) contains exactly the preflighted wheel and
+source archive. Downloaded names, sizes and SHA-256 hashes matched; package
+metadata, isolated wheel installation and `abk --help` passed. The publisher
+receipt records draft asset verification before publication and final verification.
+Production main commits, protections, immutability settings and release inventories
+were unchanged. The fixture is retained; no cleanup occurred.
 
-Shared local commit `194c01743a7a41d75c41e1434d8ca02b3702a586` implements
-`compute-release.yml`, `publish-release-assets.yml`, the publisher, and 18 tests.
-ABK pins this exact commit and binds its validated wheel/sdist with a hashed
-inventory and one Actions artifact ID. Its 182-test suite and local workflow
-contract checks pass. v0.1.1 and existing no-asset callers are unchanged.
-The implementation follows the contract below. Hosted no-bump, real immutable
-publication, repository reviews, and publication remain outstanding. See
-[the current runbook](release.md#ongoing-organization-managed-releases).
+R14 remains ongoing: untagged release-bearing history silently analyzed zero
+commits before baseline setup (R14-F7). Document and enforce the baseline
+prerequisite without automatic tag creation, and separately prove hosted recovery
+after draft creation and partial upload. Local recovery tests alone do not close
+that gate. R15 is the next product implementation item; D1 and carryover policy A
+are approved. This documentation refresh is local and has not been published.
+
+The accepted shared code is `9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9`;
+the corrected caller is `6d8bcc45197b42bddb3d60476235a36eb772e033`.
+Prior local validation passed 185 ABK tests, 18 shared tests, contract checks
+and actionlint. The existing no-asset workflow remains unchanged.
 
 1. Add a compute-only reusable entry point with `contents: read` and no tag,
-   bootstrap, or release writes. Untagged repositories use a computational
-   baseline without pushing a synthetic tag. Keep version logic centralized.
+   bootstrap, or release writes. A reviewed stable baseline tag is required for reliable version calculation.
+   R14-F7 must reject a missing baseline explicitly without creating a tag.
+   Automatic first-version inference is not implemented. Keep version logic centralized.
    Granting the existing dry-run call write permission would remove the mismatch
    but would not establish the required read-only preflight contract.
 2. Return candidate SHA, previous tag, proposed tag/version, and bump eligibility.
@@ -272,3 +281,25 @@ and documentation links/anchors, roadmap ID uniqueness/coverage (R01-R20), and
 validation was required. An initial ID-coverage check used unpadded IDs; correcting
 the check to compare numeric IDs passed without changing the roadmap identifiers.
 At the proposal-only checkpoint, no hosted workflow, remediation regression, new release, or cleanup was run. Subsequent R14 implementation evidence is recorded in [validation.md](validation.md#r14-corrective-implementation-local-evidence).
+
+## R14-F7: missing baseline handling
+
+The upstream github-tag-action v6.2 fallback uses virtual `v0.0.0` at `HEAD`;
+comparing it with the current main analyzes zero commits. The fixture's feature
+merge therefore silently skipped publication in run 34260385084. Existing ABK
+history already has v0.1.0 and was not affected by this case.
+
+Remediation: check for a stable baseline before invoking version calculation;
+report the missing prerequisite and stop without writes. Add a regression for
+release-bearing untagged history, tagged no-bump history, and the same feature
+with a baseline. Do not automatically create baseline tags or infer a first
+version from incomplete history. Update shared contract tests and caller fixtures
+when implementing the guard. The guard is proposed, not shipped.
+
+Plan L proved that this same feature computes v0.1.0 with an explicitly approved
+baseline and publishes the exact immutable assets. That resolves the evaluation
+setup; it does not implement the missing-baseline guard. Hosted draft/partial
+upload interruption and exact-byte recovery still need a separately approved
+fixture-only plan. It must bind exact source, failure points, expected temporary
+state, original bundle identity, permitted retry and post-verification before
+any external action.
