@@ -17,6 +17,11 @@ build/
 .agentic-backlog/receipts/
 .agentic-backlog/*.lock
 
+# Generated plans and snapshots. Only manifest.json is tracked state; every
+# other file the CLI writes to its default location is disposable.
+.agentic-backlog/*.json
+!.agentic-backlog/manifest.json
+
 # Release preflight bundles and local publication receipts
 release-bundle/
 release-receipt.json

@@ -124,6 +124,52 @@ class GitHubCliTransportTests(unittest.TestCase):
                 self.assertEqual(1, raised.exception.status)
 
 
+    def test_issue_write_exposes_http_422_from_cli_diagnostic(self) -> None:
+        """A CLI 422 must select the same label fallback the direct API selects."""
+
+        for method, path in (
+            ("POST", "/repos/aegolius-labs/example/issues"),
+            ("PATCH", "/repos/aegolius-labs/example/issues/35"),
+        ):
+            with self.subTest(method=method, path=path):
+                result = CompletedProcess(
+                    ["gh"], 1, stdout="", stderr="gh: Validation Failed (HTTP 422)"
+                )
+                transport = GitHubCliTransport("gh")
+
+                with patch(
+                    "agentic_backlog_kit.github.subprocess.run", return_value=result
+                ):
+                    with self.assertRaises(GitHubApiError) as raised:
+                        transport.rest(method, path, {"title": "x"})
+
+                self.assertEqual(422, raised.exception.status)
+
+    def test_unprocessable_normalization_is_limited_to_issue_writes(self) -> None:
+        cases = [
+            ("POST", "/repos/aegolius-labs/example/issues/1/sub_issues", "gh: Validation Failed (HTTP 422)"),
+            ("POST", "/repos/aegolius-labs/example/issues/1/labels", "gh: Validation Failed (HTTP 422)"),
+            ("POST", "graphql", "gh: Validation Failed (HTTP 422)"),
+            ("GET", "/repos/aegolius-labs/example/issues", "gh: Validation Failed (HTTP 422)"),
+            ("DELETE", "/repos/aegolius-labs/example/issues/1", "gh: Validation Failed (HTTP 422)"),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: Not Found (HTTP 404)"),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: API rate limit exceeded (HTTP 429)"),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: authentication required"),
+            ("POST", "/repos/aegolius-labs/example/issues/1/parent", "gh: Validation Failed (HTTP 422)"),
+        ]
+
+        for method, path, message in cases:
+            with self.subTest(method=method, path=path, message=message):
+                result = CompletedProcess(["gh"], 1, stdout="", stderr=message)
+                transport = GitHubCliTransport("gh")
+                with patch(
+                    "agentic_backlog_kit.github.subprocess.run", return_value=result
+                ):
+                    with self.assertRaises(GitHubApiError) as raised:
+                        transport.rest(method, path, {"title": "x"})
+                self.assertEqual(1, raised.exception.status)
+
+
 class GitHubExecutorTests(unittest.TestCase):
     def test_created_issue_ids_are_available_to_later_relationship_actions(self) -> None:
         data = manifest(item("T-BASE"), item("T-VALUE", depends_on=["T-BASE"]))

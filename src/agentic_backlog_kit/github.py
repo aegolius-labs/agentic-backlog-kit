@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -21,16 +22,30 @@ _PARENT_ABSENCE_MESSAGES = frozenset(
 )
 
 
-def _cli_error_status(method: str, path: str, message: str) -> int | None:
-    """Recover the one HTTP status that ``gh api`` omits for a known absence.
+_ISSUE_WRITE_PATH = re.compile(r"^/?repos/[^/]+/[^/]+/issues(?:/\d+)?$")
+_UNPROCESSABLE_MESSAGE = re.compile(r"\(HTTP 422\)")
 
-    ``gh api`` reports the issue-parent endpoint's normal empty relationship as
-    exit code 1, even though the diagnostic includes its HTTP 404 status.  The
-    snapshot reader already treats a 404 from the direct API as an absent
-    parent, so normalize only this exact endpoint/message combination.  The
-    ``gh:`` prefix is emitted by current CLI versions; the unprefixed form is
-    retained for compatibility with versions that omit it.  Other CLI failures
-    must retain their exit code and remain fatal to the reader.
+
+def _cli_error_status(method: str, path: str, message: str) -> int | None:
+    """Recover the two HTTP statuses that ``gh api`` reports only as exit code 1.
+
+    ``gh api`` exits 1 for every API failure and leaves the real status in its
+    diagnostic text.  Callers branch on status to tell a recoverable failure
+    from a fatal one, so an exit code in its place makes the CLI route behave
+    differently from the direct API route for the same request.
+
+    Two cases are normalized, both narrowly:
+
+    ``GET .../parent`` reports an issue's normal empty parent relationship as a
+    404.  The snapshot reader already treats a direct-API 404 that way, so only
+    this exact endpoint and message pair is mapped.
+
+    Creating or updating an issue reports an unavailable native issue type as a
+    422, which selects the ``native_or_label`` fallback to a type label.  Only
+    an issue write endpoint is mapped, so an unrelated 422 elsewhere stays
+    fatal.
+
+    Every other CLI failure keeps its exit code and remains fatal.
     """
 
     if (
@@ -39,6 +54,12 @@ def _cli_error_status(method: str, path: str, message: str) -> int | None:
         and message in _PARENT_ABSENCE_MESSAGES
     ):
         return 404
+    if (
+        method.upper() in {"POST", "PATCH"}
+        and _ISSUE_WRITE_PATH.match(path)
+        and _UNPROCESSABLE_MESSAGE.search(message)
+    ):
+        return 422
     return None
 
 
