@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
@@ -110,30 +111,62 @@ def _hierarchy_levels(hierarchy: list[list[str]] | tuple[tuple[str, ...], ...]) 
 
 
 def _find_dependency_cycle(items: dict[str, dict[str, Any]]) -> list[str] | None:
+    """Detect a dependency cycle iteratively so deep graphs cannot exhaust the stack.
+
+    Mirrors a depth-first search over sorted ids and sorted dependencies, so the
+    reported cycle is identical to the one a recursive walk would report.
+    """
+
     state: dict[str, int] = {item_id: 0 for item_id in items}
-    stack: list[str] = []
 
-    def visit(item_id: str) -> list[str] | None:
-        state[item_id] = 1
-        stack.append(item_id)
-        for dependency in sorted(items[item_id]["depends_on"]):
-            if state[dependency] == 0:
-                cycle = visit(dependency)
-                if cycle:
-                    return cycle
-            elif state[dependency] == 1:
-                start = stack.index(dependency)
-                return stack[start:] + [dependency]
-        stack.pop()
-        state[item_id] = 2
-        return None
-
-    for item_id in sorted(items):
-        if state[item_id] == 0:
-            cycle = visit(item_id)
-            if cycle:
-                return cycle
+    for root in sorted(items):
+        if state[root] != 0:
+            continue
+        path: list[str] = [root]
+        frames: list[tuple[str, Iterator[str]]] = [
+            (root, iter(sorted(items[root]["depends_on"])))
+        ]
+        state[root] = 1
+        while frames:
+            item_id, pending = frames[-1]
+            descended = False
+            for dependency in pending:
+                if state[dependency] == 0:
+                    state[dependency] = 1
+                    path.append(dependency)
+                    frames.append(
+                        (dependency, iter(sorted(items[dependency]["depends_on"])))
+                    )
+                    descended = True
+                    break
+                if state[dependency] == 1:
+                    start = path.index(dependency)
+                    return path[start:] + [dependency]
+            if not descended:
+                frames.pop()
+                path.pop()
+                state[item_id] = 2
     return None
+
+
+CYCLE_DIAGNOSTIC_LIMIT = 12
+
+
+def _format_cycle(cycle: list[str]) -> str:
+    """Render a cycle path within a bounded length so diagnostics stay compact.
+
+    A long cycle is elided in the middle: both ends identify the loop, and the
+    omitted count keeps the message honest without spending the caller's budget.
+    """
+
+    if len(cycle) <= CYCLE_DIAGNOSTIC_LIMIT:
+        return " -> ".join(cycle)
+    head = CYCLE_DIAGNOSTIC_LIMIT // 2
+    tail = CYCLE_DIAGNOSTIC_LIMIT - head
+    omitted = len(cycle) - CYCLE_DIAGNOSTIC_LIMIT
+    return " -> ".join(
+        [*cycle[:head], f"... {omitted} more ...", *cycle[-tail:]]
+    )
 
 
 def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
@@ -350,7 +383,7 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
     cycle = _find_dependency_cycle(by_id)
     if cycle:
-        raise ManifestError(f"Dependency cycle detected: {' -> '.join(cycle)}")
+        raise ManifestError(f"Dependency cycle detected: {_format_cycle(cycle)}")
 
     root["items"] = [by_id[item_id] for item_id in sorted(by_id)]
     return root

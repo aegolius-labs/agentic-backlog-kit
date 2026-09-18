@@ -21,6 +21,12 @@ class ScoredItem:
 
 
 def _scores(data: dict[str, Any]) -> tuple[dict[str, float], dict[str, float]]:
+    """Return base and dependency-boosted final scores without recursive traversal.
+
+    Completed work scores zero and never propagates a boost, so a finished
+    prerequisite cannot outrank or inflate the work that still remains.
+    """
+
     items = {item["id"]: item for item in data["items"]}
     done_statuses = set(data["workflow"]["done_statuses"])
     weights = data["scoring"]["weights"]
@@ -41,17 +47,30 @@ def _scores(data: dict[str, Any]) -> tuple[dict[str, float], dict[str, float]]:
         for dependency in item["depends_on"]:
             dependents[dependency].append(item_id)
 
+    # A final score consumes the final scores of everything that depends on it,
+    # so resolve items in dependent-first order. The manifest is already proven
+    # acyclic, so every item is released exactly once.
+    pending = {item_id: len(dependents[item_id]) for item_id in items}
+    ready = [item_id for item_id in sorted(items) if pending[item_id] == 0]
+
     final_scores: dict[str, float] = {}
-
-    def final_score(item_id: str) -> float:
-        if item_id not in final_scores:
+    while ready:
+        item_id = ready.pop()
+        if items[item_id]["status"] in done_statuses:
+            final_scores[item_id] = 0.0
+        else:
             final_scores[item_id] = base_scores[item_id] + boost_factor * sum(
-                final_score(dependent) for dependent in sorted(dependents[item_id])
+                final_scores[dependent] for dependent in sorted(dependents[item_id])
             )
-        return final_scores[item_id]
+        for prerequisite in sorted(items[item_id]["depends_on"]):
+            pending[prerequisite] -= 1
+            if pending[prerequisite] == 0:
+                ready.append(prerequisite)
 
-    for item_id in sorted(items):
-        final_score(item_id)
+    if len(final_scores) != len(items):  # pragma: no cover - guarded by validation
+        unresolved = sorted(set(items) - set(final_scores))
+        raise ValueError(f"Unresolved dependency graph for items: {unresolved}")
+
     return base_scores, final_scores
 
 
