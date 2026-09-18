@@ -843,7 +843,7 @@
       "effort": 1,
       "business_value": 4,
       "enabler_value": 4,
-      "status": "In Progress",
+      "status": "Done",
       "maturity": "ready",
       "sprint": null
     },
@@ -863,7 +863,7 @@
       "effort": 1,
       "business_value": 4,
       "enabler_value": 3,
-      "status": "In Progress",
+      "status": "Done",
       "maturity": "ready",
       "sprint": null
     },
@@ -883,7 +883,7 @@
       "effort": 1,
       "business_value": 4,
       "enabler_value": 4,
-      "status": "Ready",
+      "status": "In Progress",
       "maturity": "ready",
       "sprint": null
     },
@@ -943,6 +943,124 @@
       "enabler_value": 1,
       "status": "Ready",
       "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-V012",
+      "title": "v0.1.2 - Apply ergonomics",
+      "type": "Epic",
+      "description": "First use of the kit on its own backlog showed that apply succeeds but does not explain itself: a failure names no item, and a completed scaffold can still leave the target unconverged.",
+      "acceptance_criteria": [
+        "An apply failure names the item, the field, and the reason",
+        "One scaffold apply converges a fresh Project"
+      ],
+      "parent": "INIT-ABK",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R22",
+      "title": "R22 - Report actionable apply failures",
+      "type": "Feature",
+      "description": "An apply failure surfaces as 'GitHub API error 1: gh: Validation Failed (HTTP 422)', naming no item, field or reason. Diagnosis required reading the receipt, querying organization issue types by hand, and reading the transport source. The receipt is good; the operator-facing message is not.",
+      "acceptance_criteria": [
+        "A failed action names the item id and the rejected field",
+        "A known cause such as an unavailable issue type is named explicitly",
+        "The remedy or the fallback taken is stated"
+      ],
+      "parent": "EPIC-V012",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R23",
+      "title": "R23 - Converge a fresh Project in one scaffold apply",
+      "type": "Feature",
+      "description": "project.view.create cannot carry a filter, visible fields, grouping or sorting, so every created view needs an immediate repair pass. The first apply reports completed with 17 of 17 actions while leaving three views unconverged; convergence arrives only on the third plan.",
+      "acceptance_criteria": [
+        "A fresh Project converges in one reviewed apply, or the plan states plainly that a second pass is required",
+        "A completed status never implies a converged target when it is not"
+      ],
+      "parent": "EPIC-V012",
+      "depends_on": [
+        "R22"
+      ],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "S-R22-1",
+      "title": "Name the item and rejected field on apply failure",
+      "type": "Story",
+      "description": "Carry the failing action's item id and payload into the error text the operator sees, not only into the receipt.",
+      "acceptance_criteria": [
+        "The message names the item id",
+        "The message names the endpoint and rejected field"
+      ],
+      "parent": "R22",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "S-R22-2",
+      "title": "Explain an unavailable native issue type",
+      "type": "Story",
+      "description": "When a native issue type is missing, say so and say which label was used instead, rather than reporting a bare validation failure.",
+      "acceptance_criteria": [
+        "A missing native type is named",
+        "The label fallback actually taken is reported"
+      ],
+      "parent": "R22",
+      "depends_on": [
+        "S-R22-1"
+      ],
+      "impact": 4,
+      "effort": 1,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R24",
+      "title": "R24 - Reconsider hierarchy expressiveness for small work",
+      "type": "Feature",
+      "description": "The hierarchy is a strict ladder and a parent must be exactly one level above its child, so a small chore directly under a Feature has no type: Task is reserved for level 5 under a Story or Bug. Six decomposed items had to be retyped from Task to Story, which overstates them. This may be intentional; it is recorded rather than scheduled.",
+      "acceptance_criteria": [
+        "A decision is recorded either way, with the modeling rationale"
+      ],
+      "parent": "EPIC-UNSCHED",
+      "depends_on": [],
+      "impact": 2,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 1,
+      "status": "Inbox",
+      "maturity": "idea",
       "sprint": null
     }
   ]

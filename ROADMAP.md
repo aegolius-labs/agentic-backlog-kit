@@ -87,8 +87,15 @@ backlog.
 `v0.1.0` remains the published release: hosted `ubuntu-latest` CI passed on
 release commit `6a14b70`, `main` has strict `test` protection with administrator
 enforcement, and the tag carries validated wheel and source-distribution assets.
-The suite now stands at 205 tests, all passing, with byte budgets within
+The suite now stands at 207 tests, all passing, with byte budgets within
 envelope.
+
+First use of the kit on its own backlog converged and produced three new
+items. It also found a route asymmetry in the write path: the `gh` CLI route
+could never fall back from an unavailable native issue type, because
+`gh api` reports every failure as exit code 1 and the fallback keys off an
+HTTP 422. The same manifest converged on the direct API route and failed
+mid-apply on `gh`. That is fixed here.
 
 Outstanding product work: R15 and R16 (GitHub operational authority, with
 policy D1 and carryover policy A already approved) and R11 (adoption).
@@ -110,11 +117,12 @@ into release lines, each with its own membership and its own denominator.
 | --- | --- | --- | --- |
 | `v0.1.0` | Initial release | M0-M5, R01-R09 | **Shipped** 2026-09-04 |
 | `v0.1.1` | Engine correctness | R17, R18 | **Complete in code**, awaiting release |
+| `v0.1.2` | Apply ergonomics | R22, R23 | Not started; raised by first use |
 | `v0.2.0` | GitHub operational authority | R15, R16 | Not started; policies approved |
 | `v0.3.0` | Adoption | R11 | Not started |
 | `v0.4.0+` | Reconciliation and reach | R10, R13 | Not started |
-| Unscheduled | Portfolio scale | R12 | Deferred |
-| Continuous | Dogfooding | R21 | In progress |
+| Unscheduled | Portfolio scale and hierarchy | R12, R24 | Deferred |
+| Continuous | Dogfooding | R21 | Converged; reporting open |
 | Operations | Release plumbing and cleanup | R14, R19, R20 | Excluded from product basis |
 
 Two rankings changed deliberately:
@@ -127,6 +135,11 @@ Two rankings changed deliberately:
   without import the kit is usable only on a greenfield repository. For a
   product whose value is managing an existing GitHub backlog, import is the
   gate on adoption by anyone, not a post-release enhancement.
+
+A third line was added after the fact. `v0.1.2` did not come from planning:
+R22 and R23 are what first use of the kit on its own backlog exposed, and
+they are recorded here rather than folded silently into other work. See
+[first-use findings](docs/dogfooding-findings-2026-09-18.md).
 
 `v0.1.1` needed no product decision from the owner, and `v0.2.0` needs none
 either: D1 and carryover policy A are already approved.
@@ -141,15 +154,21 @@ effort, production readiness, or safety approval.
 | `v0.1.0` milestones M0-M5 | 6/6 | 100% |
 | `v0.1.0` items R01-R09 | 9/9 | 100% |
 | `v0.1.1` items R17-R18 | 2/2 | 100% in code |
+| `v0.1.2` items R22-R23 | 0/2 | 0% |
 | `v0.2.0` items R15-R16 | 0/2 | 0% |
 | `v0.3.0` item R11 | 0/1 | 0% |
 | `v0.4.0+` items R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R18 excluding deferred R12 and operations R14** | **11/14** | **79%** |
+| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **11/16** | **69%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
 R12, which is explicitly deferred, and three operations chores. The scheduled
 product figure above is the number that describes readiness.
+
+That figure fell from 79% to 69% when R22 and R23 were added. Nothing
+regressed: the denominator grew because using the product found work that
+planning had not. A completion percentage that only ever rises is measuring
+the plan rather than the product.
 
 ## Work items by release line
 
@@ -261,6 +280,30 @@ complete pending a release.
 - **High-level approach:** Completed by zeroing the final score of any item in a done status and taking that zero as the propagated contribution, which stops boost relay through completed nodes without a second traversal. Custom done statuses are honoured. Operational status from R15 is not yet available, so this uses manifest status; R15 will supply effective status in operational mode.
 - **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct. **Met:** regression tests cover dependents, boost relay, custom done statuses, and unchanged boosting for unfinished prerequisites; no unfinished score and no documented benchmark value changed.
 
+### `v0.1.2` - Apply ergonomics
+
+Raised by first use rather than by planning. Apply is correct but does not
+explain itself: a failure names no item, and a completed scaffold can leave the
+target unconverged.
+
+#### R22 - Report actionable apply failures
+
+- **Status:** Ready
+- **Importance:** High
+- **Complexity:** Medium
+- **Context:** A failed apply surfaced as `GitHub API error 1: gh: Validation Failed (HTTP 422)`, naming no item, no field and no reason. Diagnosis required reading the receipt for the failing action, querying the organization's issue types by hand, and then reading the transport source. The receipt is good; the operator-facing message is not.
+- **High-level approach:** Carry the failing action's item id, endpoint and rejected field into the error the operator sees. Name known causes explicitly, including an unavailable native issue type, and state the fallback actually taken.
+- **Done when:** A failed action names the item id and the rejected field, a known cause is named rather than implied, and the remedy or the fallback taken is stated.
+
+#### R23 - Converge a fresh Project in one scaffold apply
+
+- **Status:** Ready
+- **Importance:** Medium
+- **Complexity:** Medium
+- **Context:** `project.view.create` cannot carry a filter, visible-field list, grouping or sorting, so every created view needs an immediate repair pass. Scaffolding a fresh Project reported `completed` at 17 of 17 actions while leaving three views unconverged; convergence arrived only on the third plan. The kit is correct here and never deletes and recreates a view to work around the API boundary, but a `completed` apply that leaves the target unconverged trains the operator to distrust the status.
+- **High-level approach:** Either sequence view creation and configuration within one reviewed apply, or state plainly in the plan that a second pass is required and why.
+- **Done when:** A fresh Project converges in one reviewed apply, or the plan says a second pass is required; a completed status never implies a converged target when it is not.
+
 ### `v0.2.0` - GitHub operational authority
 
 The kit currently treats the local manifest as authoritative for operational
@@ -316,6 +359,15 @@ The gate on anyone other than the maintainer using the kit.
 
 ### Unscheduled
 
+#### R24 - Reconsider hierarchy expressiveness for small work
+
+- **Status:** Inbox; recorded, not scheduled
+- **Importance:** Low
+- **Complexity:** Medium
+- **Context:** The hierarchy is a strict ladder and a parent must be exactly one level above its child, so a small chore directly under a Feature has no type: `Task` is reserved for level 5 under a `Story` or `Bug`. Six decomposed items in the kit's own backlog were written as Tasks and had to be retyped as Stories, which overstates them.
+- **High-level approach:** Decide whether the strict ladder is intentional. If it is, document why; if it is not, consider permitting a Task directly under a Feature.
+- **Done when:** A decision is recorded either way with its modeling rationale.
+
 #### R12 - Support multi-repository portfolio planning
 
 - **Importance:** Later
@@ -328,13 +380,14 @@ The gate on anyone other than the maintainer using the kit.
 
 #### R21 - Run the kit against its own backlog
 
-- **Status:** In progress from 2026-09-18
+- **Status:** Converged on 2026-09-18; reporting remains open
 - **Importance:** High
 - **Complexity:** Easy
 - **Context:** The kit had never been pointed at its own work. The repository carried zero GitHub issues, no manifest, and no managed Project; the only applies ever performed were against disposable evaluation fixtures. Meanwhile this roadmap maintained twenty-one work items with importance, complexity, dependencies, and status by hand in one large Markdown file - exactly the artifact the kit exists to manage.
 - **High-level approach:** Express the release lines and open work items as a tracked manifest, then drive the ordinary `init -> scaffold -> sync` lifecycle against a real Project. Treat the roadmap prose as human-readable rationale and the manifest as machine-readable intent. Record every defect this surfaces against the responsible work item rather than patching around it, because first-use friction is the point.
 - **Done when:** A tracked manifest describes the open roadmap, a scaffolded Project reflects it, a second sync plan contains zero actions, and the friction encountered is written up against the responsible work item.
 - **Known cost:** Dogfooding before R15 lands means local intent overwrites GitHub `Status` and `Sprint` on ordinary sync. That is accepted deliberately: it produces the acceptance evidence R15 and R16 need.
+- **Result:** [Organization Project 6](https://github.com/orgs/aegolius-labs/projects/6) holds 50 items; the repository holds 50 issues with sub-issue and dependency links. Scaffold converged across three plans (17, 3, 0 actions) and sync across three (169 with a failure at 31, 139, 0), then an incremental 23-action pass converged again. Ten findings are recorded in [first-use findings](docs/dogfooding-findings-2026-09-18.md); two were fixed here, two became R22 and R23, and one became R24.
 
 ## Operations checklist
 
