@@ -1,6 +1,6 @@
 # Agentic Backlog Kit Roadmap
 
-Last updated: 2026-09-13
+Last updated: 2026-09-18
 
 ## Product goal
 
@@ -18,7 +18,7 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 - Native GitHub Projects access is a first-class transport invariant across a capability-complete Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API. Skills select one complete route per apply, never silently mix write transports, and keep the local engine provider-neutral.
 - The implementation uses test-first development for schemas, scoring, planning, reconciliation, and mutation safety.
 
-## Milestones
+## Shipped release - `v0.1.0` milestones
 
 ### M0 - Discovery and boundaries
 
@@ -78,13 +78,84 @@ Create a Codex-first plugin that lets agents manage GitHub Issues and Projects t
 
 Continuation ownership and prior-plan status: [active task handoff](docs/task-handoff.md).
 
-Wave D completed on 2026-09-04. The canonical public repository is published at `aegolius-labs/agentic-backlog-kit`; hosted `ubuntu-latest` CI passed all 168 tests plus package and byte-budget checks on release commit `6a14b70`; `main` has strict `test` protection with administrator enforcement and force-push/deletion disabled; and `v0.1.0` is published with validated wheel and source-distribution assets. A clean clone of the public tag passes the full suite, CLI, benchmark, plugin, and five skill validators. The separately approved disposable-resource cleanup stopped safely on its first repository-deletion failure: Project #4 is deleted, its private repository remains, and the API Project #5/repository were untouched. Cleanup now requires a fresh identity-bound plan; it does not block the completed release. Wave E is ongoing. Shared PR #4 and ABK PRs #1/#2 are merged. The accepted shared pin and production no-bump run passed; Plan L completed hosted immutable publication and downloaded-package verification on 2026-09-13 in a disposable fixture. R14 still needs missing-baseline handling (R14-F7) and hosted failure-recovery proof. R15-R18 remain proposed; D1 and carryover policy A are approved. R19 has partially published documentation and this local status refresh; R20 cleanup is separate. See [the overall progress report](docs/overall-progress-2026-09-13.md) and [remediation proposal](docs/remediation-plan.md).
+**2026-09-18.** The roadmap was re-cut from one flat twenty-item list into
+release lines, because the previous structure could not answer "what ships
+next". R17 and R18 are implemented and verified, completing the v0.1.1
+correctness line in code. R21 begins the first real use of the kit on its own
+backlog.
 
-## Work items, ranked
+`v0.1.0` remains the published release: hosted `ubuntu-latest` CI passed on
+release commit `6a14b70`, `main` has strict `test` protection with administrator
+enforcement, and the tag carries validated wheel and source-distribution assets.
+The suite now stands at 205 tests, all passing, with byte budgets within
+envelope.
+
+Outstanding product work: R15 and R16 (GitHub operational authority, with
+policy D1 and carryover policy A already approved) and R11 (adoption).
+Outstanding operations work, excluded from the product completion basis: R14
+missing-baseline handling with hosted failure-recovery proof, and R20
+disposable-resource cleanup. See
+[the overall progress report](docs/overall-progress-2026-09-13.md) and
+[remediation proposal](docs/remediation-plan.md).
+
+## Release lines
+
+The previous revision of this roadmap ranked R01-R20 as one flat list. That list
+mixed shipped scope, speculative features, correctness defects in released code,
+release-engineering chores, and disposable-resource cleanup, so its completion
+percentage carried no information about product readiness. Work is now grouped
+into release lines, each with its own membership and its own denominator.
+
+| Line | Theme | Items | State |
+| --- | --- | --- | --- |
+| `v0.1.0` | Initial release | M0-M5, R01-R09 | **Shipped** 2026-09-04 |
+| `v0.1.1` | Engine correctness | R17, R18 | **Complete in code**, awaiting release |
+| `v0.2.0` | GitHub operational authority | R15, R16 | Not started; policies approved |
+| `v0.3.0` | Adoption | R11 | Not started |
+| `v0.4.0+` | Reconciliation and reach | R10, R13 | Not started |
+| Unscheduled | Portfolio scale | R12 | Deferred |
+| Continuous | Dogfooding | R21 | In progress |
+| Operations | Release plumbing and cleanup | R14, R19, R20 | Excluded from product basis |
+
+Two rankings changed deliberately:
+
+- **R17 and R18 moved above all feature work.** They are defects in shipped
+  code, not enhancements. R17 in particular was a crash in the deterministic
+  engine that is the product's core claim.
+- **R11 moved up into its own line, ahead of R10, R12 and R13.** Ingestion
+  handles one structured item at a time and only marked issues are managed, so
+  without import the kit is usable only on a greenfield repository. For a
+  product whose value is managing an existing GitHub backlog, import is the
+  gate on adoption by anyone, not a post-release enhancement.
+
+`v0.1.1` needed no product decision from the owner, and `v0.2.0` needs none
+either: D1 and carryover policy A are already approved.
+
+## Completion basis
+
+Each line is counted against its own membership. Percentages count items, not
+effort, production readiness, or safety approval.
+
+| Basis | Complete | Share |
+| --- | --- | --- |
+| `v0.1.0` milestones M0-M5 | 6/6 | 100% |
+| `v0.1.0` items R01-R09 | 9/9 | 100% |
+| `v0.1.1` items R17-R18 | 2/2 | 100% in code |
+| `v0.2.0` items R15-R16 | 0/2 | 0% |
+| `v0.3.0` item R11 | 0/1 | 0% |
+| `v0.4.0+` items R10, R13 | 0/2 | 0% |
+| **Scheduled product work, R01-R18 excluding deferred R12 and operations R14** | **11/14** | **79%** |
+| Operations R14, R19, R20 | 1/3 | 33% |
+
+The former headline figure was "9/20 items - 45%". That denominator included
+R12, which is explicitly deferred, and three operations chores. The scheduled
+product figure above is the number that describes readiness.
+
+## Work items by release line
 
 Complexity labels describe implementation and validation effort, not importance.
 
-### Release-critical work
+### Shipped in `v0.1.0`
 
 #### R01 - Bind apply operations to fresh local and remote state
 
@@ -167,55 +238,34 @@ Complexity labels describe implementation and validation effort, not importance.
 - **High-level approach:** Completed with a local benchmark harness, documented baselines, SHA-256 payload digests, fixed/linear byte envelopes, and bounded `sprint-plan --skipped-limit` projections for model-facing output.
 - **Done when:** Token or byte budgets are documented, large-backlog benchmarks are repeatable, and CI detects material output-size regressions.
 
-### Post-`0.1.0` product work
+### `v0.1.1` - Engine correctness
 
-#### R10 - Add destructive and reverse reconciliation
+Defects in released code. Both are implemented and verified; the line is
+complete pending a release.
 
-- **Importance:** Medium
-- **Complexity:** Hard
-- **Context:** Synchronization is deliberately additive and update-only. It does not close deleted work, remove obsolete parents or dependencies, archive Project items, or reconcile remote-only changes back into local intent.
-- **High-level approach:** Define authority and conflict policies for every managed field. Introduce explicit destructive action types with stronger confirmations, remote preconditions, soft-delete/archive defaults, recovery information, and comprehensive audit tests.
-- **Done when:** Every removal or reverse-sync behavior has an explicit policy, preview, confirmation boundary, audit trail, and recovery path.
+#### R17 - Support deep dependency graphs without recursion failure
 
-#### R11 - Import existing backlogs and support bulk ingestion
-
+- **Status:** Complete on 2026-09-18; belongs to the v0.1.1 line
 - **Importance:** Medium
 - **Complexity:** Medium
-- **Context:** Ingestion handles one structured item at a time and only marked GitHub issues are managed. Adopting an established repository would therefore require significant manual work.
-- **High-level approach:** Add a read-only import preview for unmanaged issues, infer candidate types and relationships, detect duplicates, let users review mappings, assign stable ABK IDs, and apply adoption in deterministic batches.
-- **Done when:** An existing repository can be imported without modifying unselected issues, duplicate mappings are rejected, and a second import is idempotent.
+- **Context:** Prioritization and validation both walked the dependency graph recursively. Measured against the shipped v0.1.0 code, `prioritize` raised `RecursionError` from roughly 500 chained items, and `validate_manifest` raised it from roughly 1,200 items when dependencies pointed forward through sorted ids. This roadmap previously recorded the threshold as 1,200 for both; the real prioritization threshold was less than half that.
+- **High-level approach:** Completed by replacing both traversals with deterministic iterative algorithms. Cycle detection walks an explicit frame stack over sorted ids and sorted dependencies, so a reported cycle is identical to the one a recursive walk would report. Scoring resolves items in dependent-first order through a released-count queue and sums boosts in the same sorted order, so scores for unfinished work are unchanged. Cycle diagnostics are now bounded, which takes a 5,000-node cycle report from roughly 50 KB to 164 bytes.
+- **Done when:** 1,200/10,000-node chains and deep cycles have controlled results across validation and planning; existing mathematical and byte-budget checks remain valid. **Met:** 10,000-node forward and reverse chains validate and prioritize; 5,000-node cycles are still detected and reported compactly; the full suite passes and the benchmark report SHA-256 is unchanged at `0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`.
 
-#### R12 - Support multi-repository portfolio planning
+#### R18 - Enforce zero final scores for completed work
 
-- **Importance:** Later
-- **Complexity:** Hard
-- **Context:** One manifest currently targets one repository and one organization Project. Cross-repository initiatives and dependencies are outside the current authority model.
-- **High-level approach:** Separate portfolio items from repository-owned delivery items, introduce repository-qualified stable references, support cross-repository dependencies, and retain compact per-repository snapshots.
-- **Done when:** Multiple repositories can participate in one portfolio Project without ID ambiguity or loading every repository backlog into model context.
+- **Status:** Complete on 2026-09-18; belongs to the v0.1.1 line
+- **Importance:** Low
+- **Complexity:** Easy
+- **Context:** Completed work correctly scored a zero *base* score, but the dependency boost still propagated from its dependents into its *final* score. A completed item with two dependents scored 4.0 rather than 0.0, and a completed node relayed a boost to its own prerequisites.
+- **High-level approach:** Completed by zeroing the final score of any item in a done status and taking that zero as the propagated contribution, which stops boost relay through completed nodes without a second traversal. Custom done statuses are honoured. Operational status from R15 is not yet available, so this uses manifest status; R15 will supply effective status in operational mode.
+- **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct. **Met:** regression tests cover dependents, boost relay, custom done statuses, and unchanged boosting for unfinished prerequisites; no unfinished score and no documented benchmark value changed.
 
-#### R13 - Complete native transport parity and decide whether to build a dedicated MCP server
+### `v0.2.0` - GitHub operational authority
 
-- **Status:** Decision gate opened by Wave C evidence; direct GraphQL works, installed generic GitHub MCP is incomplete for Projects
-- **Importance:** High
-- **Complexity:** Hard
-- **Context:** The product requirement is native GitHub Projects interaction through the Codex GitHub integration/GitHub MCP when it exposes the complete surface, or through direct GraphQL/REST calls. Wave C proved the authenticated CLI and direct API routes can discover and create Projects, while the installed generic GitHub MCP lacks repository lifecycle, Projects, fields/views/iterations, hierarchy/dependency, issue-type, and rate-limit operations. Direct GraphQL is a first-class route, not reduced fallback behavior.
-- **High-level approach:** Formalize a capability router for three peer transports: compatible host GitHub integration/MCP, authenticated `gh` GraphQL/REST, and direct GraphQL/REST. Every declared-compatible route must emit the same compact canonical snapshots and use the shared deterministic plan, digest, apply, receipt, and verification engine. Select one complete write route per apply and report missing MCP capabilities explicitly. Use R02/R06 call counts and result shapes to decide whether a thin dedicated MCP adapter is justified; do not duplicate planning logic in that server.
-- **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence.
-
-#### R14 - Adopt organization-managed semantic releases
-
-- **Status:** Ongoing. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. Missing-baseline guard and hosted draft/partial-upload recovery remain.
-- **Importance:** High
-- **Complexity:** Medium
-- **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
-- **High-level approach:** Added organization-owned `compute-release.yml` with read-only permission and `publish-release-assets.yml` with a draft-first publisher, preserving the existing no-asset workflow. Bind preflight to the candidate SHA/tag and exact distributions; create a draft, attach and verify assets, then publish. Preserve organization ownership of tagging and releases. See [R14 design and reference-project comparison](docs/remediation-plan.md#r14-repair-shared-release-integration-f1f2).
-- **Done when:** The shared interface and caller pass permission/identity/recovery contract tests; hosted no-bump and separately authorized immutable-release evaluations pass; then protected publication and exact asset verification are recorded. Local test success alone is insufficient.
-
-### Wave E corrective work
-
-The [remediation proposal](docs/remediation-plan.md) owns detailed acceptance
-criteria and decision records for these items. They are proposed work, not
-implemented fixes or synchronized GitHub issues.
+The kit currently treats the local manifest as authoritative for operational
+fields. Both product policies are approved, so this line is implementation work
+only. R16 depends on R15.
 
 #### R15 - Respect GitHub operational status and sprint authority
 
@@ -233,25 +283,79 @@ implemented fixes or synchronized GitHub issues.
 - **Approach:** Account for retained target-sprint work once, preserve ongoing statuses, and handle work assigned elsewhere through explicit carryover review.
 - **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state.
 
-#### R17 - Support deep dependency graphs without recursion failure
+### `v0.3.0` - Adoption
 
-- **Status:** Proposed
+The gate on anyone other than the maintainer using the kit.
+
+#### R11 - Import existing backlogs and support bulk ingestion
+
 - **Importance:** Medium
 - **Complexity:** Medium
-- **Approach:** Replace recursive graph traversal/scoring with deterministic iterative algorithms; retain cycle diagnostics, score semantics, and output limits.
-- **Done when:** 1,200/10,000-node chains and deep cycles have controlled results across validation and planning; existing mathematical and byte-budget checks remain valid.
+- **Context:** Ingestion handles one structured item at a time and only marked GitHub issues are managed. Adopting an established repository would therefore require significant manual work.
+- **High-level approach:** Add a read-only import preview for unmanaged issues, infer candidate types and relationships, detect duplicates, let users review mappings, assign stable ABK IDs, and apply adoption in deterministic batches.
+- **Done when:** An existing repository can be imported without modifying unselected issues, duplicate mappings are rejected, and a second import is idempotent.
 
-#### R18 - Enforce zero final scores for completed work
+### `v0.4.0+` - Reconciliation and reach
 
-- **Status:** Proposed
-- **Importance:** Low
+#### R10 - Add destructive and reverse reconciliation
+
+- **Importance:** Medium
+- **Complexity:** Hard
+- **Context:** Synchronization is deliberately additive and update-only. It does not close deleted work, remove obsolete parents or dependencies, archive Project items, or reconcile remote-only changes back into local intent.
+- **High-level approach:** Define authority and conflict policies for every managed field. Introduce explicit destructive action types with stronger confirmations, remote preconditions, soft-delete/archive defaults, recovery information, and comprehensive audit tests.
+- **Done when:** Every removal or reverse-sync behavior has an explicit policy, preview, confirmation boundary, audit trail, and recovery path.
+
+#### R13 - Complete native transport parity and decide whether to build a dedicated MCP server
+
+- **Status:** Decision gate opened by Wave C evidence; direct GraphQL works, installed generic GitHub MCP is incomplete for Projects
+- **Importance:** High
+- **Complexity:** Hard
+- **Context:** The product requirement is native GitHub Projects interaction through the Codex GitHub integration/GitHub MCP when it exposes the complete surface, or through direct GraphQL/REST calls. Wave C proved the authenticated CLI and direct API routes can discover and create Projects, while the installed generic GitHub MCP lacks repository lifecycle, Projects, fields/views/iterations, hierarchy/dependency, issue-type, and rate-limit operations. Direct GraphQL is a first-class route, not reduced fallback behavior.
+- **High-level approach:** Formalize a capability router for three peer transports: compatible host GitHub integration/MCP, authenticated `gh` GraphQL/REST, and direct GraphQL/REST. Every declared-compatible route must emit the same compact canonical snapshots and use the shared deterministic plan, digest, apply, receipt, and verification engine. Select one complete write route per apply and report missing MCP capabilities explicitly. Use R02/R06 call counts and result shapes to decide whether a thin dedicated MCP adapter is justified; do not duplicate planning logic in that server.
+- **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence.
+
+### Unscheduled
+
+#### R12 - Support multi-repository portfolio planning
+
+- **Importance:** Later
+- **Complexity:** Hard
+- **Context:** One manifest currently targets one repository and one organization Project. Cross-repository initiatives and dependencies are outside the current authority model.
+- **High-level approach:** Separate portfolio items from repository-owned delivery items, introduce repository-qualified stable references, support cross-repository dependencies, and retain compact per-repository snapshots.
+- **Done when:** Multiple repositories can participate in one portfolio Project without ID ambiguity or loading every repository backlog into model context.
+
+### Continuous
+
+#### R21 - Run the kit against its own backlog
+
+- **Status:** In progress from 2026-09-18
+- **Importance:** High
 - **Complexity:** Easy
-- **Approach:** Zero completed final scores and stop boost propagation through completed nodes; use effective status from R15 in operational mode.
-- **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct.
+- **Context:** The kit had never been pointed at its own work. The repository carried zero GitHub issues, no manifest, and no managed Project; the only applies ever performed were against disposable evaluation fixtures. Meanwhile this roadmap maintained twenty-one work items with importance, complexity, dependencies, and status by hand in one large Markdown file - exactly the artifact the kit exists to manage.
+- **High-level approach:** Express the release lines and open work items as a tracked manifest, then drive the ordinary `init -> scaffold -> sync` lifecycle against a real Project. Treat the roadmap prose as human-readable rationale and the manifest as machine-readable intent. Record every defect this surfaces against the responsible work item rather than patching around it, because first-use friction is the point.
+- **Done when:** A tracked manifest describes the open roadmap, a scaffolded Project reflects it, a second sync plan contains zero actions, and the friction encountered is written up against the responsible work item.
+- **Known cost:** Dogfooding before R15 lands means local intent overwrites GitHub `Status` and `Sprint` on ordinary sync. That is accepted deliberately: it produces the acceptance evidence R15 and R16 need.
+
+## Operations checklist
+
+These items are release plumbing and resource cleanup. They are tracked because
+they are real and unfinished, but they are **excluded from the product
+completion basis**: none of them changes what the kit does for a user, and
+counting them alongside product work is what made the previous percentage
+misleading.
+
+#### R14 - Adopt organization-managed semantic releases
+
+- **Status:** Ongoing. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. Missing-baseline guard and hosted draft/partial-upload recovery remain.
+- **Importance:** High
+- **Complexity:** Medium
+- **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
+- **High-level approach:** Added organization-owned `compute-release.yml` with read-only permission and `publish-release-assets.yml` with a draft-first publisher, preserving the existing no-asset workflow. Bind preflight to the candidate SHA/tag and exact distributions; create a draft, attach and verify assets, then publish. Preserve organization ownership of tagging and releases. See [R14 design and reference-project comparison](docs/remediation-plan.md#r14-repair-shared-release-integration-f1f2).
+- **Done when:** The shared interface and caller pass permission/identity/recovery contract tests; hosted no-bump and separately authorized immutable-release evaluations pass; then protected publication and exact asset verification are recorded. Local test success alone is insufficient.
 
 #### R19 - Publish accurate release and remediation status
 
-- **Status:** Partial. Wave D/remediation documentation published in PRs #1/#2; the 2026-09-13 evaluation/status refresh is local and awaits protected publication/readback.
+- **Status:** Complete. Wave D/remediation documentation published in PRs #1/#2, and the 2026-09-13 evaluation/status refresh is present on `origin/main` (verified 2026-09-18: `main` is in sync with `origin/main`, no unpushed commits). The previous 'awaits publication' status was stale.
 - **Importance:** Medium
 - **Complexity:** Easy
 - **Approach:** Prepare documentation separately from unresolved R14 code; publish through the protected-branch process after applicable authorization.
@@ -265,7 +369,12 @@ implemented fixes or synchronized GitHub issues.
 - **Approach:** Refresh exact identities from the prior receipt, confirm absence of Project #4, plan only remaining resources, and stop/journal on first failure.
 - **Done when:** Remaining resources are verified absent or the owner explicitly elects retention. No deletion is authorized by this proposal.
 
-## Concurrency and dependency plan
+## Historical concurrency and dependency plan (Waves A-E)
+
+The wave plan below records how R01-R14 were sequenced and executed. It is
+retained as the delivery record for the shipped release. It does not govern the
+release lines above; those are sequenced by the dependency notes in each line.
+
 
 ### Dependency matrix
 
