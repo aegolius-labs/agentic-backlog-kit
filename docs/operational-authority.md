@@ -137,9 +137,11 @@ enforcing. Concretely:
 2. **Stop editing `status` in the manifest to drive the board.** It will not
    take effect for existing items. Use `--transition`.
 3. **Let the manifest's `status` drift.** For long-lived items it will fall out
-   of date, and that is correct - GitHub holds the current value. If you want
-   the manifest to reflect reality for offline work, refresh it from a snapshot
-   rather than treating it as the source.
+   of date, and that is correct - GitHub holds the current value. Read current
+   state with `--operational-snapshot` rather than trying to keep the manifest
+   in step by hand. There is no command that writes observed state back into
+   the manifest, and that is deliberate for now: it would reintroduce the
+   question of which copy is authoritative.
 4. **Add any board statuses you want planning to honour** to
    `workflow.statuses`, or they will be reported and ignored.
 
@@ -152,3 +154,6 @@ enforcing. Concretely:
   replanning respect an existing commitment.
 - `sprint-plan --operational-snapshot` composes fresh state for ranking, but
   capacity accounting still follows the pre-R16 rules.
+- There is no way to write observed operational state back into the manifest.
+  Offline planning therefore stays as stale as the manifest is, and the only
+  remedy is to pass a snapshot.
