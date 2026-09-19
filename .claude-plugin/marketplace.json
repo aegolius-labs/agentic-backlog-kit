@@ -10,7 +10,7 @@
     {
       "name": "agentic-backlog-kit",
       "displayName": "Agentic Backlog Kit",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Deterministic GitHub Issues and Projects backlog workflows for agents",
       "author": {
         "name": "Aegolius Labs",

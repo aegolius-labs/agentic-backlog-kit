@@ -399,7 +399,8 @@ misleading.
 
 #### R14 - Adopt organization-managed semantic releases
 
-- **Status:** Ongoing. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. Missing-baseline guard and hosted draft/partial-upload recovery remain.
+- **Status:** Ongoing. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. Missing-baseline guard (R14-F7) and hosted draft/partial-upload recovery remain, and R14-F8 was found on 2026-09-19.
+- **R14-F8 - the packaged version is not synchronized with the computed version:** the first real release-bearing merge computed `v0.1.1` while `pyproject.toml`, both plugin manifests, the marketplace entry, and `__init__.py` still declared `0.1.0`. Preflight refused with `tag 'v0.1.1' does not match package version '0.1.0'`, and no tag, draft, or asset was created - the fail-closed contract held exactly as intended. But it means every release-bearing merge fails until a human bumps five declarations and adds a CHANGELOG entry by hand, which is the opposite of delegating version calculation to the organization. Several release tests also hardcoded the current version, so a bump required editing tests.
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** The initial release used a repository-specific tag workflow. Aegolius Labs repositories are expected to delegate semantic version calculation, tagging, and GitHub Release creation to the reusable workflows maintained in `aegolius-labs/.github`.
