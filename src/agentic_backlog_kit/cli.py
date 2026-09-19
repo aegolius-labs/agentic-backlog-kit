@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -14,7 +15,9 @@ from .bootstrap import (
     bootstrap_plan_from_dict,
     build_bootstrap_plan,
 )
+from .execution import failure_hint
 from .github import (
+    GitHubApiError,
     GitHubCliTransport,
     GitHubHttpTransport,
     GitHubPlanExecutor,
@@ -42,6 +45,7 @@ from .snapshot import (
 )
 from .sprint import plan_sprint, sprint_plan_payload
 from .sync import (
+    ApplyAuthorizationError,
     apply_plan,
     build_sync_plan,
     compose_operational_state,
@@ -346,6 +350,43 @@ def _parse_transitions(
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    try:
+        return _dispatch(args)
+    except (ManifestError, GitHubApiError, ApplyAuthorizationError) as error:
+        # A rejected write should read as a decision, not a stack trace. The
+        # receipt already records the exact failing action; this is the line the
+        # operator sees, so it names the failure and, where the cause is known,
+        # what to do about it.
+        failure: dict[str, Any] = {
+            "error": type(error).__name__,
+            "message": str(error),
+        }
+        hint = failure_hint(
+            getattr(args, "command", "") or "",
+            {},
+            error,
+        )
+        receipt_path = getattr(args, "receipt", None)
+        if receipt_path and Path(receipt_path).is_file():
+            try:
+                recorded = json.loads(Path(receipt_path).read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):  # pragma: no cover - unreadable
+                recorded = {}
+            if isinstance(recorded, dict):
+                failure["receipt"] = receipt_path
+                for key in ("status", "applied_actions", "total_actions"):
+                    if key in recorded:
+                        failure[key] = recorded[key]
+                if recorded.get("failed_action"):
+                    failure["failed_action"] = recorded["failed_action"]
+                hint = recorded.get("hint") or hint
+        if hint:
+            failure["hint"] = hint
+        print(json.dumps(failure, indent=2, sort_keys=True), file=sys.stderr)
+        return 1
+
+
+def _dispatch(args: argparse.Namespace) -> int:
 
     if args.command == "init":
         path = Path(args.manifest)
@@ -638,13 +679,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = plan.as_dict()
         if args.output:
             _write_json(Path(args.output), payload)
-            _print_json(
-                {
-                    "plan": args.output,
-                    "digest": plan.digest,
-                    "actions": len(plan.actions),
-                }
-            )
+            summary = {
+                "plan": args.output,
+                "digest": plan.digest,
+                "actions": len(plan.actions),
+                "converges_in_one_apply": plan.follow_up is None,
+            }
+            if plan.follow_up:
+                summary["follow_up"] = plan.follow_up
+            _print_json(summary)
         else:
             _print_json(payload)
         return 0

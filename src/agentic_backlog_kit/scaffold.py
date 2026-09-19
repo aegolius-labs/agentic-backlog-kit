@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Callable, Iterable
 
-from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
+from .execution import ApplyReceipt, Journal, failure_hint, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
 from .views import (
     canonicalize_view,
@@ -62,12 +62,34 @@ class ScaffoldPlan:
     manifest_fingerprint: str
     snapshot_fingerprint: str
 
+    @property
+    def follow_up(self) -> str | None:
+        """Say when applying this plan will not finish the job.
+
+        GitHub cannot set a view's filter, visible fields, grouping or sorting
+        at creation time, so a newly created view is always left unconverged.
+        The kit will not delete and recreate a view to work around that, so the
+        remaining work is a second reviewed plan - and a plan that reports
+        ``completed`` while leaving the target unconverged teaches the operator
+        to distrust the status.
+        """
+
+        if any(action.kind == "project.view.create" for action in self.actions):
+            return (
+                "GitHub cannot configure a view when it is created, so each "
+                "newly created view needs one follow-up scaffold plan to "
+                "converge. Run scaffold-plan again after this apply."
+            )
+        return None
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "digest": self.digest,
             "manifest_fingerprint": self.manifest_fingerprint,
             "snapshot_fingerprint": self.snapshot_fingerprint,
             "action_count": len(self.actions),
+            "converges_in_one_apply": self.follow_up is None,
+            "follow_up": self.follow_up,
             "actions": [action.as_dict() for action in self.actions],
         }
 
@@ -368,6 +390,7 @@ def apply_scaffold_plan(
                 started_at,
                 failed_action=action.as_dict(),
                 error=f"{type(exc).__name__}: {exc}",
+                hint=failure_hint(action.kind, action.payload, exc),
             )
             if journal:
                 journal(current)
@@ -392,6 +415,7 @@ def apply_scaffold_plan(
         len(plan.actions),
         completed,
         started_at,
+        hint=plan.follow_up,
     )
     if journal:
         journal(current)

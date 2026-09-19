@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Callable, Iterable
 
-from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
+from .execution import ApplyReceipt, Journal, failure_hint, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
 from .priority import prioritize
 
@@ -559,6 +559,7 @@ def apply_plan(
                 started_at,
                 failed_action=action.as_dict(),
                 error=f"{type(exc).__name__}: {exc}",
+                hint=failure_hint(action.kind, action.payload, exc),
             )
             if journal:
                 journal(current)

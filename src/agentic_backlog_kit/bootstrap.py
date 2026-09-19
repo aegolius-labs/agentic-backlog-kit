@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from .execution import ApplyReceipt, Journal, receipt, state_fingerprint
+from .execution import ApplyReceipt, Journal, failure_hint, receipt, state_fingerprint
 from .manifest import ManifestError, default_manifest
 from .scaffold import ScaffoldAction, build_scaffold_plan
 
@@ -409,6 +409,7 @@ def apply_bootstrap_plan(
                 started_at,
                 failed_action=action.as_dict(),
                 error=f"{type(exc).__name__}: {exc}",
+                hint=failure_hint(action.kind, action.payload, exc),
             )
             if journal:
                 journal(current)

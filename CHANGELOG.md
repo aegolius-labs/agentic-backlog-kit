@@ -8,6 +8,24 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- A failed apply now records a `hint` naming the likely cause alongside the
+  failing action (R22). An unavailable native issue type names the type, the
+  remedy, and the label that would be used instead; permission, absence and
+  rate-limit failures say what to do next. Unknown causes stay silent rather
+  than guessing.
+- A scaffold plan reports `converges_in_one_apply` and, when a view is being
+  created, a `follow_up` explaining that GitHub cannot configure a view at
+  creation time and a second plan is needed (R23). The completed receipt
+  carries the same note, so a completed apply never implies a converged target.
+
+### Changed
+
+- The CLI prints a structured JSON error on stderr and exits non-zero instead
+  of raising a traceback, including the failing action and hint from the
+  receipt when one was written.
+
+### Added
+
 - Sprint planning preserves commitments (R16, carryover policy D2/A). Work
   already committed to the target sprint is retained, counted once against
   capacity, and keeps its status instead of being re-selected. Work committed

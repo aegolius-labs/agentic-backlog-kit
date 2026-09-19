@@ -125,7 +125,7 @@ What shipped is recorded after the fact.
 | Initial release | M0-M5, R01-R09 | `v0.1.0` | **Shipped** 2026-09-04 |
 | Engine correctness | R17, R18 | `v0.1.1` | **Shipped** 2026-09-19 |
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
-| Apply ergonomics | R22, R23 | - | Next; raised by first use |
+| Apply ergonomics | R22, R23 | pending | **Complete**; raised by first use |
 | Adoption | R11 | - | Not started |
 | Reconciliation and reach | R10, R13 | - | Not started |
 | Unscheduled | R12, R24 | - | Deferred |
@@ -162,11 +162,11 @@ effort, production readiness, or safety approval.
 | Initial release milestones M0-M5 | 6/6 | 100% |
 | Initial release items R01-R09 | 9/9 | 100% |
 | Engine correctness R17-R18 | 2/2 | 100% |
-| Apply ergonomics R22-R23 | 0/2 | 0% |
+| Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 0/1 | 0% |
 | Reconciliation and reach R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **13/16** | **81%** |
+| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **15/16** | **94%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -287,7 +287,7 @@ Defects in released code.
 - **High-level approach:** Completed by zeroing the final score of any item in a done status and taking that zero as the propagated contribution, which stops boost relay through completed nodes without a second traversal. Custom done statuses are honoured. Operational status from R15 is not yet available, so this uses manifest status; R15 will supply effective status in operational mode.
 - **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct. **Met:** regression tests cover dependents, boost relay, custom done statuses, and unchanged boosting for unfinished prerequisites; no unfinished score and no documented benchmark value changed.
 
-### Apply ergonomics - next
+### Apply ergonomics - complete
 
 Raised by first use rather than by planning. Apply is correct but does not
 explain itself: a failure names no item, and a completed scaffold can leave the
@@ -295,21 +295,21 @@ target unconverged.
 
 #### R22 - Report actionable apply failures
 
-- **Status:** Ready
+- **Status:** Complete on 2026-09-19
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** A failed apply surfaced as `GitHub API error 1: gh: Validation Failed (HTTP 422)`, naming no item, no field and no reason. Diagnosis required reading the receipt for the failing action, querying the organization's issue types by hand, and then reading the transport source. The receipt is good; the operator-facing message is not.
 - **High-level approach:** Carry the failing action's item id, endpoint and rejected field into the error the operator sees. Name known causes explicitly, including an unavailable native issue type, and state the fallback actually taken.
-- **Done when:** A failed action names the item id and the rejected field, a known cause is named rather than implied, and the remedy or the fallback taken is stated.
+- **Done when:** A failed action names the item id and the rejected field, a known cause is named rather than implied, and the remedy or the fallback taken is stated. **Met:** every apply path records a `hint` in its receipt alongside the failing action, and the CLI prints a structured JSON error with that hint on stderr and exits non-zero instead of raising a traceback. Hints cover the causes first use actually hit - an unavailable native issue type names the type, the remedy and the label that would be used instead; permission, absence and rate-limit failures name what to do next - and stay silent rather than guessing at an unknown cause.
 
 #### R23 - Converge a fresh Project in one scaffold apply
 
-- **Status:** Ready
+- **Status:** Complete on 2026-09-19, by the second of its two acceptable outcomes
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** `project.view.create` cannot carry a filter, visible-field list, grouping or sorting, so every created view needs an immediate repair pass. Scaffolding a fresh Project reported `completed` at 17 of 17 actions while leaving three views unconverged; convergence arrived only on the third plan. The kit is correct here and never deletes and recreates a view to work around the API boundary, but a `completed` apply that leaves the target unconverged trains the operator to distrust the status.
 - **High-level approach:** Either sequence view creation and configuration within one reviewed apply, or state plainly in the plan that a second pass is required and why.
-- **Done when:** A fresh Project converges in one reviewed apply, or the plan says a second pass is required; a completed status never implies a converged target when it is not.
+- **Done when:** A fresh Project converges in one reviewed apply, or the plan says a second pass is required; a completed status never implies a converged target when it is not. **Met by the second clause.** GitHub's view-creation input does not accept a filter, visible fields, grouping or sorting, and the kit will not delete and recreate a view to work around that boundary, so a newly created view genuinely cannot converge in the apply that creates it. A plan containing any `project.view.create` now reports `converges_in_one_apply: false` with a `follow_up` explaining why and what to run next, and the completed apply receipt carries the same note. Hiding the boundary behind a silent retry would misreport what the API can do.
 
 ### Operational authority - shipped in `v0.2.0` and `v0.3.0`
 
@@ -338,7 +338,7 @@ so this line was implementation work only.
 - **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state. **Met:** work already committed to the target sprint is retained, counted once, and keeps its status, including when it is `Blocked` or not yet ready; work committed to another sprint is withheld from automatic selection however highly it ranks, and moves only when named in `--carryover`; commitments beyond capacity report an explicit `overage` rather than dropping work; and every carryover request is rejected before planning when it names unknown, complete, already-targeted, or unassigned work, or omits a target sprint.
 - **Scope note:** commitment is relative to a target, so an untargeted `sprint-plan` ignores sprint assignment and ranks the whole backlog exactly as before. `--skipped-limit` now projects the retained and carryover lists too, which keeps a 10,000-item plan at roughly 8 KB instead of 555 KB.
 
-### Adoption - next after apply ergonomics
+### Adoption - next
 
 The gate on anyone other than the maintainer using the kit.
 
