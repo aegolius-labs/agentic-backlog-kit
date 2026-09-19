@@ -18,6 +18,31 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   Labs reusable Conventional Release workflow, guarded by a dry-run version
   computation, package/plugin preflight, and post-upload asset verification.
 
+## [0.1.1] - 2026-09-19
+
+### Fixed
+
+- Resolved dependency graphs iteratively. Prioritization previously raised
+  `RecursionError` from roughly 500 chained items and validation from roughly
+  1,200; 10,000-node chains now resolve, deep cycles are still detected, and
+  cycle diagnostics are bounded to a fixed length.
+- Zeroed the final score of completed work. The dependency boost still
+  propagated from dependents into a completed item's final score, so finished
+  work could outrank and inflate the work that remained.
+- Recovered the HTTP 422 that `gh api` reports only as exit code 1, for issue
+  create and update. In `native_or_label` mode an unavailable native issue type
+  is meant to fall back to a type label, and that fallback could never fire on
+  the CLI route: the same manifest converged through the direct API and failed
+  mid-apply through `gh`.
+
+### Changed
+
+- Re-cut the roadmap into release lines, each counted against its own
+  membership, and recorded the first-use findings from managing this
+  repository's own backlog through the kit.
+- Synchronized the package, plugin, and marketplace version declarations so a
+  release-bearing merge matches the computed semantic version.
+
 ## [0.1.0] - 2026-09-04
 
 ### Changed

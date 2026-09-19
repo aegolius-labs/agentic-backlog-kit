@@ -147,6 +147,33 @@ authority policy.
 is correct and documented behavior, but the JSON carries no indication of why a
 lower score outranks a higher one, and the column reads as a sorting bug.
 
+### F11 - A release-bearing merge cannot publish without a hand-written version bump
+
+**Owner:** R14, as R14-F8. **Status:** worked around here, not fixed.
+
+Merging the first release-bearing change exercised the organization release
+automation for real. `compute-version` correctly derived `v0.1.1` from the
+`fix:` commit. Preflight then refused:
+
+```
+release check failed: tag 'v0.1.1' does not match package version '0.1.0'; expected 'v0.1.0'
+```
+
+No tag, no draft, and no asset were created, and the `release` job was skipped.
+The fail-closed contract held exactly as intended, and the repository was left
+in a consistent state.
+
+The gap is that nothing synchronizes the packaged version with the computed one.
+Publishing required hand-editing five declarations - `pyproject.toml`, both
+plugin manifests, the marketplace entry and `__init__.py` - and adding a
+CHANGELOG entry. Delegating version calculation to the organization while
+requiring a human to predict its answer and write it into five files is not
+delegation.
+
+Four release tests also hardcoded `0.1.0`, so the bump required editing tests.
+Those now derive the expected version from the package, with deliberately
+unequal constants where a test needs a genuine mismatch.
+
 ## Evidence
 
 | Artifact | Value |

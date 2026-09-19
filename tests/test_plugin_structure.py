@@ -5,6 +5,9 @@ import unittest
 from pathlib import Path
 
 
+from agentic_backlog_kit import __version__
+
+
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_SKILLS = {
     "backlog-init",
@@ -23,7 +26,7 @@ class PluginStructureTests(unittest.TestCase):
 
         self.assertEqual("agentic-backlog-kit", plugin["name"])
         self.assertEqual("./skills/", plugin["skills"])
-        self.assertEqual("0.1.0", plugin["version"])
+        self.assertEqual(__version__, plugin["version"])
 
     def test_all_focused_skills_have_metadata_and_no_placeholders(self) -> None:
         actual = {

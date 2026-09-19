@@ -7,11 +7,16 @@ import unittest
 import zipfile
 from pathlib import Path
 
+from agentic_backlog_kit import __version__
+
 from scripts.release_check import ReleaseCheckError, validate_release
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.0"
+VERSION = __version__
+# Deliberately unequal to VERSION so drift cases stay drift cases after a bump.
+DRIFTED_VERSION = "9.9.9"
+MISMATCHED_TAG = f"v{DRIFTED_VERSION}"
 
 
 def _write_wheel(
@@ -77,7 +82,7 @@ class ReleaseCheckTests(unittest.TestCase):
             dist = Path(directory)
             _write_artifacts(dist)
 
-            report = validate_release(ROOT, dist, tag="v0.1.0")
+            report = validate_release(ROOT, dist, tag=f"v{VERSION}")
 
         self.assertEqual(VERSION, report.version)
         self.assertEqual(("wheel", "sdist"), tuple(item.kind for item in report.artifacts))
@@ -89,7 +94,7 @@ class ReleaseCheckTests(unittest.TestCase):
             _write_artifacts(dist)
 
             with self.assertRaisesRegex(ReleaseCheckError, "does not match"):
-                validate_release(ROOT, dist, tag="v0.1.1")
+                validate_release(ROOT, dist, tag=MISMATCHED_TAG)
 
     def test_rejects_unexpected_stale_asset(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -98,15 +103,15 @@ class ReleaseCheckTests(unittest.TestCase):
             (dist / "notes.txt").write_text("not a release asset", encoding="utf-8")
 
             with self.assertRaisesRegex(ReleaseCheckError, "unexpected release assets"):
-                validate_release(ROOT, dist, tag="v0.1.0")
+                validate_release(ROOT, dist, tag=f"v{VERSION}")
 
     def test_rejects_wheel_metadata_version_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            _write_artifacts(dist, metadata_version="0.1.1")
+            _write_artifacts(dist, metadata_version=DRIFTED_VERSION)
 
             with self.assertRaisesRegex(ReleaseCheckError, "metadata version"):
-                validate_release(ROOT, dist, tag="v0.1.0")
+                validate_release(ROOT, dist, tag=f"v{VERSION}")
 
     def test_rejects_artifacts_missing_commercial_notice(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -114,7 +119,7 @@ class ReleaseCheckTests(unittest.TestCase):
             _write_artifacts(dist, include_commercial=False)
 
             with self.assertRaisesRegex(ReleaseCheckError, "COMMERCIAL.md"):
-                validate_release(ROOT, dist, tag="v0.1.0")
+                validate_release(ROOT, dist, tag=f"v{VERSION}")
 
 
 if __name__ == "__main__":
