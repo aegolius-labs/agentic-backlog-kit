@@ -113,17 +113,24 @@ release-engineering chores, and disposable-resource cleanup, so its completion
 percentage carried no information about product readiness. Work is now grouped
 into release lines, each with its own membership and its own denominator.
 
-| Line | Theme | Items | State |
+Lines are named by theme, not by version number. Version numbers are computed
+by the organization's release automation from Conventional Commit history, so a
+roadmap that predicts them is guessing at an answer it does not own - and it
+guessed wrong: the operational-authority line landed as `v0.2.0` and `v0.3.0`
+rather than the single `v0.2.0` an earlier revision of this table asserted.
+What shipped is recorded after the fact.
+
+| Line | Items | Shipped as | State |
 | --- | --- | --- | --- |
-| `v0.1.0` | Initial release | M0-M5, R01-R09 | **Shipped** 2026-09-04 |
-| `v0.1.1` | Engine correctness | R17, R18 | **Complete in code**, awaiting release |
-| `v0.1.2` | Apply ergonomics | R22, R23 | Not started; raised by first use |
-| `v0.2.0` | GitHub operational authority | R15, R16 | **Complete** |
-| `v0.3.0` | Adoption | R11 | Not started |
-| `v0.4.0+` | Reconciliation and reach | R10, R13 | Not started |
-| Unscheduled | Portfolio scale and hierarchy | R12, R24 | Deferred |
-| Continuous | Dogfooding | R21 | Converged; reporting open |
-| Operations | Release plumbing and cleanup | R14, R19, R20 | Excluded from product basis |
+| Initial release | M0-M5, R01-R09 | `v0.1.0` | **Shipped** 2026-09-04 |
+| Engine correctness | R17, R18 | `v0.1.1` | **Shipped** 2026-09-19 |
+| Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
+| Apply ergonomics | R22, R23 | - | Next; raised by first use |
+| Adoption | R11 | - | Not started |
+| Reconciliation and reach | R10, R13 | - | Not started |
+| Unscheduled | R12, R24 | - | Deferred |
+| Continuous | R21 | - | Converged; reporting open |
+| Operations | R14, R19, R20 | - | Excluded from product basis |
 
 Two rankings changed deliberately:
 
@@ -136,13 +143,14 @@ Two rankings changed deliberately:
   product whose value is managing an existing GitHub backlog, import is the
   gate on adoption by anyone, not a post-release enhancement.
 
-A third line was added after the fact. `v0.1.2` did not come from planning:
-R22 and R23 are what first use of the kit on its own backlog exposed, and
-they are recorded here rather than folded silently into other work. See
+A third line was added after the fact. Apply ergonomics did not come from
+planning: R22 and R23 are what first use of the kit on its own backlog exposed,
+and they are recorded here rather than folded silently into other work. See
 [first-use findings](docs/dogfooding-findings-2026-09-18.md).
 
-`v0.1.1` needed no product decision from the owner, and `v0.2.0` needs none
-either: D1 and carryover policy A are already approved.
+Neither shipped line needed a product decision from the owner, and neither does
+the adoption line: D1 and carryover policy A were approved before any of this
+was written.
 
 ## Completion basis
 
@@ -151,13 +159,13 @@ effort, production readiness, or safety approval.
 
 | Basis | Complete | Share |
 | --- | --- | --- |
-| `v0.1.0` milestones M0-M5 | 6/6 | 100% |
-| `v0.1.0` items R01-R09 | 9/9 | 100% |
-| `v0.1.1` items R17-R18 | 2/2 | 100% in code |
-| `v0.1.2` items R22-R23 | 0/2 | 0% |
-| `v0.2.0` items R15-R16 | 2/2 | 100% |
-| `v0.3.0` item R11 | 0/1 | 0% |
-| `v0.4.0+` items R10, R13 | 0/2 | 0% |
+| Initial release milestones M0-M5 | 6/6 | 100% |
+| Initial release items R01-R09 | 9/9 | 100% |
+| Engine correctness R17-R18 | 2/2 | 100% |
+| Apply ergonomics R22-R23 | 0/2 | 0% |
+| Operational authority R15-R16 | 2/2 | 100% |
+| Adoption R11 | 0/1 | 0% |
+| Reconciliation and reach R10, R13 | 0/2 | 0% |
 | **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **13/16** | **81%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
@@ -257,14 +265,13 @@ Complexity labels describe implementation and validation effort, not importance.
 - **High-level approach:** Completed with a local benchmark harness, documented baselines, SHA-256 payload digests, fixed/linear byte envelopes, and bounded `sprint-plan --skipped-limit` projections for model-facing output.
 - **Done when:** Token or byte budgets are documented, large-backlog benchmarks are repeatable, and CI detects material output-size regressions.
 
-### `v0.1.1` - Engine correctness
+### Engine correctness - shipped in `v0.1.1`
 
-Defects in released code. Both are implemented and verified; the line is
-complete pending a release.
+Defects in released code.
 
 #### R17 - Support deep dependency graphs without recursion failure
 
-- **Status:** Complete on 2026-09-18; belongs to the v0.1.1 line
+- **Status:** Shipped in `v0.1.1` on 2026-09-19
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** Prioritization and validation both walked the dependency graph recursively. Measured against the shipped v0.1.0 code, `prioritize` raised `RecursionError` from roughly 500 chained items, and `validate_manifest` raised it from roughly 1,200 items when dependencies pointed forward through sorted ids. This roadmap previously recorded the threshold as 1,200 for both; the real prioritization threshold was less than half that.
@@ -273,14 +280,14 @@ complete pending a release.
 
 #### R18 - Enforce zero final scores for completed work
 
-- **Status:** Complete on 2026-09-18; belongs to the v0.1.1 line
+- **Status:** Shipped in `v0.1.1` on 2026-09-19
 - **Importance:** Low
 - **Complexity:** Easy
 - **Context:** Completed work correctly scored a zero *base* score, but the dependency boost still propagated from its dependents into its *final* score. A completed item with two dependents scored 4.0 rather than 0.0, and a completed node relayed a boost to its own prerequisites.
 - **High-level approach:** Completed by zeroing the final score of any item in a done status and taking that zero as the propagated contribution, which stops boost relay through completed nodes without a second traversal. Custom done statuses are honoured. Operational status from R15 is not yet available, so this uses manifest status; R15 will supply effective status in operational mode.
 - **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct. **Met:** regression tests cover dependents, boost relay, custom done statuses, and unchanged boosting for unfinished prerequisites; no unfinished score and no documented benchmark value changed.
 
-### `v0.1.2` - Apply ergonomics
+### Apply ergonomics - next
 
 Raised by first use rather than by planning. Apply is correct but does not
 explain itself: a failure names no item, and a completed scaffold can leave the
@@ -304,15 +311,16 @@ target unconverged.
 - **High-level approach:** Either sequence view creation and configuration within one reviewed apply, or state plainly in the plan that a second pass is required and why.
 - **Done when:** A fresh Project converges in one reviewed apply, or the plan says a second pass is required; a completed status never implies a converged target when it is not.
 
-### `v0.2.0` - GitHub operational authority
+### Operational authority - shipped in `v0.2.0` and `v0.3.0`
 
-The kit currently treats the local manifest as authoritative for operational
-fields. Both product policies are approved, so this line is implementation work
-only. R16 depends on R15.
+The kit treated the local manifest as authoritative for operational fields, so
+ordinary synchronization reverted what the board recorded and replanning moved
+work between sprints on its own. Both product policies were already approved,
+so this line was implementation work only.
 
 #### R15 - Respect GitHub operational status and sprint authority
 
-- **Status:** Complete on 2026-09-19; verified live against Project 6
+- **Status:** Shipped in `v0.2.0` on 2026-09-19; verified live against Project 6
 - **Design note:** [operational authority](docs/operational-authority.md)
 - **Importance:** High
 - **Complexity:** Hard
@@ -322,7 +330,7 @@ only. R16 depends on R15.
 
 #### R16 - Preserve sprint commitments and review carryover
 
-- **Status:** Complete on 2026-09-19
+- **Status:** Shipped in `v0.3.0` on 2026-09-19
 - **Design note:** [sprint commitments](docs/sprint-commitments.md)
 - **Importance:** Medium
 - **Complexity:** Medium
@@ -330,7 +338,7 @@ only. R16 depends on R15.
 - **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state. **Met:** work already committed to the target sprint is retained, counted once, and keeps its status, including when it is `Blocked` or not yet ready; work committed to another sprint is withheld from automatic selection however highly it ranks, and moves only when named in `--carryover`; commitments beyond capacity report an explicit `overage` rather than dropping work; and every carryover request is rejected before planning when it names unknown, complete, already-targeted, or unassigned work, or omits a target sprint.
 - **Scope note:** commitment is relative to a target, so an untargeted `sprint-plan` ignores sprint assignment and ranks the whole backlog exactly as before. `--skipped-limit` now projects the retained and carryover lists too, which keeps a 10,000-item plan at roughly 8 KB instead of 555 KB.
 
-### `v0.3.0` - Adoption
+### Adoption - next after apply ergonomics
 
 The gate on anyone other than the maintainer using the kit.
 
@@ -342,7 +350,7 @@ The gate on anyone other than the maintainer using the kit.
 - **High-level approach:** Add a read-only import preview for unmanaged issues, infer candidate types and relationships, detect duplicates, let users review mappings, assign stable ABK IDs, and apply adoption in deterministic batches.
 - **Done when:** An existing repository can be imported without modifying unselected issues, duplicate mappings are rejected, and a second import is idempotent.
 
-### `v0.4.0+` - Reconciliation and reach
+### Reconciliation and reach
 
 #### R10 - Add destructive and reverse reconciliation
 
