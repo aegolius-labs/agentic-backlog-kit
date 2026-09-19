@@ -32,6 +32,24 @@ shared main history and that workflow contents match the reviewed fixtures.
 The corrected caller merged in ABK PR #2. Hosted no-bump and Plan L immutable
 publication passed; missing-baseline handling and hosted failure recovery remain.
 
+### Versions are stamped, never predicted
+
+Nothing in the tree needs to declare the next version. `set_version.py` writes
+the computed version into `pyproject.toml`, both plugin manifests, the
+marketplace entry and `__init__.py`, and promotes the changelog's
+`## [Unreleased]` section into that version's entry. Preflight runs it against
+the candidate checkout before building, so the distributions carry the computed
+version and `release_check.py` compares like with like.
+
+Nothing is committed or pushed. The tag remains the record of what a version
+means, and the tree's declared version is simply the last one stamped there.
+Contributors write changelog entries under `## [Unreleased]` without knowing
+which release will carry them.
+
+This closes R14-F8. Before it, a release-bearing merge computed a tag the tree
+could not match, and preflight refused - correctly, and twice, because the
+manual bump is exactly the kind of step people forget.
+
 A stable version baseline is currently required: untagged feature history can
 silently compute no release (R14-F7). A clear no-write prerequisite guard is
 planned. Do not treat a successful untagged no-op as first-release support or
@@ -40,8 +58,9 @@ create a baseline automatically. Plan L used an explicitly approved fixture tag.
 1. `compute-release.yml` runs with contents read permission, computes the
    Conventional Commit version without tagging or bootstrap writes, and binds
    candidate SHA and tag-state fingerprint. No-bump skips remaining jobs.
-2. ABK checks out the exact candidate, runs tests/help/budgets, builds and
-   smoke-tests the package, and uses `release_check.py` to enforce aligned
+2. ABK checks out the exact candidate, runs tests/help/budgets, stamps the
+   computed version with `set_version.py`, then builds and smoke-tests the
+   package and uses `release_check.py` to enforce aligned
    package/runtime/plugin/changelog metadata. `release_inventory.py` binds the
    exact two files, sizes/hashes, tag, SHA, tag state, and notes. The upload's
    artifact ID and inventory hash become publisher inputs.

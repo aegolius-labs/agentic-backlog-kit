@@ -56,6 +56,10 @@ jobs:
           python -B -m unittest discover -s tests -v
           python -B scripts/backlog.py --help
           python -B scripts/benchmark.py --check
+      - name: Stamp the computed release version
+        run: |
+          python scripts/set_version.py --version "$RELEASE_VERSION"
+          python -c "import sys; sys.path.insert(0, 'src'); import agentic_backlog_kit as p; assert p.__version__ == '$RELEASE_VERSION', p.__version__"
       - name: Build and validate distributions
         run: |
           python -m pip install build
