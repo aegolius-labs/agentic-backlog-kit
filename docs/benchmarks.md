@@ -45,16 +45,23 @@ gate.
 These are the compact-JSON baselines produced by generator
 `r09-representative-v1` on 2026-08-27. Each cell is `bytes (estimated tokens)`.
 The release-candidate rerun after Wave B's view and iteration changes produced
-the values below; the report was byte-for-byte identical on Windows and local
-Ubuntu WSL (report SHA-256
-`0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3`).
+these values; that report's SHA-256 was
+`0c8e76542847797eda4d30c764476599cc253e1725fd339d889e83df846addf3` and it was
+byte-for-byte identical on Windows and local Ubuntu WSL.
+
+R15 and R18 changed one row. Completed work now scores zero and is released
+first so it cannot hold back its dependents, which reorders the ranked head
+wherever a fixture contains completed items and slightly shrinks the
+`prioritize` window. Every other operation is unchanged. The current report
+SHA-256 is
+`ba1b6ac6cba38315f5e5658b6e535eca0f1801c646656d5e06ae618d99eb592e`.
 
 | Operation | 100 items | 1,000 items | 10,000 items |
 | --- | ---: | ---: | ---: |
 | `summary` | 115 (29) | 123 (31) | 131 (33) |
 | `show` | 569 (143) | 569 (143) | 569 (143) |
 | `next` | 180 (45) | 180 (45) | 181 (46) |
-| `prioritize` (limit 20) | 3,494 (874) | 3,485 (872) | 3,486 (872) |
+| `prioritize` (limit 20) | 3,455 (864) | 3,362 (841) | 3,362 (841) |
 | `sprint-plan` | 6,090 (1,523) | 47,472 (11,868) | 461,313 (115,329) |
 | `sprint-plan --skipped-limit 50` | 4,272 (1,068) | 4,267 (1,067) | 4,269 (1,068) |
 | `snapshot` artifact | 75,240 (18,810) | 753,349 (188,338) | 7,552,509 (1,888,128) |

@@ -7,7 +7,7 @@ from agentic_backlog_kit.manifest import (
     ManifestError,
     validate_manifest,
 )
-from agentic_backlog_kit.priority import prioritize
+from agentic_backlog_kit.priority import prioritize, select_next
 
 from tests.helpers import item, manifest
 
@@ -141,3 +141,54 @@ class CompletedWorkScoringTests(unittest.TestCase):
         scores = {scored.id: scored.priority_score for scored in prioritize(data)}
 
         self.assertEqual(0.0, scores["T-SHIPPED"])
+
+class CompletedWorkOrderingTests(unittest.TestCase):
+    """Completed work must not hold back the work that depends on it."""
+
+    def test_completed_prerequisite_does_not_delay_its_dependent(self) -> None:
+        data = manifest(
+            item("T-DONE", status="Done"),
+            item("T-NEXT", depends_on=["T-DONE"], impact=5, business_value=5),
+            item("T-OTHER", impact=1, business_value=1, enabler_value=0),
+        )
+
+        order = [entry.id for entry in prioritize(data)]
+
+        # The finished prerequisite is released first, so its dependent is
+        # ranked on its own merit rather than behind lower-value work.
+        self.assertLess(order.index("T-NEXT"), order.index("T-OTHER"))
+
+    def test_select_next_prefers_the_highest_scoring_executable_item(self) -> None:
+        data = manifest(
+            item("T-DONE", status="Done"),
+            item("T-HIGH", depends_on=["T-DONE"], impact=5, business_value=5),
+            item("T-LOW", impact=1, business_value=1, enabler_value=0),
+        )
+
+        selected = select_next(data)
+
+        self.assertEqual("T-HIGH", selected.id)
+
+    def test_completed_work_is_still_returned_in_dependency_valid_order(self) -> None:
+        data = manifest(
+            item("T-ROOT", status="Done"),
+            item("T-MID", depends_on=["T-ROOT"], status="Done"),
+            item("T-LEAF", depends_on=["T-MID"]),
+        )
+
+        order = [entry.id for entry in prioritize(data)]
+
+        self.assertEqual(["T-ROOT", "T-MID", "T-LEAF"], order)
+
+    def test_ordering_is_deterministic_across_repeated_runs(self) -> None:
+        data = manifest(
+            item("T-DONE", status="Done"),
+            item("T-A", depends_on=["T-DONE"]),
+            item("T-B", depends_on=["T-DONE"]),
+            item("T-C"),
+        )
+
+        first = [entry.id for entry in prioritize(data)]
+        second = [entry.id for entry in prioritize(data)]
+
+        self.assertEqual(first, second)

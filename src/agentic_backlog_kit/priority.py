@@ -89,19 +89,34 @@ def prioritize(manifest: dict[str, Any]) -> list[ScoredItem]:
         for dependency in item["depends_on"]:
             dependents[dependency].append(item_id)
 
-    queue: list[tuple[float, str]] = []
+    done_statuses = set(data["workflow"]["done_statuses"])
+
+    def rank(item_id: str) -> tuple[int, float, str]:
+        """Order the release queue, completed work first.
+
+        Completed work scores zero, so ranking it by score alone would release
+        it last and hold back everything that depends on it - which is the
+        opposite of the truth, because finished work blocks nothing.  Releasing
+        it first keeps the order dependency-valid and lets the work that is
+        genuinely next surface at the front.
+        """
+
+        is_open = 0 if items[item_id]["status"] in done_statuses else 1
+        return (is_open, -final_scores[item_id], item_id)
+
+    queue: list[tuple[int, float, str]] = []
     for item_id, count in remaining_dependencies.items():
         if count == 0:
-            heapq.heappush(queue, (-final_scores[item_id], item_id))
+            heapq.heappush(queue, rank(item_id))
 
     ordered_ids: list[str] = []
     while queue:
-        _, item_id = heapq.heappop(queue)
+        _, _, item_id = heapq.heappop(queue)
         ordered_ids.append(item_id)
         for dependent in sorted(dependents[item_id]):
             remaining_dependencies[dependent] -= 1
             if remaining_dependencies[dependent] == 0:
-                heapq.heappush(queue, (-final_scores[dependent], dependent))
+                heapq.heappush(queue, rank(dependent))
 
     return [
         ScoredItem(
@@ -127,6 +142,7 @@ def select_next(manifest: dict[str, Any]) -> ScoredItem | None:
     done_statuses = set(data["workflow"]["done_statuses"])
     work_item_types = set(data["workflow"]["work_item_types"])
 
+    best: ScoredItem | None = None
     for scored in prioritize(data):
         item = by_id[scored.id]
         if item["type"] not in work_item_types:
@@ -137,6 +153,9 @@ def select_next(manifest: dict[str, Any]) -> ScoredItem | None:
             continue
         if any(by_id[dependency]["status"] not in done_statuses for dependency in item["depends_on"]):
             continue
-        return scored
-    return None
+        # Take the highest-scoring executable item rather than the first one
+        # the dependency order happens to reach; ties keep that order.
+        if best is None or scored.priority_score > best.priority_score:
+            best = scored
+    return best
 
