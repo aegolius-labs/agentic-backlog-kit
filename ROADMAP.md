@@ -125,8 +125,8 @@ What shipped is recorded after the fact.
 | Initial release | M0-M5, R01-R09 | `v0.1.0` | **Shipped** 2026-09-04 |
 | Engine correctness | R17, R18 | `v0.1.1` | **Shipped** 2026-09-19 |
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
-| Apply ergonomics | R22, R23 | pending | **Complete**; raised by first use |
-| Adoption | R11 | pending | **Complete** |
+| Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
+| Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
 | Reconciliation and reach | R10, R13 | - | Not started |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
@@ -166,12 +166,17 @@ effort, production readiness, or safety approval.
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
 | Reconciliation and reach R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **16/16** | **100%** |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23 | **16/18** | **89%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
 R12, which is explicitly deferred, and three operations chores. The scheduled
 product figure above is the number that describes readiness.
+
+R10 and R13 are the two scheduled items still open, which is why this figure
+is 89% rather than 100%. An earlier revision of this table said 16/16; that
+was arithmetic that quietly dropped them, and a completion basis that loses
+its own open items is worse than no basis at all.
 
 That figure fell from 79% to 69% when R22 and R23 were added. Nothing
 regressed: the denominator grew because using the product found work that
@@ -287,7 +292,7 @@ Defects in released code.
 - **High-level approach:** Completed by zeroing the final score of any item in a done status and taking that zero as the propagated contribution, which stops boost relay through completed nodes without a second traversal. Custom done statuses are honoured. Operational status from R15 is not yet available, so this uses manifest status; R15 will supply effective status in operational mode.
 - **Done when:** Completed prerequisites score zero for default/custom done statuses, while unfinished graph scores and stable ordering remain correct. **Met:** regression tests cover dependents, boost relay, custom done statuses, and unchanged boosting for unfinished prerequisites; no unfinished score and no documented benchmark value changed.
 
-### Apply ergonomics - complete
+### Apply ergonomics - shipped in `v0.4.0`
 
 Raised by first use rather than by planning. Apply is correct but does not
 explain itself: a failure names no item, and a completed scaffold can leave the
@@ -295,7 +300,7 @@ target unconverged.
 
 #### R22 - Report actionable apply failures
 
-- **Status:** Complete on 2026-09-19
+- **Status:** Shipped in `v0.4.0` on 2026-09-19
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** A failed apply surfaced as `GitHub API error 1: gh: Validation Failed (HTTP 422)`, naming no item, no field and no reason. Diagnosis required reading the receipt for the failing action, querying the organization's issue types by hand, and then reading the transport source. The receipt is good; the operator-facing message is not.
@@ -304,7 +309,7 @@ target unconverged.
 
 #### R23 - Converge a fresh Project in one scaffold apply
 
-- **Status:** Complete on 2026-09-19, by the second of its two acceptable outcomes
+- **Status:** Shipped in `v0.4.0` on 2026-09-19, by the second of its two acceptable outcomes
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** `project.view.create` cannot carry a filter, visible-field list, grouping or sorting, so every created view needs an immediate repair pass. Scaffolding a fresh Project reported `completed` at 17 of 17 actions while leaving three views unconverged; convergence arrived only on the third plan. The kit is correct here and never deletes and recreates a view to work around the API boundary, but a `completed` apply that leaves the target unconverged trains the operator to distrust the status.
@@ -338,13 +343,13 @@ so this line was implementation work only.
 - **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state. **Met:** work already committed to the target sprint is retained, counted once, and keeps its status, including when it is `Blocked` or not yet ready; work committed to another sprint is withheld from automatic selection however highly it ranks, and moves only when named in `--carryover`; commitments beyond capacity report an explicit `overage` rather than dropping work; and every carryover request is rejected before planning when it names unknown, complete, already-targeted, or unassigned work, or omits a target sprint.
 - **Scope note:** commitment is relative to a target, so an untargeted `sprint-plan` ignores sprint assignment and ranks the whole backlog exactly as before. `--skipped-limit` now projects the retained and carryover lists too, which keeps a 10,000-item plan at roughly 8 KB instead of 555 KB.
 
-### Adoption - complete
+### Adoption - shipped in `v0.5.0`
 
 The gate on anyone other than the maintainer using the kit.
 
 #### R11 - Import existing backlogs and support bulk ingestion
 
-- **Status:** Complete on 2026-09-19; verified live by adopting issue #63
+- **Status:** Shipped in `v0.5.0` on 2026-09-19; verified live by adopting issue #63
 - **Design note:** [adopting an existing backlog](docs/importing.md)
 - **Importance:** Medium
 - **Complexity:** Medium
