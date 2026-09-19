@@ -865,7 +865,10 @@ class GitHubPlanExecutor:
             self.service.add_project_item(
                 self._get(action.item_id), action.payload["fields"]
             )
-        elif action.kind == "project.set_fields":
+        elif action.kind in {"project.set_fields", "project.transition"}:
+            # A transition writes the same Project fields as any other update;
+            # what makes it a transition is the reviewed, drift-bound plan that
+            # authorized it, not a different mutation.
             self.service.set_project_fields(
                 self._get(action.item_id), action.payload["fields"]
             )
