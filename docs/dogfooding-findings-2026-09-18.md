@@ -149,7 +149,7 @@ lower score outranks a higher one, and the column reads as a sorting bug.
 
 ### F11 - A release-bearing merge cannot publish without a hand-written version bump
 
-**Owner:** R14, as R14-F8. **Status:** worked around here, not fixed.
+**Owner:** R14, as R14-F8. **Status:** worked around on 2026-09-18, fixed on 2026-09-19.
 
 Merging the first release-bearing change exercised the organization release
 automation for real. `compute-version` correctly derived `v0.1.1` from the
@@ -169,6 +169,15 @@ plugin manifests, the marketplace entry and `__init__.py` - and adding a
 CHANGELOG entry. Delegating version calculation to the organization while
 requiring a human to predict its answer and write it into five files is not
 delegation.
+
+The fix is `scripts/set_version.py`, run by release preflight against the
+candidate checkout before building. It stamps the computed version across all
+five declarations and promotes the changelog's Unreleased section into that
+version's entry. Nothing is committed or pushed, so the tag remains the record
+of what a version means and no one has to predict the automation's answer.
+The second release-bearing merge hit the same wall before this landed, which
+is the argument for fixing a papercut at the source rather than working
+around it twice.
 
 Four release tests also hardcoded `0.1.0`, so the bump required editing tests.
 Those now derive the expected version from the package, with deliberately

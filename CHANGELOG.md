@@ -6,6 +6,38 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-19
+
+### Added
+
+- GitHub now owns `Status` and the iteration field for work it already tracks
+  (R15, policy D1). Ordinary synchronization no longer rewrites them, so a card
+  someone moves on the board survives the next sync. A new item still receives
+  the manifest's operational defaults the first time it is projected.
+- `sync-plan --transition ID=STATUS` and `--transition-sprint ID=SPRINT` move
+  operational state deliberately. A transition is recorded in the plan, folded
+  into its digest, and bound to the value observed at planning time, so a
+  concurrent change aborts the apply before any write.
+- `prioritize`, `next` and `sprint-plan` accept `--operational-snapshot` to rank
+  against fresh GitHub state, report whether they used `github` or
+  `local-intent` state, and expose differences with
+  `--report-operational-drift`.
+- `scripts/set_version.py` stamps the computed release version across every
+  declaration and promotes the changelog's Unreleased section, so the
+  organization's computed version reaches the package without a manual bump
+  (R14-F8).
+
+### Fixed
+
+- Completed work is released before unfinished work when ordering the backlog.
+  Scoring it zero had made it sort last, which held back everything depending
+  on it: the next executable item could be a lower-value one while the
+  genuinely next work sank out of the ranked head.
+- `select_next` returns the highest-scoring executable item rather than the
+  first one dependency order happens to reach.
+- A sync plan is scored against the state it intends to leave behind, so a
+  transition and its derived `Priority` settle in one apply.
+
 ### Documentation
 
 - Recorded the completed Wave D publication, hosted CI, branch protection,
