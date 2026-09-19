@@ -61,22 +61,58 @@
   },
   "items": [
     {
-      "id": "INIT-ABK",
-      "title": "Make the Agentic Backlog Kit a finished product",
-      "type": "Initiative",
-      "description": "Take the kit from a shipped v0.1.0 that only its author can use to a product another team can adopt on an existing repository.",
+      "id": "EPIC-CONT",
+      "title": "Continuous - dogfooding and evidence",
+      "type": "Epic",
+      "description": "Run the kit on its own work so first-use friction is discovered by its maintainers rather than by its first adopter.",
       "acceptance_criteria": [
-        "Every release line has an owner, a denominator, and a done definition",
-        "The kit manages its own backlog through its own workflows"
+        "The kit's own roadmap is managed through the kit"
       ],
-      "parent": null,
+      "parent": "INIT-ABK",
       "depends_on": [],
-      "impact": 5,
-      "effort": 5,
-      "business_value": 5,
-      "enabler_value": 5,
+      "impact": 4,
+      "effort": 1,
+      "business_value": 4,
+      "enabler_value": 4,
       "status": "In Progress",
       "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-OPS",
+      "title": "Operations - release plumbing and cleanup",
+      "type": "Epic",
+      "description": "Release automation and disposable-resource cleanup. Excluded from the product completion basis: none of it changes what the kit does.",
+      "acceptance_criteria": [
+        "Release automation is organization-managed and recoverable",
+        "No orphaned evaluation resources remain"
+      ],
+      "parent": "INIT-ABK",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 2,
+      "status": "In Progress",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-UNSCHED",
+      "title": "Unscheduled - portfolio scale",
+      "type": "Epic",
+      "description": "Work that is understood but deliberately not scheduled.",
+      "acceptance_criteria": [
+        "Revisited only after the adoption line lands"
+      ],
+      "parent": "INIT-ABK",
+      "depends_on": [],
+      "impact": 1,
+      "effort": 5,
+      "business_value": 2,
+      "enabler_value": 2,
+      "status": "Inbox",
+      "maturity": "idea",
       "sprint": null
     },
     {
@@ -114,6 +150,25 @@
       "enabler_value": 3,
       "status": "In Review",
       "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "EPIC-V012",
+      "title": "v0.1.2 - Apply ergonomics",
+      "type": "Epic",
+      "description": "First use of the kit on its own backlog showed that apply succeeds but does not explain itself: a failure names no item, and a completed scaffold can still leave the target unconverged.",
+      "acceptance_criteria": [
+        "An apply failure names the item, the field, and the reason",
+        "One scaffold apply converges a fresh Project"
+      ],
+      "parent": "INIT-ABK",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "refined",
       "sprint": null
     },
     {
@@ -173,56 +228,36 @@
       "sprint": null
     },
     {
-      "id": "EPIC-UNSCHED",
-      "title": "Unscheduled - portfolio scale",
-      "type": "Epic",
-      "description": "Work that is understood but deliberately not scheduled.",
-      "acceptance_criteria": [
-        "Revisited only after the adoption line lands"
-      ],
-      "parent": "INIT-ABK",
+      "id": "GH-63",
+      "title": "Infer hierarchy and dependencies when importing existing issues",
+      "type": "Task",
+      "description": "Import (R11) adopts an existing issue with a neutral type, no parent and no dependencies.\n\nGitHub already records sub-issue links and `blocked_by` dependencies for these issues, so an import preview could propose that structure rather than flattening it. It does not yet: every adopted item lands with `parent: null` and `depends_on: []`, and a human has to rebuild the shape by hand.\n\nReading it costs one extra request per issue for the parent and one for dependencies, which is why the first cut left it out. Worth revisiting once import has been used on a repository big enough to care.\n\nFound while implementing R11 on 2026-09-19.",
+      "acceptance_criteria": [],
+      "parent": null,
       "depends_on": [],
-      "impact": 1,
-      "effort": 5,
-      "business_value": 2,
-      "enabler_value": 2,
+      "impact": 3,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 0,
       "status": "Inbox",
       "maturity": "idea",
       "sprint": null
     },
     {
-      "id": "EPIC-CONT",
-      "title": "Continuous - dogfooding and evidence",
-      "type": "Epic",
-      "description": "Run the kit on its own work so first-use friction is discovered by its maintainers rather than by its first adopter.",
+      "id": "INIT-ABK",
+      "title": "Make the Agentic Backlog Kit a finished product",
+      "type": "Initiative",
+      "description": "Take the kit from a shipped v0.1.0 that only its author can use to a product another team can adopt on an existing repository.",
       "acceptance_criteria": [
-        "The kit's own roadmap is managed through the kit"
+        "Every release line has an owner, a denominator, and a done definition",
+        "The kit manages its own backlog through its own workflows"
       ],
-      "parent": "INIT-ABK",
+      "parent": null,
       "depends_on": [],
-      "impact": 4,
-      "effort": 1,
-      "business_value": 4,
-      "enabler_value": 4,
-      "status": "In Progress",
-      "maturity": "ready",
-      "sprint": null
-    },
-    {
-      "id": "EPIC-OPS",
-      "title": "Operations - release plumbing and cleanup",
-      "type": "Epic",
-      "description": "Release automation and disposable-resource cleanup. Excluded from the product completion basis: none of it changes what the kit does.",
-      "acceptance_criteria": [
-        "Release automation is organization-managed and recoverable",
-        "No orphaned evaluation resources remain"
-      ],
-      "parent": "INIT-ABK",
-      "depends_on": [],
-      "impact": 3,
-      "effort": 3,
-      "business_value": 2,
-      "enabler_value": 2,
+      "impact": 5,
+      "effort": 5,
+      "business_value": 5,
+      "enabler_value": 5,
       "status": "In Progress",
       "maturity": "ready",
       "sprint": null
@@ -414,44 +449,110 @@
       "sprint": null
     },
     {
-      "id": "R17",
-      "title": "R17 - Support deep dependency graphs without recursion failure",
+      "id": "R10",
+      "title": "R10 - Add destructive and reverse reconciliation",
       "type": "Feature",
-      "description": "Prioritization raised RecursionError from roughly 500 chained items and validation from roughly 1,200. Both traversals are now iterative and cycle diagnostics are bounded.",
+      "description": "Synchronization is deliberately additive and update-only: it does not close deleted work, remove obsolete parents, archive Project items, or reconcile remote-only changes back into local intent.",
       "acceptance_criteria": [
-        "10,000-node forward and reverse chains validate and prioritize",
-        "Deep cycles are still detected and reported compactly",
-        "The benchmark report digest is unchanged"
+        "Every removal has explicit policy, preview, confirmation, audit, and recovery"
       ],
-      "parent": "EPIC-V011",
-      "depends_on": [],
+      "parent": "EPIC-V040",
+      "depends_on": [
+        "R01",
+        "R15",
+        "R16"
+      ],
       "impact": 3,
-      "effort": 3,
-      "business_value": 4,
-      "enabler_value": 4,
-      "status": "Done",
-      "maturity": "ready",
+      "effort": 5,
+      "business_value": 3,
+      "enabler_value": 3,
+      "status": "Refining",
+      "maturity": "idea",
       "sprint": null
     },
     {
-      "id": "R18",
-      "title": "R18 - Enforce zero final scores for completed work",
+      "id": "R11",
+      "title": "R11 - Import existing backlogs and support bulk ingestion",
       "type": "Feature",
-      "description": "The dependency boost propagated into the final score of completed work, so a Done item with two dependents scored 4.0 instead of 0.0 and relayed a boost to its own prerequisites.",
+      "description": "Ingestion handles one structured item at a time and only marked issues are managed, so the kit is usable only on a greenfield repository. This is the gate on adoption by anyone other than the maintainer.",
       "acceptance_criteria": [
-        "Completed prerequisites score zero for default and custom done statuses",
-        "Unfinished graph scores and stable ordering are unchanged"
+        "An existing repository imports without modifying unselected issues",
+        "Duplicate mappings are rejected",
+        "A second import is idempotent"
       ],
-      "parent": "EPIC-V011",
+      "parent": "EPIC-V030",
       "depends_on": [
-        "R17"
+        "R15",
+        "R16"
       ],
-      "impact": 2,
-      "effort": 1,
-      "business_value": 3,
+      "impact": 3,
+      "effort": 3,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R12",
+      "title": "R12 - Support multi-repository portfolio planning",
+      "type": "Feature",
+      "description": "One manifest targets one repository and one organization Project. Deliberately deferred until the adoption line lands.",
+      "acceptance_criteria": [
+        "Multiple repositories participate in one portfolio without ID ambiguity"
+      ],
+      "parent": "EPIC-UNSCHED",
+      "depends_on": [
+        "R10",
+        "R11"
+      ],
+      "impact": 1,
+      "effort": 5,
+      "business_value": 2,
       "enabler_value": 2,
-      "status": "Done",
-      "maturity": "ready",
+      "status": "Inbox",
+      "maturity": "idea",
+      "sprint": null
+    },
+    {
+      "id": "R13",
+      "title": "R13 - Complete native transport parity and decide on a dedicated MCP server",
+      "type": "Feature",
+      "description": "Authenticated gh and direct GraphQL are proven peers. The installed generic GitHub MCP lacks the Projects surface and fails capability preflight without writing.",
+      "acceptance_criteria": [
+        "Every declared-compatible route produces equivalent plans and state",
+        "The dedicated-MCP decision is recorded with token and call evidence"
+      ],
+      "parent": "EPIC-V040",
+      "depends_on": [
+        "R02",
+        "R06"
+      ],
+      "impact": 4,
+      "effort": 5,
+      "business_value": 3,
+      "enabler_value": 4,
+      "status": "Refining",
+      "maturity": "idea",
+      "sprint": null
+    },
+    {
+      "id": "R14",
+      "title": "R14 - Adopt organization-managed semantic releases",
+      "type": "Feature",
+      "description": "Version calculation, tagging, and Release creation are delegated to the reusable workflows in aegolius-labs/.github. Hosted no-bump and immutable publication passed; missing-baseline handling and recovery proof remain.",
+      "acceptance_criteria": [
+        "The shared interface and caller pass permission and recovery tests",
+        "Hosted failure recovery after draft creation is proven"
+      ],
+      "parent": "EPIC-OPS",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 3,
+      "status": "In Progress",
+      "maturity": "refined",
       "sprint": null
     },
     {
@@ -498,133 +599,44 @@
       "sprint": null
     },
     {
-      "id": "R11",
-      "title": "R11 - Import existing backlogs and support bulk ingestion",
+      "id": "R17",
+      "title": "R17 - Support deep dependency graphs without recursion failure",
       "type": "Feature",
-      "description": "Ingestion handles one structured item at a time and only marked issues are managed, so the kit is usable only on a greenfield repository. This is the gate on adoption by anyone other than the maintainer.",
+      "description": "Prioritization raised RecursionError from roughly 500 chained items and validation from roughly 1,200. Both traversals are now iterative and cycle diagnostics are bounded.",
       "acceptance_criteria": [
-        "An existing repository imports without modifying unselected issues",
-        "Duplicate mappings are rejected",
-        "A second import is idempotent"
+        "10,000-node forward and reverse chains validate and prioritize",
+        "Deep cycles are still detected and reported compactly",
+        "The benchmark report digest is unchanged"
       ],
-      "parent": "EPIC-V030",
-      "depends_on": [
-        "R15",
-        "R16"
-      ],
+      "parent": "EPIC-V011",
+      "depends_on": [],
       "impact": 3,
       "effort": 3,
-      "business_value": 5,
-      "enabler_value": 4,
-      "status": "Ready",
-      "maturity": "refined",
-      "sprint": null
-    },
-    {
-      "id": "R10",
-      "title": "R10 - Add destructive and reverse reconciliation",
-      "type": "Feature",
-      "description": "Synchronization is deliberately additive and update-only: it does not close deleted work, remove obsolete parents, archive Project items, or reconcile remote-only changes back into local intent.",
-      "acceptance_criteria": [
-        "Every removal has explicit policy, preview, confirmation, audit, and recovery"
-      ],
-      "parent": "EPIC-V040",
-      "depends_on": [
-        "R01",
-        "R15",
-        "R16"
-      ],
-      "impact": 3,
-      "effort": 5,
-      "business_value": 3,
-      "enabler_value": 3,
-      "status": "Refining",
-      "maturity": "idea",
-      "sprint": null
-    },
-    {
-      "id": "R13",
-      "title": "R13 - Complete native transport parity and decide on a dedicated MCP server",
-      "type": "Feature",
-      "description": "Authenticated gh and direct GraphQL are proven peers. The installed generic GitHub MCP lacks the Projects surface and fails capability preflight without writing.",
-      "acceptance_criteria": [
-        "Every declared-compatible route produces equivalent plans and state",
-        "The dedicated-MCP decision is recorded with token and call evidence"
-      ],
-      "parent": "EPIC-V040",
-      "depends_on": [
-        "R02",
-        "R06"
-      ],
-      "impact": 4,
-      "effort": 5,
-      "business_value": 3,
-      "enabler_value": 4,
-      "status": "Refining",
-      "maturity": "idea",
-      "sprint": null
-    },
-    {
-      "id": "R12",
-      "title": "R12 - Support multi-repository portfolio planning",
-      "type": "Feature",
-      "description": "One manifest targets one repository and one organization Project. Deliberately deferred until the adoption line lands.",
-      "acceptance_criteria": [
-        "Multiple repositories participate in one portfolio without ID ambiguity"
-      ],
-      "parent": "EPIC-UNSCHED",
-      "depends_on": [
-        "R10",
-        "R11"
-      ],
-      "impact": 1,
-      "effort": 5,
-      "business_value": 2,
-      "enabler_value": 2,
-      "status": "Inbox",
-      "maturity": "idea",
-      "sprint": null
-    },
-    {
-      "id": "R21",
-      "title": "R21 - Run the kit against its own backlog",
-      "type": "Feature",
-      "description": "The kit had never been pointed at its own work: zero issues, no manifest, no managed Project. This roadmap was maintained by hand in one large Markdown file - exactly the artifact the kit exists to manage.",
-      "acceptance_criteria": [
-        "A tracked manifest describes the open roadmap",
-        "A scaffolded Project reflects it",
-        "A second sync plan contains zero actions",
-        "Friction is written up against the responsible work item"
-      ],
-      "parent": "EPIC-CONT",
-      "depends_on": [
-        "R17"
-      ],
-      "impact": 4,
-      "effort": 1,
       "business_value": 4,
       "enabler_value": 4,
-      "status": "In Progress",
+      "status": "Done",
       "maturity": "ready",
       "sprint": null
     },
     {
-      "id": "R14",
-      "title": "R14 - Adopt organization-managed semantic releases",
+      "id": "R18",
+      "title": "R18 - Enforce zero final scores for completed work",
       "type": "Feature",
-      "description": "Version calculation, tagging, and Release creation are delegated to the reusable workflows in aegolius-labs/.github. Hosted no-bump and immutable publication passed; missing-baseline handling and recovery proof remain.",
+      "description": "The dependency boost propagated into the final score of completed work, so a Done item with two dependents scored 4.0 instead of 0.0 and relayed a boost to its own prerequisites.",
       "acceptance_criteria": [
-        "The shared interface and caller pass permission and recovery tests",
-        "Hosted failure recovery after draft creation is proven"
+        "Completed prerequisites score zero for default and custom done statuses",
+        "Unfinished graph scores and stable ordering are unchanged"
       ],
-      "parent": "EPIC-OPS",
-      "depends_on": [],
-      "impact": 4,
-      "effort": 3,
-      "business_value": 2,
-      "enabler_value": 3,
-      "status": "In Progress",
-      "maturity": "refined",
+      "parent": "EPIC-V011",
+      "depends_on": [
+        "R17"
+      ],
+      "impact": 2,
+      "effort": 1,
+      "business_value": 3,
+      "enabler_value": 2,
+      "status": "Done",
+      "maturity": "ready",
       "sprint": null
     },
     {
@@ -663,6 +675,169 @@
       "enabler_value": 1,
       "status": "Ready",
       "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R21",
+      "title": "R21 - Run the kit against its own backlog",
+      "type": "Feature",
+      "description": "The kit had never been pointed at its own work: zero issues, no manifest, no managed Project. This roadmap was maintained by hand in one large Markdown file - exactly the artifact the kit exists to manage.",
+      "acceptance_criteria": [
+        "A tracked manifest describes the open roadmap",
+        "A scaffolded Project reflects it",
+        "A second sync plan contains zero actions",
+        "Friction is written up against the responsible work item"
+      ],
+      "parent": "EPIC-CONT",
+      "depends_on": [
+        "R17"
+      ],
+      "impact": 4,
+      "effort": 1,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "In Progress",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "R22",
+      "title": "R22 - Report actionable apply failures",
+      "type": "Feature",
+      "description": "An apply failure surfaces as 'GitHub API error 1: gh: Validation Failed (HTTP 422)', naming no item, field or reason. Diagnosis required reading the receipt, querying organization issue types by hand, and reading the transport source. The receipt is good; the operator-facing message is not.",
+      "acceptance_criteria": [
+        "A failed action names the item id and the rejected field",
+        "A known cause such as an unavailable issue type is named explicitly",
+        "The remedy or the fallback taken is stated"
+      ],
+      "parent": "EPIC-V012",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R23",
+      "title": "R23 - Converge a fresh Project in one scaffold apply",
+      "type": "Feature",
+      "description": "project.view.create cannot carry a filter, visible fields, grouping or sorting, so every created view needs an immediate repair pass. The first apply reports completed with 17 of 17 actions while leaving three views unconverged; convergence arrives only on the third plan.",
+      "acceptance_criteria": [
+        "A fresh Project converges in one reviewed apply, or the plan states plainly that a second pass is required",
+        "A completed status never implies a converged target when it is not"
+      ],
+      "parent": "EPIC-V012",
+      "depends_on": [
+        "R22"
+      ],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "R24",
+      "title": "R24 - Reconsider hierarchy expressiveness for small work",
+      "type": "Feature",
+      "description": "The hierarchy is a strict ladder and a parent must be exactly one level above its child, so a small chore directly under a Feature has no type: Task is reserved for level 5 under a Story or Bug. Six decomposed items had to be retyped from Task to Story, which overstates them. This may be intentional; it is recorded rather than scheduled.",
+      "acceptance_criteria": [
+        "A decision is recorded either way, with the modeling rationale"
+      ],
+      "parent": "EPIC-UNSCHED",
+      "depends_on": [],
+      "impact": 2,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 1,
+      "status": "Inbox",
+      "maturity": "idea",
+      "sprint": null
+    },
+    {
+      "id": "S-R11-1",
+      "title": "Preview unmanaged issues read-only",
+      "type": "Story",
+      "description": "A read-only import preview lists unmanaged issues with inferred types and relationships, touching nothing.",
+      "acceptance_criteria": [
+        "The preview performs no writes",
+        "Unselected issues are never modified"
+      ],
+      "parent": "R11",
+      "depends_on": [
+        "S-R15-2"
+      ],
+      "impact": 5,
+      "effort": 3,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Refining",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "S-R11-2",
+      "title": "Assign stable IDs and apply adoption in deterministic batches",
+      "type": "Story",
+      "description": "Reviewed mappings receive stable local IDs and are adopted in deterministic batches.",
+      "acceptance_criteria": [
+        "Duplicate mappings are rejected",
+        "A second import is idempotent"
+      ],
+      "parent": "R11",
+      "depends_on": [
+        "S-R11-1"
+      ],
+      "impact": 5,
+      "effort": 3,
+      "business_value": 5,
+      "enabler_value": 4,
+      "status": "Refining",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "S-R14-1",
+      "title": "Enforce the release baseline prerequisite without auto-tagging",
+      "type": "Bug",
+      "description": "Untagged release-bearing history silently analyzed zero commits before baseline setup (R14-F7). The prerequisite must be explicit and must not create a tag on its own.",
+      "acceptance_criteria": [
+        "A missing baseline fails loudly",
+        "No tag is created automatically"
+      ],
+      "parent": "R14",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 3,
+      "status": "Ready",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "S-R14-2",
+      "title": "Prove hosted recovery after draft creation and partial upload",
+      "type": "Story",
+      "description": "Local recovery tests are insufficient; recovery must be demonstrated on a hosted run.",
+      "acceptance_criteria": [
+        "A hosted run recovers from a partial asset upload"
+      ],
+      "parent": "R14",
+      "depends_on": [
+        "S-R14-1"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 2,
+      "status": "Ready",
+      "maturity": "ready",
       "sprint": null
     },
     {
@@ -787,45 +962,22 @@
       "sprint": null
     },
     {
-      "id": "S-R11-1",
-      "title": "Preview unmanaged issues read-only",
+      "id": "S-R20-1",
+      "title": "Refresh disposable resource identities before any cleanup plan",
       "type": "Story",
-      "description": "A read-only import preview lists unmanaged issues with inferred types and relationships, touching nothing.",
+      "description": "The prior receipt's identities are stale. Confirm absence of Project #4 and enumerate what actually remains.",
       "acceptance_criteria": [
-        "The preview performs no writes",
-        "Unselected issues are never modified"
+        "Remaining resources are enumerated from fresh discovery",
+        "No deletion is performed under this item"
       ],
-      "parent": "R11",
-      "depends_on": [
-        "S-R15-2"
-      ],
-      "impact": 5,
-      "effort": 3,
-      "business_value": 5,
-      "enabler_value": 4,
-      "status": "Refining",
-      "maturity": "refined",
-      "sprint": null
-    },
-    {
-      "id": "S-R11-2",
-      "title": "Assign stable IDs and apply adoption in deterministic batches",
-      "type": "Story",
-      "description": "Reviewed mappings receive stable local IDs and are adopted in deterministic batches.",
-      "acceptance_criteria": [
-        "Duplicate mappings are rejected",
-        "A second import is idempotent"
-      ],
-      "parent": "R11",
-      "depends_on": [
-        "S-R11-1"
-      ],
-      "impact": 5,
-      "effort": 3,
-      "business_value": 5,
-      "enabler_value": 4,
-      "status": "Refining",
-      "maturity": "refined",
+      "parent": "R20",
+      "depends_on": [],
+      "impact": 2,
+      "effort": 1,
+      "business_value": 1,
+      "enabler_value": 1,
+      "status": "Ready",
+      "maturity": "ready",
       "sprint": null
     },
     {
@@ -888,124 +1040,6 @@
       "sprint": null
     },
     {
-      "id": "S-R14-1",
-      "title": "Enforce the release baseline prerequisite without auto-tagging",
-      "type": "Bug",
-      "description": "Untagged release-bearing history silently analyzed zero commits before baseline setup (R14-F7). The prerequisite must be explicit and must not create a tag on its own.",
-      "acceptance_criteria": [
-        "A missing baseline fails loudly",
-        "No tag is created automatically"
-      ],
-      "parent": "R14",
-      "depends_on": [],
-      "impact": 4,
-      "effort": 3,
-      "business_value": 2,
-      "enabler_value": 3,
-      "status": "Ready",
-      "maturity": "ready",
-      "sprint": null
-    },
-    {
-      "id": "S-R14-2",
-      "title": "Prove hosted recovery after draft creation and partial upload",
-      "type": "Story",
-      "description": "Local recovery tests are insufficient; recovery must be demonstrated on a hosted run.",
-      "acceptance_criteria": [
-        "A hosted run recovers from a partial asset upload"
-      ],
-      "parent": "R14",
-      "depends_on": [
-        "S-R14-1"
-      ],
-      "impact": 4,
-      "effort": 3,
-      "business_value": 2,
-      "enabler_value": 2,
-      "status": "Ready",
-      "maturity": "ready",
-      "sprint": null
-    },
-    {
-      "id": "S-R20-1",
-      "title": "Refresh disposable resource identities before any cleanup plan",
-      "type": "Story",
-      "description": "The prior receipt's identities are stale. Confirm absence of Project #4 and enumerate what actually remains.",
-      "acceptance_criteria": [
-        "Remaining resources are enumerated from fresh discovery",
-        "No deletion is performed under this item"
-      ],
-      "parent": "R20",
-      "depends_on": [],
-      "impact": 2,
-      "effort": 1,
-      "business_value": 1,
-      "enabler_value": 1,
-      "status": "Ready",
-      "maturity": "ready",
-      "sprint": null
-    },
-    {
-      "id": "EPIC-V012",
-      "title": "v0.1.2 - Apply ergonomics",
-      "type": "Epic",
-      "description": "First use of the kit on its own backlog showed that apply succeeds but does not explain itself: a failure names no item, and a completed scaffold can still leave the target unconverged.",
-      "acceptance_criteria": [
-        "An apply failure names the item, the field, and the reason",
-        "One scaffold apply converges a fresh Project"
-      ],
-      "parent": "INIT-ABK",
-      "depends_on": [],
-      "impact": 4,
-      "effort": 3,
-      "business_value": 4,
-      "enabler_value": 3,
-      "status": "Ready",
-      "maturity": "refined",
-      "sprint": null
-    },
-    {
-      "id": "R22",
-      "title": "R22 - Report actionable apply failures",
-      "type": "Feature",
-      "description": "An apply failure surfaces as 'GitHub API error 1: gh: Validation Failed (HTTP 422)', naming no item, field or reason. Diagnosis required reading the receipt, querying organization issue types by hand, and reading the transport source. The receipt is good; the operator-facing message is not.",
-      "acceptance_criteria": [
-        "A failed action names the item id and the rejected field",
-        "A known cause such as an unavailable issue type is named explicitly",
-        "The remedy or the fallback taken is stated"
-      ],
-      "parent": "EPIC-V012",
-      "depends_on": [],
-      "impact": 4,
-      "effort": 3,
-      "business_value": 4,
-      "enabler_value": 4,
-      "status": "Ready",
-      "maturity": "refined",
-      "sprint": null
-    },
-    {
-      "id": "R23",
-      "title": "R23 - Converge a fresh Project in one scaffold apply",
-      "type": "Feature",
-      "description": "project.view.create cannot carry a filter, visible fields, grouping or sorting, so every created view needs an immediate repair pass. The first apply reports completed with 17 of 17 actions while leaving three views unconverged; convergence arrives only on the third plan.",
-      "acceptance_criteria": [
-        "A fresh Project converges in one reviewed apply, or the plan states plainly that a second pass is required",
-        "A completed status never implies a converged target when it is not"
-      ],
-      "parent": "EPIC-V012",
-      "depends_on": [
-        "R22"
-      ],
-      "impact": 3,
-      "effort": 3,
-      "business_value": 4,
-      "enabler_value": 3,
-      "status": "Ready",
-      "maturity": "refined",
-      "sprint": null
-    },
-    {
       "id": "S-R22-1",
       "title": "Name the item and rejected field on apply failure",
       "type": "Story",
@@ -1043,24 +1077,6 @@
       "enabler_value": 3,
       "status": "Ready",
       "maturity": "refined",
-      "sprint": null
-    },
-    {
-      "id": "R24",
-      "title": "R24 - Reconsider hierarchy expressiveness for small work",
-      "type": "Feature",
-      "description": "The hierarchy is a strict ladder and a parent must be exactly one level above its child, so a small chore directly under a Feature has no type: Task is reserved for level 5 under a Story or Bug. Six decomposed items had to be retyped from Task to Story, which overstates them. This may be intentional; it is recorded rather than scheduled.",
-      "acceptance_criteria": [
-        "A decision is recorded either way, with the modeling rationale"
-      ],
-      "parent": "EPIC-UNSCHED",
-      "depends_on": [],
-      "impact": 2,
-      "effort": 3,
-      "business_value": 2,
-      "enabler_value": 1,
-      "status": "Inbox",
-      "maturity": "idea",
       "sprint": null
     }
   ]
