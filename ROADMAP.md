@@ -126,7 +126,7 @@ What shipped is recorded after the fact.
 | Engine correctness | R17, R18 | `v0.1.1` | **Shipped** 2026-09-19 |
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | pending | **Complete**; raised by first use |
-| Adoption | R11 | - | Not started |
+| Adoption | R11 | pending | **Complete** |
 | Reconciliation and reach | R10, R13 | - | Not started |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
@@ -164,9 +164,9 @@ effort, production readiness, or safety approval.
 | Engine correctness R17-R18 | 2/2 | 100% |
 | Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
-| Adoption R11 | 0/1 | 0% |
+| Adoption R11 | 1/1 | 100% |
 | Reconciliation and reach R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **15/16** | **94%** |
+| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **16/16** | **100%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -338,17 +338,21 @@ so this line was implementation work only.
 - **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state. **Met:** work already committed to the target sprint is retained, counted once, and keeps its status, including when it is `Blocked` or not yet ready; work committed to another sprint is withheld from automatic selection however highly it ranks, and moves only when named in `--carryover`; commitments beyond capacity report an explicit `overage` rather than dropping work; and every carryover request is rejected before planning when it names unknown, complete, already-targeted, or unassigned work, or omits a target sprint.
 - **Scope note:** commitment is relative to a target, so an untargeted `sprint-plan` ignores sprint assignment and ranks the whole backlog exactly as before. `--skipped-limit` now projects the retained and carryover lists too, which keeps a 10,000-item plan at roughly 8 KB instead of 555 KB.
 
-### Adoption - next
+### Adoption - complete
 
 The gate on anyone other than the maintainer using the kit.
 
 #### R11 - Import existing backlogs and support bulk ingestion
 
+- **Status:** Complete on 2026-09-19; verified live by adopting issue #63
+- **Design note:** [adopting an existing backlog](docs/importing.md)
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** Ingestion handles one structured item at a time and only marked GitHub issues are managed. Adopting an established repository would therefore require significant manual work.
 - **High-level approach:** Add a read-only import preview for unmanaged issues, infer candidate types and relationships, detect duplicates, let users review mappings, assign stable ABK IDs, and apply adoption in deterministic batches.
-- **Done when:** An existing repository can be imported without modifying unselected issues, duplicate mappings are rejected, and a second import is idempotent.
+- **Done when:** An existing repository can be imported without modifying unselected issues, duplicate mappings are rejected, and a second import is idempotent. **Met:** `import-plan` reads and writes nothing and reports why every unproposed issue was left out; `import-apply` adopts only the reviewed plan, prepending the marker and preserving the existing body, and touches no other issue; a colliding id is refused outright while a colliding title is withheld unless explicitly allowed; and a marked issue is no longer unmanaged, so a second plan proposes nothing. Verified live end to end: issue #63 was adopted, and the next sync plan recognised it as existing rather than creating a duplicate.
+- **Found while verifying:** adoption marks GitHub before the manifest records the item, and the first live run failed in between, stranding the issue as managed on GitHub and unknown locally. `import-plan` now reports such `orphans` and `import-reconcile` repairs them locally, because GitHub is already correct. The ordering cannot be inverted: writing the manifest first would make synchronization create duplicates if the GitHub write then failed.
+- **Deliberately out of scope:** hierarchy and dependency inference, which costs an extra request per issue. Tracked as the adopted issue #63 itself.
 
 ### Reconciliation and reach
 

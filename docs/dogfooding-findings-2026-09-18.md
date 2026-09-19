@@ -183,6 +183,27 @@ Four release tests also hardcoded `0.1.0`, so the bump required editing tests.
 Those now derive the expected version from the package, with deliberately
 unequal constants where a test needs a genuine mismatch.
 
+### F12 - Adoption marked GitHub before the manifest could record it
+
+**Owner:** R11. **Status:** fixed on 2026-09-19.
+
+The first live adoption wrote the marker to issue #63, then failed before
+saving the manifest - `save_manifest` requires an `expected_sha256` the caller
+did not pass. GitHub was mutated; the manifest was not.
+
+That left the issue stranded in the one state neither workflow handles: import
+skipped it because it was already marked, and synchronization ignored it
+because no item claimed it.
+
+The immediate cause was a missing argument. The durable fix is that the state
+is now nameable and repairable: `import-plan` reports `orphans`, and
+`import-reconcile` records them locally under the ids GitHub already uses,
+touching nothing remote because GitHub is already correct.
+
+The ordering cannot be inverted. Writing the manifest first would make
+synchronization create duplicates if the GitHub write then failed, which is
+worse than a recoverable orphan.
+
 ## Evidence
 
 | Artifact | Value |

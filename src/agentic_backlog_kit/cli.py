@@ -16,6 +16,15 @@ from .bootstrap import (
     build_bootstrap_plan,
 )
 from .execution import failure_hint
+from .importing import (
+    ImportExecutor,
+    apply_import_plan,
+    build_import_plan,
+    find_orphans,
+    import_plan_from_dict,
+    merge_imported_items,
+    reconcile_orphans,
+)
 from .github import (
     GitHubApiError,
     GitHubCliTransport,
@@ -200,6 +209,51 @@ def _parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--manifest", default=DEFAULT_MANIFEST)
     snapshot.add_argument("--output")
     snapshot.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+
+    import_plan = commands.add_parser(
+        "import-plan", help="Preview adopting issues the repository already has"
+    )
+    import_plan.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    import_plan.add_argument("--snapshot", help="Unmanaged issue listing to reuse")
+    import_plan.add_argument("--output")
+    import_plan.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+    import_plan.add_argument(
+        "--include",
+        action="append",
+        type=int,
+        metavar="NUMBER",
+        help="Adopt only these issue numbers; repeat per issue",
+    )
+    import_plan.add_argument(
+        "--limit", type=int, help="Adopt at most this many issues"
+    )
+    import_plan.add_argument(
+        "--allow-duplicate-titles",
+        action="store_true",
+        help="Adopt an issue whose title already exists in the manifest",
+    )
+
+    import_reconcile = commands.add_parser(
+        "import-reconcile",
+        help="Record marked issues the manifest lost, without touching GitHub",
+    )
+    import_reconcile.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    import_reconcile.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
+
+    import_apply = commands.add_parser(
+        "import-apply", help="Adopt one exact reviewed import plan"
+    )
+    import_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    import_apply.add_argument("--plan", required=True)
+    import_apply.add_argument("--confirm", required=True)
+    import_apply.add_argument(
+        "--receipt", default=".agentic-backlog/receipts/import-apply.json"
+    )
+    import_apply.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
 
     sync_plan = commands.add_parser("sync-plan", help="Preview GitHub changes")
     sync_plan.add_argument("--manifest", default=DEFAULT_MANIFEST)
@@ -600,6 +654,102 @@ def _dispatch(args: argparse.Namespace) -> int:
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})
         else:
             _print_json(snapshot)
+        return 0
+    if args.command in {"import-plan", "import-apply", "import-reconcile"}:
+        github = manifest["github"]
+        transport = _transport(args.backend)
+        reader = GitHubSnapshotReader(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+        )
+        if args.command == "import-plan":
+            if args.snapshot:
+                unmanaged = json.loads(
+                    Path(args.snapshot).read_text(encoding="utf-8")
+                )
+            else:
+                unmanaged = reader.read_unmanaged()
+            plan = build_import_plan(
+                manifest,
+                unmanaged,
+                include=set(args.include) if args.include else None,
+                limit=args.limit,
+                allow_duplicate_titles=args.allow_duplicate_titles,
+            )
+            payload = plan.as_dict()
+            if args.output:
+                _write_json(Path(args.output), payload)
+                _print_json(
+                    {
+                        "plan": args.output,
+                        "digest": plan.digest,
+                        "actions": len(plan.actions),
+                        "unmanaged_issues": len(unmanaged),
+                        "skipped": len(plan.skipped),
+                        "orphans": [
+                            issue["abk_id"]
+                            for issue in find_orphans(
+                                manifest, reader.read_marked_issues()
+                            )
+                        ],
+                    }
+                )
+            else:
+                _print_json(payload)
+            return 0
+
+        if args.command == "import-reconcile":
+            merged, recovered = reconcile_orphans(
+                manifest, reader.read_marked_issues()
+            )
+            if recovered:
+                save_manifest(
+                    Path(args.manifest),
+                    merged,
+                    expected_sha256=file_sha256(Path(args.manifest)),
+                )
+            _print_json(
+                {
+                    "manifest": args.manifest,
+                    "recovered": [entry["id"] for entry in recovered],
+                }
+            )
+            return 0
+
+        raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+        plan = import_plan_from_dict(raw_plan)
+        fresh_manifest = load_manifest(args.manifest)
+        unmanaged = reader.read_unmanaged()
+        service = GitHubService(
+            transport,
+            owner=github["owner"],
+            repository=github["repository"],
+            project_number=github["project_number"],
+            issue_type_mode=github["issue_type_mode"],
+        )
+        applied = apply_import_plan(
+            plan,
+            executor=ImportExecutor(service),
+            confirmation=args.confirm,
+            manifest=fresh_manifest,
+            unmanaged_issues=unmanaged,
+            journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
+        )
+        merged = merge_imported_items(fresh_manifest, plan.items)
+        save_manifest(
+            Path(args.manifest),
+            merged,
+            expected_sha256=file_sha256(Path(args.manifest)),
+        )
+        _print_json(
+            {
+                **asdict(applied),
+                "manifest": args.manifest,
+                "imported_items": [item["id"] for item in plan.items],
+            }
+        )
         return 0
     if args.command == "sync-plan":
         snapshot = _read_snapshot(args.snapshot, manifest, args.backend)

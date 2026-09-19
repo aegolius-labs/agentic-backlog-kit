@@ -390,6 +390,20 @@ class GitHubService:
                     {"labels": [payload["fallback_label"]]},
                 )
 
+    def adopt_issue(self, number: int, body: str) -> None:
+        """Mark one existing issue as managed without changing anything else.
+
+        Adoption writes the body and only the body: title, labels, type,
+        assignees, comments and Project membership are left exactly as the
+        repository already had them.
+        """
+
+        self.transport.rest(
+            "PATCH",
+            f"{self.repository_path}/issues/{int(number)}",
+            {"body": body},
+        )
+
     def set_parent(self, child: GitHubIssueRef, parent: GitHubIssueRef) -> None:
         self.transport.rest(
             "POST",

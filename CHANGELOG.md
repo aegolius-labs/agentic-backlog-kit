@@ -8,6 +8,24 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- Adoption of issues a repository already has (R11). `import-plan` previews
+  which unmanaged issues would become backlog items and writes nothing;
+  `import-apply` adopts exactly the reviewed plan, prepending the kit's marker
+  to each issue body without removing anything already written, and records the
+  item in the manifest so synchronization takes over without creating a
+  duplicate. `--include` and `--limit` bound what is adopted; everything else
+  is reported with its reason.
+- `import-reconcile` records marked issues the manifest lost, touching nothing
+  on GitHub. Adoption marks GitHub before the manifest records the item, so an
+  interruption between those steps strands the issue; `import-plan` now reports
+  these as `orphans`.
+
+### Fixed
+
+- Import saved the manifest without pinning the version it had read.
+
+### Added
+
 - A failed apply now records a `hint` naming the likely cause alongside the
   failing action (R22). An unavailable native issue type names the type, the
   remedy, and the label that would be used instead; permission, absence and

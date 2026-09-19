@@ -236,6 +236,71 @@ class GitHubSnapshotReader:
                     return matched
         return None
 
+    def read_marked_issues(self) -> list[dict[str, Any]]:
+        """Return every issue carrying the kit's marker, with its content.
+
+        Adoption writes the marker to GitHub before the manifest records it, so
+        a failure between those two steps leaves an issue that is managed as far
+        as GitHub is concerned and unknown to the manifest. Reading the markers
+        is what makes that state recoverable, and it costs no request beyond the
+        listing the reader already performs.
+        """
+
+        marked: list[dict[str, Any]] = []
+        for issue in sorted(self._list_issues(), key=lambda value: int(value["number"])):
+            item_id = self._item_id_from_issue(issue)
+            if item_id is None:
+                continue
+            raw_type = issue.get("type")
+            issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
+            labels = self._label_names(issue)
+            if not issue_type:
+                issue_type = self._fallback_issue_type(labels)
+            marked.append(
+                {
+                    "abk_id": item_id,
+                    "number": int(issue["number"]),
+                    "title": issue.get("title", ""),
+                    "body": issue.get("body") or "",
+                    "state": str(issue.get("state", "open")),
+                    "labels": labels,
+                    "type": issue_type,
+                }
+            )
+        return marked
+
+    def read_unmanaged(self) -> list[dict[str, Any]]:
+        """Return the repository issues this kit does not manage.
+
+        Adoption has to start from what is already there, and what is already
+        there is exactly the set the managed snapshot filters out.  This reads
+        it without touching anything: an issue the operator never selects must
+        be observed and left alone.
+        """
+
+        unmanaged: list[dict[str, Any]] = []
+        for issue in sorted(self._list_issues(), key=lambda value: int(value["number"])):
+            if self._item_id_from_issue(issue) is not None:
+                continue
+            raw_type = issue.get("type")
+            issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
+            labels = self._label_names(issue)
+            if not issue_type:
+                issue_type = self._fallback_issue_type(labels)
+            unmanaged.append(
+                {
+                    "number": int(issue["number"]),
+                    "node_id": str(issue["node_id"]),
+                    "url": str(issue.get("html_url") or issue.get("url") or ""),
+                    "title": issue.get("title", ""),
+                    "body": issue.get("body") or "",
+                    "state": str(issue.get("state", "open")),
+                    "labels": labels,
+                    "type": issue_type,
+                }
+            )
+        return unmanaged
+
     def read(self) -> dict[str, Any]:
         all_issues = self._list_issues()
         managed = [
