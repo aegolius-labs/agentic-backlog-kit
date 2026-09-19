@@ -158,6 +158,15 @@ def _parser() -> argparse.ArgumentParser:
     sprint.add_argument("--capacity", type=int)
     sprint.add_argument("--sprint")
     sprint.add_argument("--snapshot", help="Fresh Project scaffold snapshot for target validation")
+    sprint.add_argument(
+        "--carryover",
+        action="append",
+        metavar="ID",
+        help=(
+            "Explicitly carry one item over from the sprint it is committed to. "
+            "Replanning never moves committed work on its own; repeat per item."
+        ),
+    )
     _add_operational_arguments(sprint)
     sprint.add_argument("--as-of", help="ISO date used to resolve @current and @next")
     sprint.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
@@ -497,6 +506,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             sprint=args.sprint,
             project_snapshot=project_snapshot,
             as_of=args.as_of,
+            carryover=set(args.carryover or ()),
         )
         payload = sprint_plan_payload(plan, skipped_limit=args.skipped_limit)
         payload["operational_state"] = (

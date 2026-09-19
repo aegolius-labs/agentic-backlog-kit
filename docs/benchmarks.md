@@ -52,9 +52,16 @@ byte-for-byte identical on Windows and local Ubuntu WSL.
 R15 and R18 changed one row. Completed work now scores zero and is released
 first so it cannot hold back its dependents, which reorders the ranked head
 wherever a fixture contains completed items and slightly shrinks the
-`prioritize` window. Every other operation is unchanged. The current report
-SHA-256 is
-`ba1b6ac6cba38315f5e5658b6e535eca0f1801c646656d5e06ae618d99eb592e`.
+`prioritize` window. Every other operation is unchanged. R16 then changed the two sprint rows. A plan now reports the work already
+committed to the target sprint and the work committed elsewhere, so the
+unbounded `sprint-plan` grows with those lists while the 100-item case shrinks
+slightly - work withheld as carryover is reported once rather than duplicated
+into `skipped`. The projected variant grows because `--skipped-limit` now bounds
+the retained and carryover lists as well, which is what keeps the 1,000- and
+10,000-item cases flat at roughly 8 KB instead of scaling with the backlog.
+
+The current report SHA-256 is
+`df5cf57d650ae5d584137ec937b00ca9b910f18360f49a83572f6e55644b2955`.
 
 | Operation | 100 items | 1,000 items | 10,000 items |
 | --- | ---: | ---: | ---: |
@@ -62,8 +69,8 @@ SHA-256 is
 | `show` | 569 (143) | 569 (143) | 569 (143) |
 | `next` | 180 (45) | 180 (45) | 181 (46) |
 | `prioritize` (limit 20) | 3,455 (864) | 3,362 (841) | 3,362 (841) |
-| `sprint-plan` | 6,090 (1,523) | 47,472 (11,868) | 461,313 (115,329) |
-| `sprint-plan --skipped-limit 50` | 4,272 (1,068) | 4,267 (1,067) | 4,269 (1,068) |
+| `sprint-plan` | 5,990 (1,498) | 55,718 (13,930) | 555,449 (138,863) |
+| `sprint-plan --skipped-limit 50` | 4,947 (1,237) | 8,100 (2,025) | 8,150 (2,038) |
 | `snapshot` artifact | 75,240 (18,810) | 753,349 (188,338) | 7,552,509 (1,888,128) |
 | cold `sync-plan` artifact | 72,319 (18,080) | 720,417 (180,105) | 7,202,332 (1,800,583) |
 
