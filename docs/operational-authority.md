@@ -63,6 +63,12 @@ If anyone changes that field between planning and apply, the plan no longer
 matches fresh state and apply refuses before writing anything. Recovery is the
 same as everywhere else in the kit: build a new plan, review it, confirm it.
 
+A transition also carries its own derived consequences. Moving an item to a
+done status changes its computed `Priority`, so the plan sets that too and one
+apply settles. A plan should describe the state it intends to leave behind; a
+plan that scored only the state it found would need a second sync to settle the
+priorities it had just invalidated.
+
 A transition is rejected before planning when it names an unknown item, a
 status outside `workflow.statuses`, a field other than `Status` or the
 iteration field, an unresolved `@current` / `@next` alias, or an item GitHub

@@ -310,5 +310,45 @@ class ComposedOperationalStateTests(unittest.TestCase):
         self.assertEqual(0.0, planned["B"])
 
 
+class TransitionConvergenceTests(unittest.TestCase):
+    """A plan must describe the state it intends to leave behind."""
+
+    def test_a_transition_carries_its_own_derived_priority(self) -> None:
+        data = _manifest(item("T-1", status="Ready"))
+
+        plan = build_sync_plan(
+            data,
+            _snapshot(_remote(status="Ready")),
+            manage_body=False,
+            transitions={"T-1": {"Status": "Done"}},
+        )
+
+        priorities = {
+            action.item_id: action.payload["fields"]["Priority"]
+            for action in plan.actions
+            if "Priority" in action.payload.get("fields", {})
+        }
+        self.assertEqual(0.0, priorities["T-1"])
+
+    def test_applying_a_transition_converges_in_one_pass(self) -> None:
+        data = _manifest(item("T-1", status="Ready"))
+        before = _snapshot(_remote(status="Ready"))
+
+        plan = build_sync_plan(
+            data, before, manage_body=False,
+            transitions={"T-1": {"Status": "Done"}},
+        )
+
+        # Replay the plan onto the snapshot the way GitHub would record it.
+        applied = _snapshot(_remote(status="Ready"))
+        fields = applied["issues"][0]["project_fields"]
+        for action in plan.actions:
+            fields.update(action.payload.get("fields", {}))
+
+        settled = build_sync_plan(data, applied, manage_body=False)
+
+        self.assertEqual([], settled.actions)
+
+
 if __name__ == "__main__":
     unittest.main()

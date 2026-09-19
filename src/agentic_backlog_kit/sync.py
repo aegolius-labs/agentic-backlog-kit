@@ -311,15 +311,28 @@ def build_sync_plan(
     data = validate_manifest(manifest)
     remote_by_id = _normalize_remote(remote_snapshot)
     local_by_id = {item["id"]: item for item in data["items"]}
-    # Priority is a planning field, so it is computed from fresh operational
-    # state: a remotely completed prerequisite must not keep boosting work.
-    operational, _ = compose_operational_state(manifest, remote_snapshot)
-    score_by_id = {entry.id: entry.priority_score for entry in prioritize(operational)}
     iteration = data["workflow"].get("iteration") or {}
     sprint_field = iteration.get("field", "Sprint")
     requested_transitions = normalize_transitions(
         transitions, data, remote_by_id, sprint_field
     )
+
+    # Priority is a planning field derived from operational state, so it is
+    # computed from fresh GitHub state with this plan's own transitions already
+    # applied.  A plan should describe the state it intends to leave behind; if
+    # it scored the state it found, every transition would need a second sync to
+    # settle the priorities it just invalidated.
+    operational, _ = compose_operational_state(manifest, remote_snapshot)
+    intended = {item["id"]: item for item in operational["items"]}
+    for item_id, fields in requested_transitions.items():
+        target = intended.get(item_id)
+        if target is None:  # pragma: no cover - rejected during normalization
+            continue
+        if "Status" in fields:
+            target["status"] = fields["Status"]
+        if sprint_field in fields:
+            target["sprint"] = fields[sprint_field]
+    score_by_id = {entry.id: entry.priority_score for entry in prioritize(operational)}
 
     creates: list[SyncAction] = []
     updates: list[SyncAction] = []
