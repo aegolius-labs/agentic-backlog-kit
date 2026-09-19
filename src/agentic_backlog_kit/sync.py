@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Callable, Iterable
@@ -38,6 +39,7 @@ class SyncPlan:
     manifest_fingerprint: str
     snapshot_fingerprint: str
     manage_body: bool = True
+    transitions: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -45,6 +47,7 @@ class SyncPlan:
             "manifest_fingerprint": self.manifest_fingerprint,
             "snapshot_fingerprint": self.snapshot_fingerprint,
             "manage_body": self.manage_body,
+            "transitions": self.transitions,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
         }
@@ -96,6 +99,90 @@ def _desired_fields(
     return fields
 
 
+def operational_field_names(sprint_field: str) -> tuple[str, ...]:
+    """Return the Project fields GitHub owns for work it already tracks.
+
+    Status and the iteration field describe what is happening to an item now.
+    That is an observation about reality, and reality is reported by GitHub, so
+    the manifest supplies these only when an item is first projected.
+    """
+
+    return ("Status", sprint_field)
+
+
+def _split_operational(
+    fields: dict[str, Any], sprint_field: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    operational_names = operational_field_names(sprint_field)
+    planning = {
+        name: value
+        for name, value in fields.items()
+        if name not in operational_names
+    }
+    operational = {
+        name: value for name, value in fields.items() if name in operational_names
+    }
+    return planning, operational
+
+
+def normalize_transitions(
+    transitions: dict[str, dict[str, Any]] | None,
+    data: dict[str, Any],
+    remote_by_id: dict[str, dict[str, Any]],
+    sprint_field: str,
+) -> dict[str, dict[str, Any]]:
+    """Validate requested operational transitions before anything is planned.
+
+    A transition is the only way local intent may move Status or Sprint for work
+    GitHub already tracks, so every request is checked against the manifest's
+    vocabulary and against the item actually existing remotely.
+    """
+
+    if not transitions:
+        return {}
+    statuses = set(data["workflow"]["statuses"])
+    local_ids = {item["id"] for item in data["items"]}
+    normalized: dict[str, dict[str, Any]] = {}
+    for item_id in sorted(transitions):
+        requested = transitions[item_id]
+        if not isinstance(requested, dict) or not requested:
+            raise ManifestError(
+                f"Transition for '{item_id}' must name at least one operational field"
+            )
+        if item_id not in local_ids:
+            raise ManifestError(f"Transition references unknown item '{item_id}'")
+        remote = remote_by_id.get(item_id)
+        if remote is None:
+            raise ManifestError(
+                f"Transition for '{item_id}' requires an existing GitHub issue; "
+                "synchronize the item before transitioning it"
+            )
+        if not remote.get("in_project", False):
+            raise ManifestError(
+                f"Transition for '{item_id}' requires the item to be in the Project; "
+                "synchronize the item before transitioning it"
+            )
+        allowed = operational_field_names(sprint_field)
+        for name, value in sorted(requested.items()):
+            if name not in allowed:
+                raise ManifestError(
+                    f"Transition for '{item_id}' may only set {', '.join(allowed)}; "
+                    f"got '{name}'"
+                )
+            if name == "Status" and value not in statuses:
+                raise ManifestError(
+                    f"Transition for '{item_id}' status '{value}' is not one of the "
+                    "manifest workflow statuses"
+                )
+            if value in {"@current", "@next"}:
+                raise ManifestError(
+                    f"Transition for '{item_id}' sprint alias must be resolved to an "
+                    "exact active iteration title"
+                )
+        normalized[item_id] = dict(sorted(requested.items()))
+    return normalized
+
+
 def _normalize_remote(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
     if not isinstance(snapshot, dict) or not isinstance(snapshot.get("issues", []), list):
         raise ManifestError("Remote snapshot must contain an issues array")
@@ -112,17 +199,94 @@ def _normalize_remote(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return remote_by_id
 
 
+def compose_operational_state(
+    manifest: dict[str, Any], remote_snapshot: dict[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Return the manifest with fresh GitHub operational state applied.
+
+    Planning asks what should happen next, which depends on what is happening
+    now.  What is happening now is an observation, and GitHub reports it, so
+    ranking and sprint selection read Status and the iteration field from a
+    fresh snapshot rather than from local intent.
+
+    A remote status the manifest does not define is reported but not adopted:
+    scoring and sprint rules are expressed in the manifest's vocabulary, and
+    silently importing a foreign status would give those rules a value they
+    cannot reason about.  Scaffolding appends the manifest's statuses to the
+    ones GitHub already offers, so a board can legitimately carry statuses the
+    manifest has never heard of.
+
+    Returns the composed manifest and the list of observed differences.
+    """
+
+    data = validate_manifest(manifest)
+    remote_by_id = _normalize_remote(remote_snapshot)
+    iteration = data["workflow"].get("iteration") or {}
+    sprint_field = iteration.get("field", "Sprint")
+    statuses = set(data["workflow"]["statuses"])
+
+    composed = deepcopy(data)
+    differences: list[dict[str, Any]] = []
+    for item in composed["items"]:
+        remote = remote_by_id.get(item["id"])
+        if remote is None or not remote.get("in_project", False):
+            continue
+        fields = remote.get("project_fields") or {}
+
+        observed_status = fields.get("Status")
+        if isinstance(observed_status, str) and observed_status != item["status"]:
+            if observed_status in statuses:
+                differences.append(
+                    {
+                        "id": item["id"],
+                        "field": "status",
+                        "local": item["status"],
+                        "remote": observed_status,
+                        "applied": True,
+                    }
+                )
+                item["status"] = observed_status
+            else:
+                differences.append(
+                    {
+                        "id": item["id"],
+                        "field": "status",
+                        "local": item["status"],
+                        "remote": observed_status,
+                        "applied": False,
+                        "reason": "remote status is not a manifest workflow status",
+                    }
+                )
+
+        observed_sprint = fields.get(sprint_field)
+        if isinstance(observed_sprint, str) and observed_sprint != item["sprint"]:
+            differences.append(
+                {
+                    "id": item["id"],
+                    "field": "sprint",
+                    "local": item["sprint"],
+                    "remote": observed_sprint,
+                    "applied": True,
+                }
+            )
+            item["sprint"] = observed_sprint
+
+    return composed, differences
+
+
 def _plan_digest(
     actions: Iterable[SyncAction],
     manifest_fingerprint: str,
     snapshot_fingerprint: str,
     manage_body: bool,
+    transitions: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     payload = {
         "actions": [action.as_dict() for action in actions],
         "manifest_fingerprint": manifest_fingerprint,
         "snapshot_fingerprint": snapshot_fingerprint,
         "manage_body": manage_body,
+        "transitions": transitions or {},
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -133,19 +297,34 @@ def build_sync_plan(
     remote_snapshot: dict[str, Any],
     *,
     manage_body: bool = True,
+    transitions: dict[str, dict[str, Any]] | None = None,
 ) -> SyncPlan:
-    """Build an idempotent local-to-GitHub plan without performing mutations."""
+    """Build an idempotent local-to-GitHub plan without performing mutations.
+
+    Ordinary synchronization never rewrites Status or the iteration field for
+    work GitHub already tracks: those describe what is happening now, and
+    GitHub observes that.  An item still receives the manifest's operational
+    defaults the first time it is projected, and an explicit reviewed
+    transition is the one way local intent may move them afterwards.
+    """
 
     data = validate_manifest(manifest)
     remote_by_id = _normalize_remote(remote_snapshot)
     local_by_id = {item["id"]: item for item in data["items"]}
-    score_by_id = {entry.id: entry.priority_score for entry in prioritize(data)}
+    # Priority is a planning field, so it is computed from fresh operational
+    # state: a remotely completed prerequisite must not keep boosting work.
+    operational, _ = compose_operational_state(manifest, remote_snapshot)
+    score_by_id = {entry.id: entry.priority_score for entry in prioritize(operational)}
     iteration = data["workflow"].get("iteration") or {}
     sprint_field = iteration.get("field", "Sprint")
+    requested_transitions = normalize_transitions(
+        transitions, data, remote_by_id, sprint_field
+    )
 
     creates: list[SyncAction] = []
     updates: list[SyncAction] = []
     project_actions: list[SyncAction] = []
+    transition_actions: list[SyncAction] = []
     relationship_actions: list[SyncAction] = []
 
     for item_id in sorted(local_by_id):
@@ -214,9 +393,10 @@ def build_sync_plan(
                 )
             else:
                 current_fields = remote.get("project_fields") or {}
+                planning_fields, _ = _split_operational(desired_fields, sprint_field)
                 changed_fields = {
                     name: value
-                    for name, value in desired_fields.items()
+                    for name, value in planning_fields.items()
                     if current_fields.get(name) != value
                 }
                 if changed_fields:
@@ -228,6 +408,29 @@ def build_sync_plan(
                             {"issue": remote},
                         )
                     )
+
+                requested = requested_transitions.get(item_id)
+                if requested:
+                    changed_operational = {
+                        name: value
+                        for name, value in requested.items()
+                        if current_fields.get(name) != value
+                    }
+                    if changed_operational:
+                        transition_actions.append(
+                            SyncAction(
+                                "project.transition",
+                                item_id,
+                                {"fields": changed_operational},
+                                {
+                                    "issue": remote,
+                                    "observed": {
+                                        name: current_fields.get(name)
+                                        for name in sorted(changed_operational)
+                                    },
+                                },
+                            )
+                        )
 
         current_parent = remote.get("parent_abk_id") if remote else None
         if item["parent"] and current_parent != item["parent"]:
@@ -253,17 +456,28 @@ def build_sync_plan(
                 )
             )
 
-    actions = creates + updates + project_actions + relationship_actions
+    actions = (
+        creates
+        + updates
+        + project_actions
+        + transition_actions
+        + relationship_actions
+    )
     manifest_fingerprint = state_fingerprint(data)
     snapshot_fingerprint = state_fingerprint(remote_snapshot)
     return SyncPlan(
         actions=actions,
         digest=_plan_digest(
-            actions, manifest_fingerprint, snapshot_fingerprint, manage_body
+            actions,
+            manifest_fingerprint,
+            snapshot_fingerprint,
+            manage_body,
+            requested_transitions,
         ),
         manifest_fingerprint=manifest_fingerprint,
         snapshot_fingerprint=snapshot_fingerprint,
         manage_body=manage_body,
+        transitions=requested_transitions,
     )
 
 
@@ -287,6 +501,7 @@ def apply_plan(
         plan.manifest_fingerprint,
         plan.snapshot_fingerprint,
         plan.manage_body,
+        plan.transitions,
     ) != plan.digest:
         raise ApplyAuthorizationError("Sync plan changed after validation")
     if manifest is None or remote_snapshot is None:
@@ -294,7 +509,10 @@ def apply_plan(
             "Apply requires a freshly verified manifest and remote snapshot"
         )
     fresh_plan = build_sync_plan(
-        manifest, remote_snapshot, manage_body=plan.manage_body
+        manifest,
+        remote_snapshot,
+        manage_body=plan.manage_body,
+        transitions=plan.transitions,
     )
     if fresh_plan.digest != plan.digest:
         raise ApplyAuthorizationError(
@@ -381,13 +599,23 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
     manifest_fingerprint = data.get("manifest_fingerprint")
     snapshot_fingerprint = data.get("snapshot_fingerprint")
     manage_body = data.get("manage_body")
+    transitions = data.get("transitions", {})
+    if not isinstance(transitions, dict) or any(
+        not isinstance(key, str) or not isinstance(value, dict)
+        for key, value in transitions.items()
+    ):
+        raise ManifestError("Sync plan transitions must map item ids to field objects")
     if (
         not isinstance(digest, str)
         or not isinstance(manifest_fingerprint, str)
         or not isinstance(snapshot_fingerprint, str)
         or not isinstance(manage_body, bool)
         or _plan_digest(
-            actions, manifest_fingerprint, snapshot_fingerprint, manage_body
+            actions,
+            manifest_fingerprint,
+            snapshot_fingerprint,
+            manage_body,
+            transitions,
         )
         != digest
     ):
@@ -398,4 +626,5 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
         manifest_fingerprint=manifest_fingerprint,
         snapshot_fingerprint=snapshot_fingerprint,
         manage_body=manage_body,
+        transitions=transitions,
     )

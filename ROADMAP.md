@@ -118,7 +118,7 @@ into release lines, each with its own membership and its own denominator.
 | `v0.1.0` | Initial release | M0-M5, R01-R09 | **Shipped** 2026-09-04 |
 | `v0.1.1` | Engine correctness | R17, R18 | **Complete in code**, awaiting release |
 | `v0.1.2` | Apply ergonomics | R22, R23 | Not started; raised by first use |
-| `v0.2.0` | GitHub operational authority | R15, R16 | Not started; policies approved |
+| `v0.2.0` | GitHub operational authority | R15, R16 | R15 complete; R16 next |
 | `v0.3.0` | Adoption | R11 | Not started |
 | `v0.4.0+` | Reconciliation and reach | R10, R13 | Not started |
 | Unscheduled | Portfolio scale and hierarchy | R12, R24 | Deferred |
@@ -155,10 +155,10 @@ effort, production readiness, or safety approval.
 | `v0.1.0` items R01-R09 | 9/9 | 100% |
 | `v0.1.1` items R17-R18 | 2/2 | 100% in code |
 | `v0.1.2` items R22-R23 | 0/2 | 0% |
-| `v0.2.0` items R15-R16 | 0/2 | 0% |
+| `v0.2.0` items R15-R16 | 1/2 | 50% |
 | `v0.3.0` item R11 | 0/1 | 0% |
 | `v0.4.0+` items R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **11/16** | **69%** |
+| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **12/16** | **75%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -312,11 +312,13 @@ only. R16 depends on R15.
 
 #### R15 - Respect GitHub operational status and sprint authority
 
-- **Status:** Proposed; user approved GitHub authority for existing work (D1).
+- **Status:** Complete on 2026-09-19; verified live against Project 6
+- **Design note:** [operational authority](docs/operational-authority.md)
 - **Importance:** High
 - **Complexity:** Hard
 - **Approach:** Compose fresh operational state for planning; preserve existing Status/Sprint during ordinary sync; represent changes as explicit digest-bound transitions. Document legacy-manifest migration and offline-preview limits.
-- **Done when:** Remote completion/assignment survives stale local intent, planning uses fresh operational state, and explicit transitions fail safely on drift. See R15 acceptance cases in the proposal.
+- **Done when:** Remote completion/assignment survives stale local intent, planning uses fresh operational state, and explicit transitions fail safely on drift. See R15 acceptance cases in the proposal. **Met:** ordinary sync no longer plans `Status` or `Sprint` writes for work GitHub already tracks; `--transition` and `--transition-sprint` emit digest-bound actions carrying the observed value, and replaying a stale transition plan was refused live; `prioritize`, `next` and `sprint-plan` accept `--operational-snapshot`, report whether they used `github` or `local-intent` state, and surface differences with `--report-operational-drift`. A remote status the manifest does not define is reported and not adopted, because scaffolding appends manifest statuses to GitHub's own and the scoring rules are written in the manifest's vocabulary.
+- **Found while verifying:** completed work scoring zero (R18) made it sort last, which held back every item depending on it - `next` returned a lower-value item while the genuinely next story sank. Completed work is now released first so it never delays a dependent, `select_next` takes the highest-scoring executable item rather than the first one dependency order reaches, and the CLI omits completed work from the ranked head unless `--include-completed` is passed. This changed one documented benchmark row; [benchmarks](docs/benchmarks.md) records the new digest.
 
 #### R16 - Preserve sprint commitments and review carryover
 

@@ -21,7 +21,7 @@ from .github import (
     GitHubScaffoldExecutor,
     GitHubService,
 )
-from .manifest import default_manifest, load_manifest
+from .manifest import ManifestError, default_manifest, load_manifest
 from .iterations import (
     apply_iteration_plan,
     build_iteration_plan,
@@ -41,7 +41,12 @@ from .snapshot import (
     GitHubSnapshotReader,
 )
 from .sprint import plan_sprint, sprint_plan_payload
-from .sync import apply_plan, build_sync_plan, sync_plan_from_dict
+from .sync import (
+    apply_plan,
+    build_sync_plan,
+    compose_operational_state,
+    sync_plan_from_dict,
+)
 
 
 DEFAULT_MANIFEST = ".agentic-backlog/manifest.json"
@@ -133,15 +138,27 @@ def _parser() -> argparse.ArgumentParser:
     priority = commands.add_parser("prioritize", help="Compute concise priority order")
     priority.add_argument("--manifest", default=DEFAULT_MANIFEST)
     priority.add_argument("--limit", type=int, default=20)
+    priority.add_argument(
+        "--include-completed",
+        action="store_true",
+        help=(
+            "Include completed work. Completed items score zero and are "
+            "released first so they never hold back their dependents, so they "
+            "are omitted by default to keep the ranked head actionable."
+        ),
+    )
+    _add_operational_arguments(priority)
 
     next_item = commands.add_parser("next", help="Return the next executable item")
     next_item.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    _add_operational_arguments(next_item)
 
     sprint = commands.add_parser("sprint-plan", help="Plan a dependency-safe sprint")
     sprint.add_argument("--manifest", default=DEFAULT_MANIFEST)
     sprint.add_argument("--capacity", type=int)
     sprint.add_argument("--sprint")
     sprint.add_argument("--snapshot", help="Fresh Project scaffold snapshot for target validation")
+    _add_operational_arguments(sprint)
     sprint.add_argument("--as-of", help="ISO date used to resolve @current and @next")
     sprint.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
     sprint.add_argument(
@@ -177,6 +194,21 @@ def _parser() -> argparse.ArgumentParser:
     sync_plan.add_argument("--output")
     sync_plan.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
     sync_plan.add_argument("--preserve-body", action="store_true")
+    sync_plan.add_argument(
+        "--transition",
+        action="append",
+        metavar="ID=STATUS",
+        help=(
+            "Explicitly move one item's Status. Ordinary synchronization never "
+            "rewrites Status for work GitHub already tracks; repeat per item."
+        ),
+    )
+    sync_plan.add_argument(
+        "--transition-sprint",
+        action="append",
+        metavar="ID=SPRINT",
+        help="Explicitly move one item's iteration to an exact active title",
+    )
 
     sync_apply = commands.add_parser(
         "sync-apply", help="Apply one exact reviewed plan"
@@ -246,6 +278,61 @@ def _parser() -> argparse.ArgumentParser:
         "--backend", choices=("auto", "gh", "api"), default="auto"
     )
     return parser
+
+
+def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
+    """Let a planning command read Status and Sprint from fresh GitHub state."""
+
+    parser.add_argument(
+        "--operational-snapshot",
+        help=(
+            "Remote sync snapshot supplying fresh Status and Sprint. Without it, "
+            "planning uses local intent, which may be stale."
+        ),
+    )
+    parser.add_argument(
+        "--report-operational-drift",
+        action="store_true",
+        help="Include the observed local/remote operational differences",
+    )
+
+
+def _operational_manifest(
+    manifest: dict[str, Any], args: argparse.Namespace
+) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
+    """Return the manifest planning should use, plus any observed differences.
+
+    Offline preview is supported and is the default, but it is a preview: with
+    no snapshot the answer reflects local intent rather than what GitHub is
+    currently reporting.
+    """
+
+    path = getattr(args, "operational_snapshot", None)
+    if not path:
+        return manifest, None
+    snapshot = json.loads(Path(path).read_text(encoding="utf-8"))
+    composed, differences = compose_operational_state(manifest, snapshot)
+    return composed, differences
+
+
+def _parse_transitions(
+    status_arguments: Sequence[str] | None,
+    sprint_arguments: Sequence[str] | None,
+    sprint_field: str,
+) -> dict[str, dict[str, Any]]:
+    transitions: dict[str, dict[str, Any]] = {}
+    for field_name, raw_values in (
+        ("Status", status_arguments or []),
+        (sprint_field, sprint_arguments or []),
+    ):
+        for raw in raw_values:
+            item_id, separator, value = raw.partition("=")
+            if not separator or not item_id.strip() or not value.strip():
+                raise ManifestError(
+                    f"Transition '{raw}' must be written as ID={field_name.upper()}"
+                )
+            transitions.setdefault(item_id.strip(), {})[field_name] = value.strip()
+    return transitions
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -361,12 +448,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "prioritize":
-        items = [asdict(item) for item in prioritize(manifest)[: max(args.limit, 0)]]
-        _print_json({"count": len(items), "items": items})
+        planning, differences = _operational_manifest(manifest, args)
+        done_statuses = set(planning["workflow"]["done_statuses"])
+        ranked = [
+            entry
+            for entry in prioritize(planning)
+            if args.include_completed or entry.status not in done_statuses
+        ]
+        items = [asdict(entry) for entry in ranked[: max(args.limit, 0)]]
+        payload: dict[str, Any] = {"count": len(items), "items": items}
+        payload["operational_state"] = (
+            "github" if differences is not None else "local-intent"
+        )
+        if args.report_operational_drift and differences is not None:
+            payload["operational_drift"] = differences
+        _print_json(payload)
         return 0
     if args.command == "next":
-        item = select_next(manifest)
-        _print_json({"item": asdict(item) if item else None})
+        planning, differences = _operational_manifest(manifest, args)
+        item = select_next(planning)
+        payload = {
+            "item": asdict(item) if item else None,
+            "operational_state": (
+                "github" if differences is not None else "local-intent"
+            ),
+        }
+        if args.report_operational_drift and differences is not None:
+            payload["operational_drift"] = differences
+        _print_json(payload)
         return 0
     if args.command == "sprint-plan":
         project_snapshot = None
@@ -381,14 +490,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                     repository=github["repository"],
                     project_number=github["project_number"],
                 ).read()
+        planning, differences = _operational_manifest(manifest, args)
         plan = plan_sprint(
-            manifest,
+            planning,
             capacity=args.capacity,
             sprint=args.sprint,
             project_snapshot=project_snapshot,
             as_of=args.as_of,
         )
         payload = sprint_plan_payload(plan, skipped_limit=args.skipped_limit)
+        payload["operational_state"] = (
+            "github" if differences is not None else "local-intent"
+        )
+        if args.report_operational_drift and differences is not None:
+            payload["operational_drift"] = differences
         _print_json(payload)
         return 0
     if args.command == "show":
@@ -437,8 +552,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "sync-plan":
         snapshot = _read_snapshot(args.snapshot, manifest, args.backend)
+        iteration = manifest["workflow"].get("iteration") or {}
         plan = build_sync_plan(
-            manifest, snapshot, manage_body=not args.preserve_body
+            manifest,
+            snapshot,
+            manage_body=not args.preserve_body,
+            transitions=_parse_transitions(
+                args.transition,
+                args.transition_sprint,
+                iteration.get("field", "Sprint"),
+            ),
         )
         payload = plan.as_dict()
         if args.output:
