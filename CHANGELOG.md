@@ -6,6 +6,26 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Sprint planning preserves commitments (R16, carryover policy D2/A). Work
+  already committed to the target sprint is retained, counted once against
+  capacity, and keeps its status instead of being re-selected. Work committed
+  to another sprint is withheld from automatic selection however highly it
+  ranks, and moves only when named with `sprint-plan --carryover ID`.
+- A plan reports `retained`, `retained_effort`, `overage`,
+  `carryover_available` and `carryover_selected`. Commitments beyond capacity
+  surface as an explicit overage rather than silently dropping work.
+
+### Changed
+
+- `--skipped-limit` now projects the retained and carryover lists as well as
+  the skipped one, each with a count and truncation marker, which keeps a
+  10,000-item sprint plan at roughly 8 KB instead of 555 KB.
+- `sprint-plan` without a target sprint ignores sprint assignment and ranks the
+  whole backlog as before: commitment is relative to a target, so with no
+  target there is nothing to protect and no elsewhere to withhold from.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added

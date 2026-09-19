@@ -268,7 +268,11 @@ def prepare_suite(
             "project_number_pending": True,
             "expected_item_ids": [item["id"] for item in seed_manifest["items"]],
             "expected_priority_ids": ranking,
-            "expected_sprint_ids": [item.id for item in sprint.items],
+            # Sprint content is what the sprint holds: work already committed to
+            # it plus whatever this plan newly selects.
+            "expected_sprint_ids": [
+                item.id for item in [*sprint.retained, *sprint.items]
+            ],
             "resource_create_action": {
                 **resource_create_record,
                 "digest": _digest(resource_create_record),

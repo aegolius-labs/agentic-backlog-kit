@@ -118,7 +118,7 @@ into release lines, each with its own membership and its own denominator.
 | `v0.1.0` | Initial release | M0-M5, R01-R09 | **Shipped** 2026-09-04 |
 | `v0.1.1` | Engine correctness | R17, R18 | **Complete in code**, awaiting release |
 | `v0.1.2` | Apply ergonomics | R22, R23 | Not started; raised by first use |
-| `v0.2.0` | GitHub operational authority | R15, R16 | R15 complete; R16 next |
+| `v0.2.0` | GitHub operational authority | R15, R16 | **Complete** |
 | `v0.3.0` | Adoption | R11 | Not started |
 | `v0.4.0+` | Reconciliation and reach | R10, R13 | Not started |
 | Unscheduled | Portfolio scale and hierarchy | R12, R24 | Deferred |
@@ -155,10 +155,10 @@ effort, production readiness, or safety approval.
 | `v0.1.0` items R01-R09 | 9/9 | 100% |
 | `v0.1.1` items R17-R18 | 2/2 | 100% in code |
 | `v0.1.2` items R22-R23 | 0/2 | 0% |
-| `v0.2.0` items R15-R16 | 1/2 | 50% |
+| `v0.2.0` items R15-R16 | 2/2 | 100% |
 | `v0.3.0` item R11 | 0/1 | 0% |
 | `v0.4.0+` items R10, R13 | 0/2 | 0% |
-| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **12/16** | **75%** |
+| **Scheduled product work, R01-R23 excluding deferred R12/R24 and operations R14** | **13/16** | **81%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -322,11 +322,13 @@ only. R16 depends on R15.
 
 #### R16 - Preserve sprint commitments and review carryover
 
-- **Status:** Proposed; carryover policy A approved (D2); implementation depends on R15.
+- **Status:** Complete on 2026-09-19
+- **Design note:** [sprint commitments](docs/sprint-commitments.md)
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Approach:** Account for retained target-sprint work once, preserve ongoing statuses, and handle work assigned elsewhere through explicit carryover review.
-- **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state.
+- **Done when:** Replanning neither moves work automatically nor regresses status; capacity, dependencies, overage, and carryover are verified against fresh state. **Met:** work already committed to the target sprint is retained, counted once, and keeps its status, including when it is `Blocked` or not yet ready; work committed to another sprint is withheld from automatic selection however highly it ranks, and moves only when named in `--carryover`; commitments beyond capacity report an explicit `overage` rather than dropping work; and every carryover request is rejected before planning when it names unknown, complete, already-targeted, or unassigned work, or omits a target sprint.
+- **Scope note:** commitment is relative to a target, so an untargeted `sprint-plan` ignores sprint assignment and ranks the whole backlog exactly as before. `--skipped-limit` now projects the retained and carryover lists too, which keeps a 10,000-item plan at roughly 8 KB instead of 555 KB.
 
 ### `v0.3.0` - Adoption
 

@@ -145,15 +145,19 @@ enforcing. Concretely:
 4. **Add any board statuses you want planning to honour** to
    `workflow.statuses`, or they will be reported and ignored.
 
+## Sprint commitments
+
+R16 builds on this. Once GitHub owns `Sprint`, replanning must not undo what
+that field records, so `sprint-plan` retains work already committed to the
+target sprint and withholds work committed elsewhere unless it is explicitly
+carried over. See [sprint commitments](sprint-commitments.md).
+
 ## Known limits
 
 - Composition reads `Status` and the iteration field only. Assignees, labels
   outside the type label, and other Project fields are not yet composed.
-- Sprint commitment and carryover rules are **R16** and are not implemented
-  here. This change stops sync from overwriting `Sprint`; it does not yet make
-  replanning respect an existing commitment.
-- `sprint-plan --operational-snapshot` composes fresh state for ranking, but
-  capacity accounting still follows the pre-R16 rules.
+- Composition reads fields, not people: who is assigned to an item is not part
+  of operational state yet.
 - There is no way to write observed operational state back into the manifest.
   Offline planning therefore stays as stale as the manifest is, and the only
   remedy is to pass a snapshot.
