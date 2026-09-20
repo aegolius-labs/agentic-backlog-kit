@@ -94,22 +94,25 @@ class GitHubCliTransportTests(unittest.TestCase):
                 self.assertEqual(404, raised.exception.status)
                 self.assertEqual(message, raised.exception.message)
 
-    def test_parent_absence_normalization_fails_closed_for_near_miss_errors(self) -> None:
+    def test_a_404_that_is_not_the_exact_parent_absence_stays_fatal(self) -> None:
+        """The reader treats a 404 on that endpoint as "no parent".
+
+        ``GET .../parent`` also answers 404 when the issue itself is absent, so
+        mapping any 404 there would turn a missing issue into a silent success.
+        Only the exact endpoint and message pair is mapped; every other 404
+        keeps its exit code and stays fatal.
+        """
+
         cases = [
             ("POST", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 404)"),
             ("GET", "/repos/aegolius-labs/example/issues/1", "No parent issue found (HTTP 404)"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 403)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent", "No parent issue found (HTTP 404): extra detail"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 403)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 404): extra detail"),
             ("GET", "/repos/aegolius-labs/example/issues/1", "gh: No parent issue found (HTTP 404)"),
             ("POST", "/repos/aegolius-labs/example/issues/1/parent", "gh: No parent issue found (HTTP 404)"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: authentication required"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: API rate limit exceeded (HTTP 429)"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: Resource not accessible by integration (HTTP 403)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent?verbose=true", "No parent issue found (HTTP 404)"),
             ("GET", "/repos/aegolius-labs/example/issues/1/parent/", "No parent issue found (HTTP 404)"),
-            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "authentication required"),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: Not Found (HTTP 404)"),
         ]
 
         for method, path, message in cases:
@@ -121,8 +124,19 @@ class GitHubCliTransportTests(unittest.TestCase):
                 ):
                     with self.assertRaises(GitHubApiError) as raised:
                         transport.rest(method, path)
-                self.assertEqual(1, raised.exception.status)
+                self.assertNotEqual(404, raised.exception.status)
 
+    def test_a_failure_with_no_reported_status_keeps_its_exit_code(self) -> None:
+        for message in ("gh: authentication required", "authentication required"):
+            with self.subTest(message=message):
+                result = CompletedProcess(["gh"], 1, stdout="", stderr=message)
+                transport = GitHubCliTransport("gh")
+                with patch(
+                    "agentic_backlog_kit.github.subprocess.run", return_value=result
+                ):
+                    with self.assertRaises(GitHubApiError) as raised:
+                        transport.rest("GET", "/repos/aegolius-labs/example/issues/1")
+                self.assertEqual(1, raised.exception.status)
 
     def test_issue_write_exposes_http_422_from_cli_diagnostic(self) -> None:
         """A CLI 422 must select the same label fallback the direct API selects."""
@@ -145,20 +159,25 @@ class GitHubCliTransportTests(unittest.TestCase):
 
                 self.assertEqual(422, raised.exception.status)
 
-    def test_unprocessable_normalization_is_limited_to_issue_writes(self) -> None:
+    def test_the_reported_status_is_recovered_for_every_non_404_failure(self) -> None:
+        """Callers branch on status to explain a failure and to choose a fallback.
+
+        Reporting the exit code instead left the CLI route without the hints
+        and the recovery the direct API route had for the identical request,
+        which is the peer-route claim failing quietly.
+        """
+
         cases = [
-            ("POST", "/repos/aegolius-labs/example/issues/1/sub_issues", "gh: Validation Failed (HTTP 422)"),
-            ("POST", "/repos/aegolius-labs/example/issues/1/labels", "gh: Validation Failed (HTTP 422)"),
-            ("POST", "graphql", "gh: Validation Failed (HTTP 422)"),
-            ("GET", "/repos/aegolius-labs/example/issues", "gh: Validation Failed (HTTP 422)"),
-            ("DELETE", "/repos/aegolius-labs/example/issues/1", "gh: Validation Failed (HTTP 422)"),
-            ("POST", "/repos/aegolius-labs/example/issues", "gh: Not Found (HTTP 404)"),
-            ("POST", "/repos/aegolius-labs/example/issues", "gh: API rate limit exceeded (HTTP 429)"),
-            ("POST", "/repos/aegolius-labs/example/issues", "gh: authentication required"),
-            ("POST", "/repos/aegolius-labs/example/issues/1/parent", "gh: Validation Failed (HTTP 422)"),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: Validation Failed (HTTP 422)", 422),
+            ("PATCH", "/repos/aegolius-labs/example/issues/35", "gh: Validation Failed (HTTP 422)", 422),
+            ("POST", "/repos/aegolius-labs/example/issues/1/sub_issues", "gh: Validation Failed (HTTP 422)", 422),
+            ("POST", "graphql", "gh: Validation Failed (HTTP 422)", 422),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: API rate limit exceeded (HTTP 429)", 429),
+            ("GET", "/repos/aegolius-labs/example/issues/1/parent", "gh: Resource not accessible by integration (HTTP 403)", 403),
+            ("POST", "/repos/aegolius-labs/example/issues", "gh: Server Error (HTTP 500)", 500),
         ]
 
-        for method, path, message in cases:
+        for method, path, message, expected in cases:
             with self.subTest(method=method, path=path, message=message):
                 result = CompletedProcess(["gh"], 1, stdout="", stderr=message)
                 transport = GitHubCliTransport("gh")
@@ -167,7 +186,33 @@ class GitHubCliTransportTests(unittest.TestCase):
                 ):
                     with self.assertRaises(GitHubApiError) as raised:
                         transport.rest(method, path, {"title": "x"})
-                self.assertEqual(1, raised.exception.status)
+                self.assertEqual(expected, raised.exception.status)
+
+    def test_a_422_outside_issue_creation_is_not_turned_into_a_label(self) -> None:
+        """Recovering the status must not widen where the fallback applies.
+
+        The label fallback belongs to creating or updating an issue. A 422 from
+        linking a sub-issue is a different failure and must stay fatal.
+        """
+
+        service = GitHubService(
+            GitHubCliTransport("gh"),
+            owner="o",
+            repository="r",
+            project_number=1,
+            issue_type_mode="native_or_label",
+        )
+        child = GitHubIssueRef("T-1", 1, 10, "I_1", "u")
+        parent = GitHubIssueRef("T-0", 2, 20, "I_2", "u")
+        result = CompletedProcess(
+            ["gh"], 1, stdout="", stderr="gh: Validation Failed (HTTP 422)"
+        )
+
+        with patch("agentic_backlog_kit.github.subprocess.run", return_value=result):
+            with self.assertRaises(GitHubApiError) as raised:
+                service.set_parent(child, parent)
+
+        self.assertEqual(422, raised.exception.status)
 
 
 class GitHubExecutorTests(unittest.TestCase):

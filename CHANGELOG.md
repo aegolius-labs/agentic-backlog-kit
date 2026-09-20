@@ -6,6 +6,29 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Capability preflight for execution routes (R13). Every action kind declares
+  the capabilities it requires and every transport declares what it provides,
+  so sync, scaffold, iteration, bootstrap and import all refuse before their
+  first write when the selected route cannot finish the plan, naming each
+  missing capability instead of failing partway through.
+- `abk capabilities` reports what the selected route can and cannot do without
+  planning anything.
+
+### Fixed
+
+- The CLI route reported a 403, 429 or 500 as exit code 1, so the hints that
+  explain a failure fired on the direct API route and never on `gh`. The
+  reported status is now taken as the status, except that a 404 is mapped only
+  for the exact parent-absence case, because that endpoint also answers 404
+  when the issue itself is absent.
+
+### Changed
+
+- The direct GraphQL/REST transport is documented and typed as a peer of the
+  CLI route rather than a fallback for hosts without `gh`.
+
 ### Fixed
 
 - A release run with no version tag behind it now fails instead of reporting
