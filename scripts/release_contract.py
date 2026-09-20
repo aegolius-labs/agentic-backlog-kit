@@ -25,7 +25,9 @@ def validate_contract(caller, compute, publisher):
             raise ContractError(message)
 
     jobs = caller['jobs']
+    require('baseline-guard' in jobs, 'Caller drops the release baseline guard')
     calculate, preflight, publish = (jobs[name] for name in ('compute-version', 'preflight', 'release'))
+    guard = jobs['baseline-guard']
     prefix = 'aegolius-labs/.github/.github/workflows/'
     pins = []
     for job, filename in ((calculate, 'compute-release.yml'), (publish, 'publish-release-assets.yml')):
@@ -55,6 +57,26 @@ def validate_contract(caller, compute, publisher):
     require(str(versions[0]['with']['default_bump']).lower() == 'false', 'No-bump policy changed')
     require(str(versions[0]['with']['fetch_all_tags']).lower() == 'true', 'Version calculator truncates tag history')
     require(preflight['needs'] == 'compute-version', 'Preflight must depend on computation')
+    # A no-bump must be checked, not assumed. The guard runs on exactly the
+    # runs preflight does not, so no outcome of the calculator is unexamined,
+    # and it stays read-only because it must never create the baseline itself.
+    require(guard['needs'] == 'compute-version', 'Baseline guard must depend on computation')
+    require(guard['permissions'] == {'contents': 'read'}, 'Baseline guard must be read-only')
+    require("needs.compute-version.outputs.new-tag == ''" in guard['if'],
+            'Baseline guard does not run on the no-bump path')
+    require("needs.compute-version.outputs.new-tag != ''" in preflight['if'],
+            'Preflight no longer complements the baseline guard')
+    checkouts = [step for step in guard['steps'] if step.get('uses', '').startswith('actions/checkout@')]
+    require(len(checkouts) == 1, 'Baseline guard needs exactly one checkout')
+    # The guard reads tags, so a shallow checkout would have it judge the
+    # baseline from a truncated history rather than the real one.
+    require(str(checkouts[0].get('with', {}).get('fetch-depth')) == '0',
+            'Baseline guard checkout truncates tag history')
+    guard_runs = [step.get('run', '') for step in guard['steps']]
+    require(any('release_baseline.py' in step for step in guard_runs),
+            'Baseline guard does not run the baseline check')
+    require(not any('git tag' in step and 'tag --list' not in step for step in guard_runs),
+            'Baseline guard may create a tag')
     require(set(publish['needs']) == {'compute-version', 'preflight'}, 'Publication bypasses preflight')
     require("needs.preflight.result == 'success'" in publish['if'], 'Publication is not success-gated')
     require(publish['with']['candidate-sha'] == '${{ needs.compute-version.outputs.candidate-sha }}', 'Candidate not bound to computation')

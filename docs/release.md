@@ -50,10 +50,33 @@ This closes R14-F8. Before it, a release-bearing merge computed a tag the tree
 could not match, and preflight refused - correctly, and twice, because the
 manual bump is exactly the kind of step people forget.
 
-A stable version baseline is currently required: untagged feature history can
-silently compute no release (R14-F7). A clear no-write prerequisite guard is
-planned. Do not treat a successful untagged no-op as first-release support or
-create a baseline automatically. Plan L used an explicitly approved fixture tag.
+### A no-bump is checked, not assumed
+
+The calculator derives the next version from the commits since the last release
+tag. With no tag at all there is nothing to derive from, so it produces no new
+tag - which is indistinguishable, to every later job, from the legitimate case
+where nothing release-bearing has landed. A release-bearing merge then appears
+to succeed and publishes nothing (R14-F7).
+
+The `baseline-guard` job runs on exactly the runs `preflight` does not, so no
+outcome of the calculator goes unexamined. It runs `release_baseline.py`, which
+fails when a no-bump has no version tag behind it and passes when one does.
+
+It is read-only and **never creates a tag**. Where a project's version history
+starts is a decision with permanent consequences for every version computed
+afterwards, and an automation that guesses it is worse than one that stops. The
+failure names the remedy instead:
+
+```
+No release baseline exists, so the computed version would be derived from no
+history and nothing would be published. Create the first tag explicitly, for
+example 'git tag -a v0.0.0 <sha> && git push origin v0.0.0', then re-run.
+```
+
+The contract tests reject removing the guard, making it read-write, inverting
+its condition, dropping the check from it, letting it run `git tag`, or giving
+it a shallow checkout that would hide the tags it judges by. Plan L used an
+explicitly approved fixture tag, which is still how a baseline gets created.
 
 1. `compute-release.yml` runs with contents read permission, computes the
    Conventional Commit version without tagging or bootstrap writes, and binds

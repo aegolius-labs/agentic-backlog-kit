@@ -19,6 +19,27 @@ jobs:
       contents: read
     uses: aegolius-labs/.github/.github/workflows/compute-release.yml@9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
 
+  baseline-guard:
+    # A no-bump is only trustworthy when there is a baseline to have bumped
+    # from. Without one the calculator derives a version from no history and
+    # every later job is skipped, so a release-bearing merge publishes nothing
+    # and reports success (R14-F7).
+    needs: compute-version
+    if: ${{ needs.compute-version.outputs.new-tag == '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require an explicit release baseline
+        run: python scripts/release_baseline.py --new-tag ''
+
   preflight:
     needs: compute-version
     if: ${{ needs.compute-version.outputs.new-tag != '' }}
