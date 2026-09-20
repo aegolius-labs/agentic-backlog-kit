@@ -6,6 +6,16 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- A release run with no version tag behind it now fails instead of reporting
+  success and publishing nothing (R14-F7). The calculator derives the next
+  version from commits since the last release tag, so with no tag it produces
+  none, which every later job read as a legitimate no-bump. A `baseline-guard`
+  job runs on exactly the runs preflight does not and fails when a no-bump has
+  no baseline, naming how to create one. It is read-only and never creates a
+  tag; the release contract rejects any change that would weaken that.
+
 ### Added
 
 - Adoption of issues a repository already has (R11). `import-plan` previews
