@@ -127,7 +127,7 @@ What shipped is recorded after the fact.
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
-| Reconciliation and reach | R10, R13 | - | Not started |
+| Reconciliation and reach | R10, R13 | pending | R13 complete; R10 open |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
@@ -165,8 +165,8 @@ effort, production readiness, or safety approval.
 | Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
-| Reconciliation and reach R10, R13 | 0/2 | 0% |
-| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23 | **16/18** | **89%** |
+| Reconciliation and reach R10, R13 | 1/2 | 50% |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23 | **17/18** | **94%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -371,12 +371,15 @@ The gate on anyone other than the maintainer using the kit.
 
 #### R13 - Complete native transport parity and decide whether to build a dedicated MCP server
 
-- **Status:** Decision gate opened by Wave C evidence; direct GraphQL works, installed generic GitHub MCP is incomplete for Projects
+- **Status:** Complete on 2026-09-19; the dedicated-MCP decision is recorded as **no**
+- **Design note:** [transport parity and the dedicated-MCP decision](docs/transport-parity.md)
 - **Importance:** High
 - **Complexity:** Hard
 - **Context:** The product requirement is native GitHub Projects interaction through the Codex GitHub integration/GitHub MCP when it exposes the complete surface, or through direct GraphQL/REST calls. Wave C proved the authenticated CLI and direct API routes can discover and create Projects, while the installed generic GitHub MCP lacks repository lifecycle, Projects, fields/views/iterations, hierarchy/dependency, issue-type, and rate-limit operations. Direct GraphQL is a first-class route, not reduced fallback behavior.
 - **High-level approach:** Formalize a capability router for three peer transports: compatible host GitHub integration/MCP, authenticated `gh` GraphQL/REST, and direct GraphQL/REST. Every declared-compatible route must emit the same compact canonical snapshots and use the shared deterministic plan, digest, apply, receipt, and verification engine. Select one complete write route per apply and report missing MCP capabilities explicitly. Use R02/R06 call counts and result shapes to decide whether a thin dedicated MCP adapter is justified; do not duplicate planning logic in that server.
-- **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence.
+- **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence. **Met:** action kinds declare their required capabilities and transports declare what they provide, so all five apply paths refuse before their first write when the selected route cannot finish, naming every missing capability; `abk capabilities` reports a route without planning anything; both peer routes are driven through the same service in parity tests; and direct GraphQL is documented and typed as a peer rather than a fallback.
+- **Decision: do not build a dedicated MCP server.** An MCP tool returns its result to the model, so routing discovery through one would put a 75 KB / 753 KB / 7.5 MB snapshot into context and undo R09; a cold sync of 1,000 items is 2,220 write calls and roughly 2,001 reads, which belongs in a journaled loop rather than a conversation; and a third route is a third route to hold at parity, which broke twice in a single day of real use. Revisit triggers are recorded in the design note.
+- **Found while verifying:** after the earlier narrow 422 fix, a 403, 429 or 500 still reported as exit code 1 on the CLI route, so R22's hints fired on the API route and never on `gh`. The parity test found it. The reported status is now taken as the status, except that a 404 is mapped only for the exact parent-absence pair, because `GET .../parent` also answers 404 when the issue itself is absent.
 
 ### Unscheduled
 

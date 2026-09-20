@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .capabilities import ALL_CAPABILITIES
 from .manifest import ManifestError
 from .scaffold import ScaffoldAction
 from .sync import SyncAction
@@ -26,26 +27,25 @@ _ISSUE_WRITE_PATH = re.compile(r"^/?repos/[^/]+/[^/]+/issues(?:/\d+)?$")
 _UNPROCESSABLE_MESSAGE = re.compile(r"\(HTTP 422\)")
 
 
+_REPORTED_STATUS = re.compile(r"\(HTTP (\d{3})\)")
+
+
 def _cli_error_status(method: str, path: str, message: str) -> int | None:
-    """Recover the two HTTP statuses that ``gh api`` reports only as exit code 1.
+    """Recover the HTTP status ``gh api`` reports only inside its diagnostic.
 
     ``gh api`` exits 1 for every API failure and leaves the real status in its
-    diagnostic text.  Callers branch on status to tell a recoverable failure
-    from a fatal one, so an exit code in its place makes the CLI route behave
-    differently from the direct API route for the same request.
+    stderr text.  Callers branch on status to tell a recoverable failure from a
+    fatal one and to explain a failure to the operator, so an exit code in its
+    place makes the CLI route behave differently from the direct API route for
+    the same request - which is precisely the peer-route claim R13 exists to
+    hold up.
 
-    Two cases are normalized, both narrowly:
-
-    ``GET .../parent`` reports an issue's normal empty parent relationship as a
-    404.  The snapshot reader already treats a direct-API 404 that way, so only
-    this exact endpoint and message pair is mapped.
-
-    Creating or updating an issue reports an unavailable native issue type as a
-    422, which selects the ``native_or_label`` fallback to a type label.  Only
-    an issue write endpoint is mapped, so an unrelated 422 elsewhere stays
-    fatal.
-
-    Every other CLI failure keeps its exit code and remains fatal.
+    The reported status is taken as the status, with one deliberate exception.
+    A 404 is only mapped for the exact endpoint and message pair that means an
+    issue simply has no parent, because ``GET .../parent`` also returns 404
+    when the issue itself is absent, and the snapshot reader treats a 404 there
+    as "no parent".  Conflating those two would turn a missing issue into a
+    silent success, so any other 404 keeps its exit code and stays fatal.
     """
 
     if (
@@ -54,12 +54,10 @@ def _cli_error_status(method: str, path: str, message: str) -> int | None:
         and message in _PARENT_ABSENCE_MESSAGES
     ):
         return 404
-    if (
-        method.upper() in {"POST", "PATCH"}
-        and _ISSUE_WRITE_PATH.match(path)
-        and _UNPROCESSABLE_MESSAGE.search(message)
-    ):
-        return 422
+    match = _REPORTED_STATUS.search(message)
+    if match:
+        status = int(match.group(1))
+        return None if status == 404 else status
     return None
 
 
@@ -79,7 +77,15 @@ class GitHubTransport(Protocol):
 
 
 class GitHubHttpTransport:
-    """Small standard-library transport for environments without GitHub CLI."""
+    """Direct GraphQL/REST access over the standard library.
+
+    This is a peer of the CLI route, not a fallback for environments that lack
+    it. Both are proven complete over the Projects surface and both run the
+    same plan, digest, apply, receipt and verification contract.
+    """
+
+    route = "api"
+    capabilities = ALL_CAPABILITIES
 
     def __init__(
         self,
@@ -143,7 +149,13 @@ class GitHubHttpTransport:
 
 
 class GitHubCliTransport:
-    """Use an authenticated `gh` session without exposing its token to this process."""
+    """Use an authenticated `gh` session without exposing its token to this process.
+
+    A peer of the direct API route; see :class:`GitHubHttpTransport`.
+    """
+
+    route = "gh"
+    capabilities = ALL_CAPABILITIES
 
     def __init__(self, executable: str = "gh") -> None:
         self.executable = executable

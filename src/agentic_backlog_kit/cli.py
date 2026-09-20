@@ -15,6 +15,12 @@ from .bootstrap import (
     bootstrap_plan_from_dict,
     build_bootstrap_plan,
 )
+from .capabilities import (
+    ACTION_CAPABILITIES,
+    CapabilityError,
+    inspect_route,
+    require_capabilities,
+)
 from .execution import failure_hint
 from .importing import (
     ImportExecutor,
@@ -144,6 +150,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     init_apply.add_argument("--force", action="store_true")
     init_apply.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+
+    capabilities = commands.add_parser(
+        "capabilities", help="Report what the selected route can and cannot do"
+    )
+    capabilities.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    capabilities.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
 
     validate = commands.add_parser("validate", help="Validate without mutation")
     validate.add_argument("--manifest", default=DEFAULT_MANIFEST)
@@ -406,7 +420,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         return _dispatch(args)
-    except (ManifestError, GitHubApiError, ApplyAuthorizationError) as error:
+    except (
+        ManifestError,
+        GitHubApiError,
+        ApplyAuthorizationError,
+        CapabilityError,
+    ) as error:
         # A rejected write should read as a decision, not a stack trace. The
         # receipt already records the exact failing action; this is the line the
         # operator sees, so it names the failure and, where the cause is known,
@@ -504,6 +523,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             repository=plan.repository,
             project_number=plan.project["number"] if plan.project else 1,
         )
+        require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_bootstrap_plan(
             plan,
             executor=BootstrapExecutor(service),
@@ -542,6 +562,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
 
     manifest = load_manifest(args.manifest)
+    if args.command == "capabilities":
+        report = inspect_route(_transport(args.backend), sorted(ACTION_CAPABILITIES))
+        _print_json(report.as_dict())
+        return 0
     if args.command == "validate":
         _print_json(
             {
@@ -729,6 +753,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        require_capabilities(transport, [a.kind for a in plan.actions])
         applied = apply_import_plan(
             plan,
             executor=ImportExecutor(service),
@@ -796,6 +821,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_plan(
             plan,
             executor=GitHubPlanExecutor(service, remote_snapshot=snapshot),
@@ -891,6 +917,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_iteration_plan(
             plan,
             executor=GitHubScaffoldExecutor(service),
@@ -929,6 +956,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_scaffold_plan(
             plan,
             executor=GitHubScaffoldExecutor(service),
