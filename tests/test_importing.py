@@ -362,5 +362,198 @@ class OrphanRecoveryTests(unittest.TestCase):
         self.assertEqual("Done", recovered[0]["status"])
 
 
+def _related_issue(
+    number: int,
+    *,
+    issue_type: str | None = None,
+    parent: dict | None = None,
+    blocked_by: list[dict] | None = None,
+) -> dict:
+    """An unmanaged issue read with `with_relationships=True`."""
+
+    observed = _issue(number, issue_type=issue_type)
+    observed["parent_issue"] = parent
+    observed["blocked_by"] = blocked_by or []
+    return observed
+
+
+def _related(number: int, abk_id: str | None = None) -> dict:
+    return {"number": number, "abk_id": abk_id}
+
+
+class RelationshipInferenceTests(unittest.TestCase):
+    """Issue #63 - adopt the shape GitHub already records, or say why not."""
+
+    def test_relationships_are_not_inferred_unless_asked(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, issue_type="Feature"),
+                _related_issue(8, issue_type="Story", parent=_related(7)),
+            ],
+        )
+
+        self.assertEqual([None, None], [entry["parent"] for entry in plan.items])
+        self.assertEqual({}, plan.withheld_relationships)
+        self.assertFalse(plan.infer_relationships)
+
+    def test_proposes_a_parent_the_hierarchy_allows(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, issue_type="Feature"),
+                _related_issue(8, issue_type="Story", parent=_related(7)),
+            ],
+            infer_relationships=True,
+        )
+
+        self.assertEqual([None, "GH-7"], [entry["parent"] for entry in plan.items])
+        self.assertEqual({}, plan.withheld_relationships)
+        self.assertTrue(plan.infer_relationships)
+
+    def test_proposes_a_parent_the_manifest_already_manages(self) -> None:
+        plan = build_import_plan(
+            manifest(item("E-1", item_type="Epic")),
+            [_related_issue(8, issue_type="Feature", parent=_related(1, "E-1"))],
+            infer_relationships=True,
+        )
+
+        self.assertEqual("E-1", plan.items[0]["parent"])
+
+    def test_withholds_a_parent_the_hierarchy_does_not_allow(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, issue_type="Epic"),
+                _related_issue(8, issue_type="Story", parent=_related(7)),
+            ],
+            infer_relationships=True,
+        )
+
+        self.assertIsNone(plan.items[1]["parent"])
+        self.assertIn(
+            "the hierarchy does not allow", plan.withheld_relationships["GH-8"][0]
+        )
+
+    def test_withholds_a_parent_that_is_marked_but_unrecorded(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [_related_issue(8, issue_type="Story", parent=_related(1, "GH-1"))],
+            infer_relationships=True,
+        )
+
+        self.assertIsNone(plan.items[0]["parent"])
+        self.assertIn("import-reconcile", plan.withheld_relationships["GH-8"][0])
+
+    def test_withholds_a_parent_left_out_of_this_adoption(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, issue_type="Feature"),
+                _related_issue(8, issue_type="Story", parent=_related(7)),
+            ],
+            include={8},
+            infer_relationships=True,
+        )
+
+        self.assertIsNone(plan.items[0]["parent"])
+        self.assertIn(
+            "neither managed nor part of this adoption",
+            plan.withheld_relationships["GH-8"][0],
+        )
+
+    def test_proposes_the_dependencies_github_records(self) -> None:
+        plan = build_import_plan(
+            manifest(item("T-1")),
+            [
+                _related_issue(7),
+                _related_issue(
+                    8, blocked_by=[_related(7), _related(1, "T-1")]
+                ),
+            ],
+            infer_relationships=True,
+        )
+
+        self.assertEqual([], plan.items[0]["depends_on"])
+        self.assertEqual(["GH-7", "T-1"], plan.items[1]["depends_on"])
+
+    def test_withholds_a_dependency_that_would_close_a_cycle(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, blocked_by=[_related(8)]),
+                _related_issue(8, blocked_by=[_related(7)]),
+            ],
+            infer_relationships=True,
+        )
+
+        self.assertEqual(["GH-8"], plan.items[0]["depends_on"])
+        self.assertEqual([], plan.items[1]["depends_on"])
+        self.assertIn(
+            "would close a dependency cycle", plan.withheld_relationships["GH-8"][0]
+        )
+
+    def test_refuses_to_infer_from_issues_read_without_relationships(self) -> None:
+        with self.assertRaisesRegex(ManifestError, r"#9"):
+            build_import_plan(
+                manifest(),
+                [_related_issue(7), _issue(9)],
+                infer_relationships=True,
+            )
+
+    def test_an_inferred_plan_round_trips_through_its_serialized_form(self) -> None:
+        plan = build_import_plan(
+            manifest(),
+            [
+                _related_issue(7, issue_type="Epic"),
+                _related_issue(8, issue_type="Story", parent=_related(7)),
+            ],
+            infer_relationships=True,
+        )
+
+        restored = import_plan_from_dict(plan.as_dict())
+
+        self.assertTrue(restored.infer_relationships)
+        self.assertEqual(plan.withheld_relationships, restored.withheld_relationships)
+        self.assertEqual(plan.digest, restored.digest)
+
+    def test_apply_rebuilds_the_plan_the_same_way_it_was_reviewed(self) -> None:
+        issues = [
+            _related_issue(7, issue_type="Feature"),
+            _related_issue(8, issue_type="Story", parent=_related(7)),
+        ]
+        plan = build_import_plan(manifest(), issues, infer_relationships=True)
+        adopted: list[str] = []
+
+        apply_import_plan(
+            plan,
+            executor=lambda action: adopted.append(action.item_id),
+            confirmation=plan.digest,
+            manifest=manifest(),
+            unmanaged_issues=issues,
+        )
+
+        self.assertEqual(["GH-7", "GH-8"], adopted)
+
+    def test_apply_refuses_a_plan_whose_inference_flag_was_edited(self) -> None:
+        issues = [
+            _related_issue(7, issue_type="Feature"),
+            _related_issue(8, issue_type="Story", parent=_related(7)),
+        ]
+        plan = build_import_plan(manifest(), issues, infer_relationships=True)
+        tampered = import_plan_from_dict(
+            {**plan.as_dict(), "infer_relationships": False}
+        )
+
+        with self.assertRaises(ApplyAuthorizationError):
+            apply_import_plan(
+                tampered,
+                executor=lambda action: None,
+                confirmation=plan.digest,
+                manifest=manifest(),
+                unmanaged_issues=issues,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

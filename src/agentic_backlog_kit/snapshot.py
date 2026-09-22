@@ -117,6 +117,43 @@ class GitHubSnapshotReader:
                 return issues
             page += 1
 
+    def _relationships(
+        self, number: int
+    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        """Read one issue's parent and blocking dependencies.
+
+        Two requests per issue, which is why no caller reads them for every
+        issue in the repository unless it was asked to.
+        """
+
+        try:
+            parent = self.transport.rest(
+                "GET", f"{self.repository_path}/issues/{number}/parent"
+            )
+        except GitHubApiError as exc:
+            if exc.status != 404:
+                raise
+            parent = None
+        dependencies = self.transport.rest(
+            "GET",
+            f"{self.repository_path}/issues/{number}/dependencies/blocked_by?per_page=100",
+        )
+        return parent, list(dependencies or [])
+
+    def _related(self, issue: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Identify a related issue by number, and by item id when it is marked.
+
+        Both are needed: an unmanaged issue can be related to one this kit
+        already manages, and only the marker says which item that is.
+        """
+
+        if issue is None:
+            return None
+        return {
+            "number": int(issue["number"]),
+            "abk_id": self._item_id_from_issue(issue),
+        }
+
     def _project_items(self) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = {}
         cursor: str | None = None
@@ -269,36 +306,61 @@ class GitHubSnapshotReader:
             )
         return marked
 
-    def read_unmanaged(self) -> list[dict[str, Any]]:
+    def read_unmanaged(self, *, with_relationships: bool = False) -> list[dict[str, Any]]:
         """Return the repository issues this kit does not manage.
 
         Adoption has to start from what is already there, and what is already
         there is exactly the set the managed snapshot filters out.  This reads
         it without touching anything: an issue the operator never selects must
         be observed and left alone.
+
+        `with_relationships` additionally reads each unmanaged issue's sub-issue
+        parent and `blocked_by` dependencies, so an import can propose the shape
+        GitHub already records instead of flattening it.  It costs two extra
+        requests per unmanaged issue and is therefore opt-in.  The relationship
+        keys are absent entirely when it is off, so a consumer can tell "not
+        read" from "read, and there was nothing".
         """
 
         unmanaged: list[dict[str, Any]] = []
         for issue in sorted(self._list_issues(), key=lambda value: int(value["number"])):
             if self._item_id_from_issue(issue) is not None:
                 continue
+            number = int(issue["number"])
             raw_type = issue.get("type")
             issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
             labels = self._label_names(issue)
             if not issue_type:
                 issue_type = self._fallback_issue_type(labels)
-            unmanaged.append(
-                {
-                    "number": int(issue["number"]),
-                    "node_id": str(issue["node_id"]),
-                    "url": str(issue.get("html_url") or issue.get("url") or ""),
-                    "title": issue.get("title", ""),
-                    "body": issue.get("body") or "",
-                    "state": str(issue.get("state", "open")),
-                    "labels": labels,
-                    "type": issue_type,
-                }
-            )
+            observed = {
+                "number": number,
+                "node_id": str(issue["node_id"]),
+                "url": str(issue.get("html_url") or issue.get("url") or ""),
+                "title": issue.get("title", ""),
+                "body": issue.get("body") or "",
+                "state": str(issue.get("state", "open")),
+                "labels": labels,
+                "type": issue_type,
+            }
+            if with_relationships:
+                parent, dependencies = self._relationships(number)
+                observed.update(
+                    {
+                        "parent_issue": self._related(parent),
+                        "blocked_by": [
+                            related
+                            for related in (
+                                self._related(dependency)
+                                for dependency in sorted(
+                                    dependencies,
+                                    key=lambda value: int(value["number"]),
+                                )
+                            )
+                            if related is not None
+                        ],
+                    }
+                )
+            unmanaged.append(observed)
         return unmanaged
 
     def read(self) -> dict[str, Any]:
@@ -311,18 +373,7 @@ class GitHubSnapshotReader:
 
         for issue in sorted(managed, key=lambda value: int(value["number"])):
             number = int(issue["number"])
-            try:
-                parent = self.transport.rest(
-                    "GET", f"{self.repository_path}/issues/{number}/parent"
-                )
-            except GitHubApiError as exc:
-                if exc.status != 404:
-                    raise
-                parent = None
-            dependencies = self.transport.rest(
-                "GET",
-                f"{self.repository_path}/issues/{number}/dependencies/blocked_by?per_page=100",
-            )
+            parent, dependencies = self._relationships(number)
             project_state = project_items.get(str(issue["node_id"]), {})
             raw_type = issue.get("type")
             issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type

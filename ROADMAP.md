@@ -97,11 +97,18 @@ could never fall back from an unavailable native issue type, because
 HTTP 422. The same manifest converged on the direct API route and failed
 mid-apply on `gh`. That is fixed here.
 
-Outstanding product work: R15 and R16 (GitHub operational authority, with
-policy D1 and carryover policy A already approved) and R11 (adoption).
-Outstanding operations work, excluded from the product completion basis: R14
-missing-baseline handling with hosted failure-recovery proof, and R20
-disposable-resource cleanup. See
+**2026-09-21.** R15, R16, R11, R22 and R23 have since shipped, and R13 closed
+with the dedicated-MCP decision recorded as no. GH-63 lands here: adoption now
+proposes the sub-issue and dependency structure GitHub already records instead
+of flattening it, which also closes a divergence, because additive
+synchronization never removed the relationships a flat adoption denied.
+
+Outstanding product work: **R10** alone, and it is the one open item that still
+needs a product decision from the owner — a removal and reverse-sync authority
+policy per managed field. Outstanding operations work, excluded from the
+product completion basis: R14 hosted draft/partial-upload recovery proof, and
+R20 disposable-resource cleanup. Both need an authorized evaluation against a
+disposable fixture rather than more local code. See
 [the overall progress report](docs/overall-progress-2026-09-13.md) and
 [remediation proposal](docs/remediation-plan.md).
 
@@ -127,7 +134,7 @@ What shipped is recorded after the fact.
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
-| Reconciliation and reach | R10, R13 | pending | R13 complete; R10 open |
+| Reconciliation and reach | R10, R13, GH-63 | pending | R13 and GH-63 complete; R10 open |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
@@ -165,8 +172,8 @@ effort, production readiness, or safety approval.
 | Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
-| Reconciliation and reach R10, R13 | 1/2 | 50% |
-| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23 | **17/18** | **94%** |
+| Reconciliation and reach R10, R13, GH-63 | 2/3 | 67% |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63 | **18/19** | **95%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -380,6 +387,35 @@ The gate on anyone other than the maintainer using the kit.
 - **Done when:** The representative fixture produces equivalent plans and verified GitHub state through every declared-compatible route; incomplete routes fail capability preflight without partial writes; direct GraphQL remains fully supported; and the dedicated-MCP decision is recorded with token/call evidence. **Met:** action kinds declare their required capabilities and transports declare what they provide, so all five apply paths refuse before their first write when the selected route cannot finish, naming every missing capability; `abk capabilities` reports a route without planning anything; both peer routes are driven through the same service in parity tests; and direct GraphQL is documented and typed as a peer rather than a fallback.
 - **Decision: do not build a dedicated MCP server.** An MCP tool returns its result to the model, so routing discovery through one would put a 75 KB / 753 KB / 7.5 MB snapshot into context and undo R09; a cold sync of 1,000 items is 2,220 write calls and roughly 2,001 reads, which belongs in a journaled loop rather than a conversation; and a third route is a third route to hold at parity, which broke twice in a single day of real use. Revisit triggers are recorded in the design note.
 - **Found while verifying:** after the earlier narrow 422 fix, a 403, 429 or 500 still reported as exit code 1 on the CLI route, so R22's hints fired on the API route and never on `gh`. The parity test found it. The reported status is now taken as the status, except that a 404 is mapped only for the exact parent-absence pair, because `GET .../parent` also answers 404 when the issue itself is absent.
+
+#### GH-63 - Infer hierarchy and dependencies when importing existing issues
+
+- **Status:** Complete on 2026-09-21, in code and unit tests; not yet live-validated
+- **Importance:** High
+- **Complexity:** Medium
+- **Context:** R11 adopted an existing issue flat: neutral type, `parent: null`,
+  `depends_on: []`. GitHub already records the sub-issue parent and the
+  `blocked_by` dependencies, and synchronization is additive, so it never
+  removed the relationships the manifest claimed did not exist. An adopted
+  repository therefore kept a structure on GitHub that local intent denied, and
+  nothing reconciled the two. This item is the reason import was usable only as
+  a flat dump of an existing backlog.
+- **High-level approach:** `read_unmanaged(with_relationships=True)` reads the
+  parent and the `blocked_by` set per unmanaged issue, and
+  `import-plan --infer-relationships` proposes them. Opt-in, because it costs
+  two extra reads per issue. A relationship the manifest cannot express is
+  withheld with its reason rather than forced, and the plan records which mode
+  built it so apply rebuilds and re-digests the same way.
+- **Done when:** An import proposes the parent and dependency structure GitHub
+  records; a relationship outside the hierarchy ladder, outside the adoption,
+  or closing a dependency cycle is reported rather than applied; the default
+  read cost is unchanged; and a plan whose mode was edited after review is
+  refused. **Met** in code and unit tests. Live validation against a repository
+  with real sub-issue structure has not been run.
+- **Withheld rather than forced:** a repository whose issue types are outside
+  the manifest's hierarchy adopts as `Task` throughout, and `Task` cannot
+  parent `Task`, so its whole structure reports as withheld. That is the strict
+  ladder R24 is open about, surfaced by real use rather than argued about.
 
 ### Unscheduled
 

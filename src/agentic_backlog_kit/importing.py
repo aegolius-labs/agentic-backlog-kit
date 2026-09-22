@@ -72,6 +72,8 @@ class ImportPlan:
     manifest_fingerprint: str
     snapshot_fingerprint: str
     skipped: dict[str, str] = field(default_factory=dict)
+    infer_relationships: bool = False
+    withheld_relationships: dict[str, list[str]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -81,6 +83,11 @@ class ImportPlan:
             "action_count": len(self.actions),
             "items": self.items,
             "skipped": dict(self.skipped),
+            "infer_relationships": self.infer_relationships,
+            "withheld_relationships": {
+                item_id: list(reasons)
+                for item_id, reasons in self.withheld_relationships.items()
+            },
             "actions": [action.as_dict() for action in self.actions],
         }
 
@@ -150,6 +157,137 @@ def _digest(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _reaches(adjacency: dict[str, set[str]], start: str, target: str) -> bool:
+    """Whether `target` is reachable from `start` along accepted dependencies."""
+
+    seen: set[str] = set()
+    queue = [start]
+    while queue:
+        current = queue.pop()
+        if current == target:
+            return True
+        if current in seen:
+            continue
+        seen.add(current)
+        queue.extend(sorted(adjacency.get(current, ())))
+    return False
+
+
+def _resolve_related(
+    related: dict[str, Any] | None,
+    *,
+    existing_ids: set[str],
+    adopted_by_number: dict[int, str],
+) -> tuple[str | None, str | None]:
+    """Map one observed GitHub relationship onto a manifest item id.
+
+    Returns the resolved id, or `None` with the reason it could not be used.
+    An issue outside both the manifest and this adoption cannot be referenced:
+    the manifest validator rejects an unknown id, so proposing one would make
+    the plan unapplyable.
+    """
+
+    if related is None:
+        return None, None
+    number = int(related["number"])
+    marker_id = related.get("abk_id")
+    if marker_id:
+        if marker_id in existing_ids:
+            return str(marker_id), None
+        return None, (
+            f"issue #{number} is marked as '{marker_id}' but the manifest does "
+            "not record it; run import-reconcile first"
+        )
+    adopted = adopted_by_number.get(number)
+    if adopted:
+        return adopted, None
+    return None, (
+        f"issue #{number} is neither managed nor part of this adoption"
+    )
+
+
+def _infer_relationships(
+    data: dict[str, Any],
+    adopted: list[tuple[dict[str, Any], dict[str, Any]]],
+    levels: dict[str, int],
+) -> dict[str, list[str]]:
+    """Propose the hierarchy and dependencies GitHub already records.
+
+    `adopted` pairs each observed issue with the item proposed for it, which
+    the caller already knows; this mutates those items in place.
+
+    Every relationship this cannot express is dropped and reported rather than
+    forced: adoption must succeed against a repository shaped however it is
+    shaped, and the manifest's strict ladder and acyclic dependency rule are
+    narrower than what GitHub permits.
+    """
+
+    existing_ids = {item["id"] for item in data["items"]}
+    adopted_by_number = {
+        int(issue["number"]): item["id"] for issue, item in adopted
+    }
+    known_types = {
+        **{item["id"]: item["type"] for item in data["items"]},
+        **{item["id"]: item["type"] for _, item in adopted},
+    }
+    withheld: dict[str, list[str]] = {}
+
+    def withhold(item_id: str, reason: str) -> None:
+        withheld.setdefault(item_id, []).append(reason)
+
+    for issue, item in adopted:
+        parent_id, reason = _resolve_related(
+            issue.get("parent_issue"),
+            existing_ids=existing_ids,
+            adopted_by_number=adopted_by_number,
+        )
+        if reason:
+            withhold(item["id"], f"parent: {reason}")
+            continue
+        if parent_id is None:
+            continue
+        parent_type = known_types[parent_id]
+        if levels[item["type"]] != levels[parent_type] + 1:
+            withhold(
+                item["id"],
+                f"parent: '{parent_id}' is type '{parent_type}' and this item is "
+                f"type '{item['type']}', which the hierarchy does not allow",
+            )
+            continue
+        item["parent"] = parent_id
+
+    adjacency: dict[str, set[str]] = {
+        existing["id"]: set(existing["depends_on"]) for existing in data["items"]
+    }
+    for _, item in adopted:
+        adjacency.setdefault(item["id"], set())
+
+    for issue, item in adopted:
+        accepted: set[str] = set()
+        for related in issue.get("blocked_by") or []:
+            dependency_id, reason = _resolve_related(
+                related,
+                existing_ids=existing_ids,
+                adopted_by_number=adopted_by_number,
+            )
+            if reason:
+                withhold(item["id"], f"blocked by: {reason}")
+                continue
+            if dependency_id is None or dependency_id == item["id"]:
+                continue
+            if _reaches(adjacency, dependency_id, item["id"]):
+                withhold(
+                    item["id"],
+                    f"blocked by: '{dependency_id}' would close a dependency cycle",
+                )
+                continue
+            adjacency[item["id"]].add(dependency_id)
+            accepted.add(dependency_id)
+        item["depends_on"] = sorted(accepted)
+
+    return {item_id: withheld[item_id] for item_id in sorted(withheld)}
+
+
 def build_import_plan(
     manifest: dict[str, Any],
     unmanaged_issues: list[dict[str, Any]],
@@ -157,6 +295,7 @@ def build_import_plan(
     include: set[int] | frozenset[int] | None = None,
     limit: int | None = None,
     allow_duplicate_titles: bool = False,
+    infer_relationships: bool = False,
 ) -> ImportPlan:
     """Preview adopting existing issues without reading or writing anything more.
 
@@ -166,13 +305,28 @@ def build_import_plan(
     """
 
     data = validate_manifest(manifest)
-    hierarchy_types = {
-        level_type
-        for level in data["workflow"].get("hierarchy", [])
+    hierarchy = data["workflow"].get("hierarchy", [])
+    hierarchy_types = {level_type for level in hierarchy for level_type in level}
+    levels = {
+        level_type: index
+        for index, level in enumerate(hierarchy)
         for level_type in level
     }
     existing_ids = {item["id"] for item in data["items"]}
     existing_titles = {item["title"].strip().casefold() for item in data["items"]}
+
+    if infer_relationships:
+        unread = sorted(
+            int(issue["number"])
+            for issue in unmanaged_issues
+            if "parent_issue" not in issue or "blocked_by" not in issue
+        )
+        if unread:
+            raise ManifestError(
+                "Relationship inference needs issues read with relationships; "
+                "these carry none: "
+                + ", ".join(f"#{number}" for number in unread)
+            )
 
     if limit is not None and (
         isinstance(limit, bool) or not isinstance(limit, int) or limit < 1
@@ -190,6 +344,7 @@ def build_import_plan(
 
     actions: list[ImportAction] = []
     items: list[dict[str, Any]] = []
+    adopted: list[tuple[dict[str, Any], dict[str, Any]]] = []
     skipped: dict[str, str] = {}
     proposed_ids: set[str] = set()
 
@@ -241,6 +396,7 @@ def build_import_plan(
             "sprint": None,
         }
         items.append(item)
+        adopted.append((issue, item))
         proposed_ids.add(item_id)
         existing_titles.add(title.casefold())
 
@@ -264,6 +420,10 @@ def build_import_plan(
             )
         )
 
+    withheld_relationships: dict[str, list[str]] = {}
+    if infer_relationships:
+        withheld_relationships = _infer_relationships(data, adopted, levels)
+
     # Validate the manifest the plan intends to produce before offering it.
     merged = {**data, "items": [*data["items"], *items]}
     validate_manifest(merged)
@@ -277,6 +437,8 @@ def build_import_plan(
         manifest_fingerprint=manifest_fingerprint,
         snapshot_fingerprint=snapshot_fingerprint,
         skipped=skipped,
+        infer_relationships=infer_relationships,
+        withheld_relationships=withheld_relationships,
     )
 
 
@@ -315,6 +477,12 @@ def import_plan_from_dict(data: dict[str, Any]) -> ImportPlan:
     skipped = data.get("skipped") or {}
     if not isinstance(skipped, dict):
         raise ManifestError("Import plan skipped must be an object")
+    withheld = data.get("withheld_relationships") or {}
+    if not isinstance(withheld, dict):
+        raise ManifestError("Import plan withheld_relationships must be an object")
+    inferred = data.get("infer_relationships", False)
+    if not isinstance(inferred, bool):
+        raise ManifestError("Import plan infer_relationships must be true or false")
     return ImportPlan(
         actions=actions,
         items=items,
@@ -322,6 +490,8 @@ def import_plan_from_dict(data: dict[str, Any]) -> ImportPlan:
         manifest_fingerprint=manifest_fingerprint,
         snapshot_fingerprint=snapshot_fingerprint,
         skipped=skipped,
+        infer_relationships=inferred,
+        withheld_relationships=withheld,
     )
 
 
@@ -348,6 +518,7 @@ def apply_import_plan(
         manifest,
         unmanaged_issues,
         include={int(action.payload["number"]) for action in plan.actions},
+        infer_relationships=plan.infer_relationships,
     )
     if fresh.digest != plan.digest:
         raise ApplyAuthorizationError(

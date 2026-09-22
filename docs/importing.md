@@ -44,15 +44,56 @@ survives when synchronization later renders the managed body.
 | `status` | `Done` for a closed issue; otherwise `Inbox` |
 | `maturity` | `idea` — an adopted issue has not been refined by this backlog |
 | scores | Neutral (3), enabler value 0 |
-| `parent`, `depends_on` | Empty |
+| `parent`, `depends_on` | Empty, unless `--infer-relationships` is passed |
 
 An organization defines its own issue types. `User Story` and `Tech Story` map
 to `Story`, `Defect` to `Bug`, `Chore` to `Task`; anything the manifest's
 hierarchy does not define adopts as `Task` rather than inventing a level.
 
-Hierarchy and dependencies are **not** inferred yet. GitHub records sub-issue
-links and `blocked_by` relationships, and reading them costs an extra request
-per issue, which the first cut left out.
+## Inferring hierarchy and dependencies
+
+GitHub already records sub-issue links and `blocked_by` relationships. Adoption
+flattens them by default, and `--infer-relationships` proposes them instead:
+
+```bash
+abk import-plan --infer-relationships --output .agentic-backlog/import.json
+```
+
+It is opt-in because it costs two extra reads per unmanaged issue — one for the
+parent, one for the dependencies — on top of the single listing adoption
+otherwise performs. On a repository of any size that is the difference between
+one request and hundreds.
+
+Flattening was not merely incomplete, it was a divergence: synchronization is
+additive and never removes a parent or a dependency, so an adopted issue kept
+its GitHub structure while the manifest said it had none, and nothing ever
+reconciled the two. Inferring the structure is what makes the manifest agree
+with the repository it adopted.
+
+### What gets proposed, and what gets withheld
+
+A relationship is proposed only when it can be expressed as this manifest's
+own rules allow. Everything else is dropped and reported under
+`withheld_relationships`, keyed by the item it belongs to:
+
+| Observed | Outcome |
+| --- | --- |
+| Parent is adopted in this same plan, one hierarchy level above | Proposed |
+| Parent is already a managed item, one level above | Proposed |
+| Parent is not exactly one level above the child | Withheld — the hierarchy forbids it |
+| Related issue is neither managed nor part of this adoption | Withheld — the id would not exist |
+| Related issue carries a marker the manifest does not record | Withheld — run `import-reconcile` first, then re-plan |
+| A dependency that would close a cycle | Withheld — the earlier edge wins, deterministically by item id |
+
+Nothing is forced. A repository whose issue types do not match the manifest's
+hierarchy adopts as `Task` throughout, and `Task` cannot parent `Task`, so its
+structure is reported as withheld rather than invented. That is the honest
+outcome, and it is the same strict-ladder constraint R24 is open about.
+
+The plan records which mode built it. `import-apply` re-reads the repository
+the same way and rebuilds the plan with the same setting before comparing
+digests, so a plan whose mode was edited after review is refused rather than
+applied.
 
 ## Choosing what to adopt
 
@@ -101,9 +142,9 @@ recovery path exists because of it.
 
 ## After adopting
 
-An adopted item enters the backlog unrefined by design — neutral scores,
-`idea` maturity, no hierarchy. That is honest rather than helpful: the kit has
-no basis for scoring work somebody else filed. Refine with `item-update`, then
+An adopted item enters the backlog unrefined by design — neutral scores and
+`idea` maturity, and no hierarchy unless it was inferred. That is honest rather
+than helpful: the kit has no basis for scoring work somebody else filed. Refine with `item-update`, then
 synchronize.
 
 The first synchronization after adoption will render the managed body template
@@ -112,7 +153,10 @@ the issue's formatting exactly as it is.
 
 ## Known limits
 
-- Parent and dependency relationships are not inferred.
+- Relationship inference reads two extra requests per unmanaged issue and has
+  no batched or GraphQL route yet.
+- A withheld relationship is reported, not repaired. Retyping the items and
+  re-planning is manual.
 - Scores and maturity are neutral defaults, not inferred from labels or
   milestones.
 - Adoption reads every issue in the repository; there is no incremental mode
