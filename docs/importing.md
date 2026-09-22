@@ -21,6 +21,10 @@ performs no writes at all.
 marker to each issue's body and records the item in the manifest. Ordinary
 synchronization then takes over.
 
+From an installed plugin this is the `$backlog-adopt` skill, whose
+[adoption contract](../skills/backlog-adopt/references/adoption-contract.md)
+carries the same rules in the form an agent reads.
+
 ## What adoption does and does not touch
 
 | Adoption writes | Adoption leaves alone |

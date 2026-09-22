@@ -1,0 +1,13 @@
+interface:
+  display_name: "Adopt Existing Backlog"
+  short_description: "Bring a repository's existing issues under management"
+  default_prompt: "Use $backlog-adopt to take this repository's existing issues under management."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "Read repository issues and update issue bodies"
+      transport: "streamable_http"
+      url: "https://api.githubcopilot.com/mcp/"
+policy:
+  allow_implicit_invocation: true
