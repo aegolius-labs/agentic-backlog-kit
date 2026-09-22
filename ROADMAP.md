@@ -134,7 +134,7 @@ What shipped is recorded after the fact.
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
-| Reconciliation and reach | R10, R13, GH-63 | pending | R13 and GH-63 complete; R10 open |
+| Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R10 and R25 open |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
@@ -172,8 +172,8 @@ effort, production readiness, or safety approval.
 | Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
-| Reconciliation and reach R10, R13, GH-63 | 2/3 | 67% |
-| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63 | **18/19** | **95%** |
+| Reconciliation and reach R10, R13, GH-63, R25 | 2/4 | 50% |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25 | **18/20** | **90%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -416,6 +416,34 @@ The gate on anyone other than the maintainer using the kit.
   the manifest's hierarchy adopts as `Task` throughout, and `Task` cannot
   parent `Task`, so its whole structure reports as withheld. That is the strict
   ladder R24 is open about, surfaced by real use rather than argued about.
+
+#### R25 - Carry a canonical GUID through to GitHub for Seam A traceability
+
+- **Status:** Open; filed 2026-09-22 through this kit's own backlog as
+  [#69](https://github.com/aegolius-labs/agentic-backlog-kit/issues/69)
+- **Importance:** High as an enabler; nothing today depends on it
+- **Complexity:** Medium
+- **Context:** `aio-agentic-sdlc/doc/authority-model.md` requires that a
+  canonical GUID be carried into the ABK item and into the GitHub issue body
+  marker, so a projected issue can always be traced back to its Intention DAG
+  node. This kit cannot. `$defs.item` sets `additionalProperties: false` over a
+  fixed fourteen-field list with no GUID field, and the marker
+  `<!-- agentic-backlog-kit:id=<id>;schema=1 -->` has room for a second key that
+  nothing writes or reads. Seam B is implemented and pinned by fixtures on both
+  sides; Seam A is documented and unbuilt, and neither repository references the
+  other in `src` or `tests`.
+- **High-level approach:** An optional GUID on the item under a bumped schema
+  version with a tested migration from version 1, carried into the marker, plus
+  a Seam A fixture committed on each side so neither repository imports the
+  other to test the contract.
+- **Done when:** An item can carry a GUID and one without stays valid, because
+  standalone use owns no Intention DAG; the marker round-trips it through read
+  and adoption; and both fixtures exist.
+- **Why now rather than when the framework arrives:** adding the carrier later
+  costs a schema bump, a marker extension, and a re-link pass over every issue
+  created before it. That is cheap at fifty issues and expensive at five
+  thousand. Standalone use is a supported configuration, so this blocks nothing
+  today - it only gets more expensive.
 
 ### Unscheduled
 
