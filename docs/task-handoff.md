@@ -12,25 +12,39 @@ sub-issue parent and `blocked_by` dependencies GitHub already records, withholds
 whatever the manifest's hierarchy and acyclic rules cannot express, and reports
 why. Suite: 358 tests passing.
 
+## Current activation checkpoint (2026-09-22, later)
+
+GH-63 shipped in `v0.7.0` and is now live-validated against
+`aegolius-labs/abk-adopt-eval-20260922`; see
+[the validation record](adoption-live-validation-2026-09-22.md). The
+`backlog-adopt` skill shipped alongside it, closing the gap the earlier
+checkpoint recorded: adoption is now reachable from the installed plugin and not
+only from the CLI.
+
+Three items were filed through the kit's own backlog during this work, each with
+`item-add` then a reviewed, digest-confirmed sync: R25 (#69), S-R11-3 (#70,
+since closed) and S-R11-4 (#72). Every sync converged to zero on its second
+plan.
+
 **Next work, in order:**
 
-1. **Live-validate GH-63.** It is verified in unit tests only. The cheapest real
-   target is this repository: Project 6 already holds 50 issues with sub-issue
-   and dependency links, so re-planning an adoption there with
-   `--infer-relationships` against a disposable manifest exercises real
-   structure. No write is needed to learn whether inference proposes the shape
-   that is actually there.
-2. **R10**, the last open scheduled product item. It needs an owner decision
-   first: a removal and reverse-sync authority policy per managed field. Do not
-   start implementation before that policy is recorded.
-3. **Operations**, both needing an authorized evaluation rather than more code:
+1. **S-R11-4**, the one open item that needs nothing from the owner.
+   `import-reconcile` recovers a stranded marker flat, which is the divergence
+   GH-63 removed from adoption still present in the recovery path. Adoption is
+   honest about structure and recovery is not.
+2. **R10**, the last open scheduled feature. It needs an owner decision first: a
+   removal and reverse-sync authority policy per managed field. Do not start
+   implementation before that policy is recorded.
+3. **R25**, the Seam A traceability carrier. It bumps the manifest schema
+   version, so confirm the migration shape with the owner before starting.
+4. **Operations**, both needing an authorized evaluation rather than more code:
    R14 hosted draft/partial-upload recovery, and R20 disposable-resource
-   cleanup with refreshed identities.
+   cleanup - whose scope now includes the retained adoption fixture, recorded by
+   exact name in the roadmap.
 
-**Known gap, not yet tracked as an item:** `skills/` documents init, ingest,
-prioritize, sprint planning and sync, and says nothing about adoption. R11 and
-GH-63 are reachable from the CLI and from `docs/importing.md` only, so an agent
-working through the skills alone cannot adopt an existing repository.
+**Standing limitation of the adoption evidence:** GitHub refuses to create a
+dependency cycle, so the cycle-withholding branch could not be exercised live
+and stays covered by unit tests alone.
 
 ## Current activation checkpoint (2026-09-18)
 

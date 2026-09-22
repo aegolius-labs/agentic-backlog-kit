@@ -390,7 +390,9 @@ The gate on anyone other than the maintainer using the kit.
 
 #### GH-63 - Infer hierarchy and dependencies when importing existing issues
 
-- **Status:** Complete on 2026-09-21, in code and unit tests; not yet live-validated
+- **Status:** Complete. Shipped in `v0.7.0` on 2026-09-22 and live-validated the
+  same day against a disposable fixture; see
+  [live validation](docs/adoption-live-validation-2026-09-22.md)
 - **Importance:** High
 - **Complexity:** Medium
 - **Context:** R11 adopted an existing issue flat: neutral type, `parent: null`,
@@ -410,8 +412,21 @@ The gate on anyone other than the maintainer using the kit.
   records; a relationship outside the hierarchy ladder, outside the adoption,
   or closing a dependency cycle is reported rather than applied; the default
   read cost is unchanged; and a plan whose mode was edited after review is
-  refused. **Met** in code and unit tests. Live validation against a repository
-  with real sub-issue structure has not been run.
+  refused. **Met**, in unit tests and then against
+  `aegolius-labs/abk-adopt-eval-20260922`: three parents and three dependencies
+  proposed from real GitHub structure, two parents withheld with accurate
+  reasons, a narrowed adoption withholding only its outside references, the
+  orphan reason and its `import-reconcile` recovery working end to end, apply
+  completing 9/9 against the reviewed digest, and a second plan proposing
+  nothing. Seven of nine adopted items then matched GitHub's structure exactly;
+  the two that did not were the deliberate withholdings.
+- **Found while validating:** GitHub itself refuses to create a dependency
+  cycle, so the cycle-withholding branch cannot be reached through its own
+  `blocked_by` graph. It still fires when a dependency resolves onto an
+  already-managed item whose `depends_on` closes a loop, so it is not dead code,
+  but its trigger is narrower than the design assumed and it stays covered by
+  unit tests rather than by that run. Recorded rather than quietly claimed as
+  exercised.
 - **Withheld rather than forced:** a repository whose issue types are outside
   the manifest's hierarchy adopts as `Task` throughout, and `Task` cannot
   parent `Task`, so its whole structure reports as withheld. That is the strict
@@ -507,7 +522,13 @@ misleading.
 
 #### R20 - Resolve remaining disposable evaluation resources
 
-- **Status:** Pending fresh identity discovery and separately confirmed cleanup plan.
+- **Status:** Pending fresh identity discovery and separately confirmed cleanup
+  plan. One resource was added on 2026-09-22 and its identity is recorded rather
+  than left to be rediscovered: `aegolius-labs/abk-adopt-eval-20260922`, private,
+  created for the GH-63 live validation and retained because the authenticated
+  token carries no `delete_repo` scope. Deleting it needs a token that does, and
+  it is safe to delete - nothing references it but
+  [the validation record](docs/adoption-live-validation-2026-09-22.md).
 - **Importance:** Low; not a release blocker
 - **Complexity:** Easy, subject to permissions
 - **Approach:** Refresh exact identities from the prior receipt, confirm absence of Project #4, plan only remaining resources, and stop/journal on first failure.
