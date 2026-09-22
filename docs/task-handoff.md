@@ -3,6 +3,35 @@
 The user transferred continuation of **Create agentic backlog kit** into
 **Review project roadmap** and approved carryover policy A.
 
+## Current activation checkpoint (2026-09-21)
+
+R15, R16, R11, R22, R23 and R13 have all shipped since the checkpoint below,
+which is retained but no longer describes the next work. GH-63 lands adoption
+relationship inference: `import-plan --infer-relationships` proposes the
+sub-issue parent and `blocked_by` dependencies GitHub already records, withholds
+whatever the manifest's hierarchy and acyclic rules cannot express, and reports
+why. Suite: 358 tests passing.
+
+**Next work, in order:**
+
+1. **Live-validate GH-63.** It is verified in unit tests only. The cheapest real
+   target is this repository: Project 6 already holds 50 issues with sub-issue
+   and dependency links, so re-planning an adoption there with
+   `--infer-relationships` against a disposable manifest exercises real
+   structure. No write is needed to learn whether inference proposes the shape
+   that is actually there.
+2. **R10**, the last open scheduled product item. It needs an owner decision
+   first: a removal and reverse-sync authority policy per managed field. Do not
+   start implementation before that policy is recorded.
+3. **Operations**, both needing an authorized evaluation rather than more code:
+   R14 hosted draft/partial-upload recovery, and R20 disposable-resource
+   cleanup with refreshed identities.
+
+**Known gap, not yet tracked as an item:** `skills/` documents init, ingest,
+prioritize, sprint planning and sync, and says nothing about adoption. R11 and
+GH-63 are reachable from the CLI and from `docs/importing.md` only, so an agent
+working through the skills alone cannot adopt an existing repository.
+
 ## Current activation checkpoint (2026-09-18)
 
 The roadmap was re-cut from one flat twenty-item list into release lines, each
@@ -19,10 +48,7 @@ issue type - which is fixed here, and produced new items R22, R23 and R24. See
 Suite: 207 tests passing; byte budgets within envelope; the benchmark report
 digest is unchanged.
 
-**Next work:** R15, then R16, using already approved D1 and carryover policy A.
-Both are implementation-only; no product decision is outstanding. R22 and R23
-are small and independent. R11 remains the adoption gate. R14 and R20 remain
-open at the operations level and are excluded from the product basis.
+**Next work:** superseded by the 2026-09-21 checkpoint below.
 
 The `Status` and `Sprint` values on Project 6 are currently written from local
 intent. That is the R15 defect, accepted deliberately while dogfooding, and it

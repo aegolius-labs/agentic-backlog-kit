@@ -15,6 +15,13 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   missing capability instead of failing partway through.
 - `abk capabilities` reports what the selected route can and cannot do without
   planning anything.
+- `abk import-plan --infer-relationships` proposes the sub-issue parent and
+  `blocked_by` dependencies GitHub already records, instead of adopting every
+  issue flat. It is opt-in because it costs two extra reads per unmanaged
+  issue. A relationship the manifest cannot express — a parent that is not
+  exactly one hierarchy level above, a reference to an issue outside the
+  adoption, or a dependency that would close a cycle — is withheld and reported
+  under `withheld_relationships` rather than forced.
 
 ### Fixed
 

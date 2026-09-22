@@ -760,6 +760,27 @@
       "sprint": null
     },
     {
+      "id": "R25",
+      "title": "R25 - Carry a canonical GUID through to GitHub for Seam A traceability",
+      "type": "Feature",
+      "description": "The authority model in aio-agentic-sdlc requires that a canonical GUID be carried into the ABK item and into the GitHub issue body marker, so a projected issue can always be traced back to its Intention DAG node. This kit cannot do that. `$defs.item` in schemas/manifest.schema.json sets `additionalProperties: false` over a fixed fourteen-field list with no GUID field, so an item carrying one fails validation. The marker is `<!-- agentic-backlog-kit:id=<id>;schema=1 -->`; the separator leaves room for a second key but nothing writes or reads one.\n\nSeam B (agentic-qa-kit to here) is implemented and pinned by fixtures on both sides. Seam A is documented and unbuilt: neither repository references the other in src or tests.\n\nThis does not block standalone use, which is a supported configuration, not a degraded one. It is a cost that grows. Adding the carrier later means a schema version bump, a marker extension, and a re-link pass over every issue created before it. That is cheap at fifty issues and expensive at five thousand, which is why it is recorded now rather than when the framework arrives.\n\nFound on 2026-09-21 while assessing whether aio-agentic-sdlc can be adopted after this kit is already in use.",
+      "acceptance_criteria": [
+        "A manifest item can carry an optional canonical GUID without failing validation, under a bumped schema version with a tested migration from version 1",
+        "The issue body marker carries the GUID when the item has one, and round-trips through read and adoption without loss",
+        "An item with no GUID stays valid, because standalone use owns no Intention DAG",
+        "A Seam A fixture is committed here and its counterpart in aio-agentic-sdlc, so neither repository imports the other to test the contract"
+      ],
+      "parent": "EPIC-V040",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 5,
+      "status": "Inbox",
+      "maturity": "idea",
+      "sprint": null
+    },
+    {
       "id": "S-R11-1",
       "title": "Preview unmanaged issues read-only",
       "type": "Story",
@@ -799,6 +820,27 @@
       "enabler_value": 4,
       "status": "Refining",
       "maturity": "refined",
+      "sprint": null
+    },
+    {
+      "id": "S-R11-3",
+      "title": "Cover adoption in the skills, not only the CLI",
+      "type": "Story",
+      "description": "The skills directory carries backlog-init, backlog-ingest, backlog-prioritize, backlog-sprint-plan and backlog-sync-github, and none of them mentions adoption. R11 and the relationship inference that followed it are reachable from the CLI and from docs/importing.md only.\n\nThat inverts the adoption story. An agent working through the installed plugin can initialize a backlog and synchronize one it already manages, but cannot take on a repository that already has issues, which is the path any new user is actually on. Ingestion handles one structured item at a time, so without an adoption skill the plugin's answer to an existing backlog is to re-file it by hand.\n\nFound on 2026-09-21 while assessing readiness for use across existing projects.",
+      "acceptance_criteria": [
+        "A skill covers the plan, review, apply and reconcile shape of adoption, including what adoption writes and what it leaves alone",
+        "It states that relationship inference is opt-in and why, and what a withheld relationship means",
+        "It routes orphan recovery to import-reconcile rather than to a second adoption",
+        "Skill structural validation and host manifest parity stay green"
+      ],
+      "parent": "R11",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 3,
+      "status": "Inbox",
+      "maturity": "idea",
       "sprint": null
     },
     {

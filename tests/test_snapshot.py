@@ -159,6 +159,94 @@ class SnapshotReaderTests(unittest.TestCase):
         self.assertEqual(["customer", "type:task"], by_id["T-BASE"]["labels"])
 
 
+class UnmanagedReaderTests(unittest.TestCase):
+    """Issue #63 - relationships cost two reads per issue, so they are opt-in."""
+
+    ISSUES_PATH = "/repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
+
+    def _reader(self, transport: RoutedTransport) -> GitHubSnapshotReader:
+        return GitHubSnapshotReader(
+            transport,
+            owner="aegolius-labs",
+            repository="example",
+            project_number=1,
+        )
+
+    def _issue(self, number: int, body: str = "") -> dict:
+        return {
+            "id": 100 + number,
+            "node_id": f"NODE_{number}",
+            "number": number,
+            "html_url": f"issue-{number}",
+            "title": f"Issue {number}",
+            "body": body,
+            "state": "open",
+            "type": {"name": "Task"},
+            "labels": [],
+        }
+
+    def test_reads_no_relationship_requests_by_default(self) -> None:
+        transport = RoutedTransport()
+        transport.rest_responses = {("GET", self.ISSUES_PATH): [self._issue(7)]}
+
+        unmanaged = self._reader(transport).read_unmanaged()
+
+        self.assertEqual(1, len(unmanaged))
+        self.assertNotIn("parent_issue", unmanaged[0])
+        self.assertNotIn("blocked_by", unmanaged[0])
+
+    def test_reads_the_parent_and_dependencies_when_asked(self) -> None:
+        transport = RoutedTransport()
+        managed = self._issue(
+            5, body="<!-- agentic-backlog-kit:id=T-PARENT;schema=1 -->"
+        )
+        transport.rest_responses = {
+            ("GET", self.ISSUES_PATH): [self._issue(7)],
+            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): managed,
+            (
+                "GET",
+                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
+            ): [self._issue(6)],
+        }
+
+        unmanaged = self._reader(transport).read_unmanaged(with_relationships=True)
+
+        self.assertEqual(
+            {"number": 5, "abk_id": "T-PARENT"}, unmanaged[0]["parent_issue"]
+        )
+        self.assertEqual([{"number": 6, "abk_id": None}], unmanaged[0]["blocked_by"])
+
+    def test_an_unparented_issue_reports_no_parent(self) -> None:
+        transport = RoutedTransport()
+        transport.rest_responses = {
+            ("GET", self.ISSUES_PATH): [self._issue(7)],
+            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): GitHubApiError(
+                404, "No parent issue found"
+            ),
+            (
+                "GET",
+                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
+            ): [],
+        }
+
+        unmanaged = self._reader(transport).read_unmanaged(with_relationships=True)
+
+        self.assertIsNone(unmanaged[0]["parent_issue"])
+        self.assertEqual([], unmanaged[0]["blocked_by"])
+
+    def test_a_managed_issue_is_never_offered_for_adoption(self) -> None:
+        transport = RoutedTransport()
+        transport.rest_responses = {
+            ("GET", self.ISSUES_PATH): [
+                self._issue(7, body="<!-- agentic-backlog-kit:id=T-ONE;schema=1 -->")
+            ]
+        }
+
+        self.assertEqual(
+            [], self._reader(transport).read_unmanaged(with_relationships=True)
+        )
+
+
 class ProjectDiscoveryReaderTests(unittest.TestCase):
     def test_discovers_shallow_projects_then_hydrates_only_selected_project(self) -> None:
         transport = RoutedTransport()

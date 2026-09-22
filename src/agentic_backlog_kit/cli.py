@@ -246,6 +246,14 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Adopt an issue whose title already exists in the manifest",
     )
+    import_plan.add_argument(
+        "--infer-relationships",
+        action="store_true",
+        help=(
+            "Propose the sub-issue parent and blocked-by dependencies GitHub "
+            "already records; costs two extra reads per unmanaged issue"
+        ),
+    )
 
     import_reconcile = commands.add_parser(
         "import-reconcile",
@@ -694,13 +702,16 @@ def _dispatch(args: argparse.Namespace) -> int:
                     Path(args.snapshot).read_text(encoding="utf-8")
                 )
             else:
-                unmanaged = reader.read_unmanaged()
+                unmanaged = reader.read_unmanaged(
+                    with_relationships=args.infer_relationships
+                )
             plan = build_import_plan(
                 manifest,
                 unmanaged,
                 include=set(args.include) if args.include else None,
                 limit=args.limit,
                 allow_duplicate_titles=args.allow_duplicate_titles,
+                infer_relationships=args.infer_relationships,
             )
             payload = plan.as_dict()
             if args.output:
@@ -712,6 +723,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                         "actions": len(plan.actions),
                         "unmanaged_issues": len(unmanaged),
                         "skipped": len(plan.skipped),
+                        "withheld_relationships": len(plan.withheld_relationships),
                         "orphans": [
                             issue["abk_id"]
                             for issue in find_orphans(
@@ -745,7 +757,11 @@ def _dispatch(args: argparse.Namespace) -> int:
         raw_plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
         plan = import_plan_from_dict(raw_plan)
         fresh_manifest = load_manifest(args.manifest)
-        unmanaged = reader.read_unmanaged()
+        # A plan that proposed relationships was digested over them, so the
+        # drift check has to compare against the same observation.
+        unmanaged = reader.read_unmanaged(
+            with_relationships=plan.infer_relationships
+        )
         service = GitHubService(
             transport,
             owner=github["owner"],
