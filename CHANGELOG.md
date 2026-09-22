@@ -15,6 +15,13 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   missing capability instead of failing partway through.
 - `abk capabilities` reports what the selected route can and cannot do without
   planning anything.
+- `abk import-reconcile --infer-relationships` recovers the sub-issue parent and
+  `blocked by` dependencies GitHub records for each stranded marker, instead of
+  recovering it flat. Recovering flat reproduced exactly the divergence
+  adoption's relationship inference removes: the item claimed no structure while
+  GitHub still held one, and additive synchronization never reconciles that.
+  Recovery resolves a relationship against the ids it is about to write as well
+  as the manifest, because one stranded issue can be the parent of another.
 - A `backlog-adopt` skill, so adoption is reachable from the installed plugin
   and not only from the CLI. Previously `skills/` covered initialization,
   ingestion, prioritization, sprint planning and synchronization, and said

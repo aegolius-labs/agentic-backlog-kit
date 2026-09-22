@@ -323,7 +323,7 @@ class OrphanRecoveryTests(unittest.TestCase):
     def test_recovers_the_orphan_under_the_id_github_already_uses(self) -> None:
         data = manifest()
 
-        merged, recovered = reconcile_orphans(
+        merged, recovered, _ = reconcile_orphans(
             data,
             [self._marked("GH-63", 63, title="Stranded", body="Real content")],
         )
@@ -336,7 +336,7 @@ class OrphanRecoveryTests(unittest.TestCase):
     def test_recovery_writes_nothing_when_there_is_nothing_to_recover(self) -> None:
         data = manifest(item("T-1"))
 
-        merged, recovered = reconcile_orphans(data, [self._marked("T-1", 1)])
+        merged, recovered, _ = reconcile_orphans(data, [self._marked("T-1", 1)])
 
         self.assertEqual([], recovered)
         self.assertEqual(1, len(merged["items"]))
@@ -345,8 +345,8 @@ class OrphanRecoveryTests(unittest.TestCase):
         data = manifest()
         marked = [self._marked("GH-63", 63)]
 
-        once, _ = reconcile_orphans(data, marked)
-        twice, recovered = reconcile_orphans(once, marked)
+        once, _, _ = reconcile_orphans(data, marked)
+        twice, recovered, _ = reconcile_orphans(once, marked)
 
         self.assertEqual([], recovered)
         self.assertEqual(
@@ -355,7 +355,7 @@ class OrphanRecoveryTests(unittest.TestCase):
         )
 
     def test_a_closed_orphan_recovers_as_complete(self) -> None:
-        _, recovered = reconcile_orphans(
+        _, recovered, _ = reconcile_orphans(
             manifest(), [self._marked("GH-63", 63, state="closed")]
         )
 
@@ -553,6 +553,114 @@ class RelationshipInferenceTests(unittest.TestCase):
                 manifest=manifest(),
                 unmanaged_issues=issues,
             )
+
+
+class OrphanRelationshipRecoveryTests(unittest.TestCase):
+    """S-R11-4 - recovery must restore the structure GitHub still holds."""
+
+    def _marked(
+        self,
+        item_id: str,
+        number: int,
+        *,
+        issue_type: str | None = None,
+        parent: dict | None = None,
+        blocked_by: list[dict] | None = None,
+        relationships: bool = True,
+    ) -> dict:
+        issue = _issue(number, issue_type=issue_type)
+        issue["abk_id"] = item_id
+        if relationships:
+            issue["parent_issue"] = parent
+            issue["blocked_by"] = blocked_by or []
+        return issue
+
+    def test_recovery_stays_flat_unless_asked(self) -> None:
+        _, recovered, withheld = reconcile_orphans(
+            manifest(item("E-1", item_type="Epic")),
+            [self._marked("GH-8", 8, issue_type="Feature", parent=_related(1, "E-1"))],
+        )
+
+        self.assertIsNone(recovered[0]["parent"])
+        self.assertEqual({}, withheld)
+
+    def test_recovers_a_parent_the_manifest_already_manages(self) -> None:
+        _, recovered, withheld = reconcile_orphans(
+            manifest(item("E-1", item_type="Epic")),
+            [self._marked("GH-8", 8, issue_type="Feature", parent=_related(1, "E-1"))],
+            infer_relationships=True,
+        )
+
+        self.assertEqual("E-1", recovered[0]["parent"])
+        self.assertEqual({}, withheld)
+
+    def test_one_orphan_can_be_the_parent_of_another(self) -> None:
+        _, recovered, withheld = reconcile_orphans(
+            manifest(),
+            [
+                self._marked("GH-7", 7, issue_type="Feature"),
+                self._marked(
+                    "GH-8", 8, issue_type="Story", parent=_related(7, "GH-7")
+                ),
+            ],
+            infer_relationships=True,
+        )
+
+        by_id = {entry["id"]: entry for entry in recovered}
+        self.assertEqual("GH-7", by_id["GH-8"]["parent"])
+        self.assertEqual({}, withheld)
+
+    def test_recovers_the_dependencies_github_records(self) -> None:
+        _, recovered, _ = reconcile_orphans(
+            manifest(item("T-1")),
+            [self._marked("GH-8", 8, blocked_by=[_related(1, "T-1")])],
+            infer_relationships=True,
+        )
+
+        self.assertEqual(["T-1"], recovered[0]["depends_on"])
+
+    def test_withholds_what_the_hierarchy_does_not_allow(self) -> None:
+        _, recovered, withheld = reconcile_orphans(
+            manifest(item("E-1", item_type="Epic")),
+            [self._marked("GH-8", 8, issue_type="Story", parent=_related(1, "E-1"))],
+            infer_relationships=True,
+        )
+
+        self.assertIsNone(recovered[0]["parent"])
+        self.assertIn(
+            "the hierarchy does not allow", withheld["GH-8"][0]
+        )
+
+    def test_withholds_a_reference_to_an_unmanaged_issue(self) -> None:
+        _, recovered, withheld = reconcile_orphans(
+            manifest(),
+            [self._marked("GH-8", 8, issue_type="Story", parent=_related(4))],
+            infer_relationships=True,
+        )
+
+        self.assertIsNone(recovered[0]["parent"])
+        self.assertIn(
+            "neither managed nor part of this recovery", withheld["GH-8"][0]
+        )
+
+    def test_refuses_to_infer_from_issues_read_without_relationships(self) -> None:
+        with self.assertRaisesRegex(ManifestError, r"#8"):
+            reconcile_orphans(
+                manifest(),
+                [self._marked("GH-8", 8, relationships=False)],
+                infer_relationships=True,
+            )
+
+    def test_recovery_still_writes_nothing_when_there_is_nothing_to_recover(self) -> None:
+        data = manifest(item("T-1"))
+
+        merged, recovered, withheld = reconcile_orphans(
+            data, [self._marked("T-1", 1)], infer_relationships=True
+        )
+
+        self.assertEqual([], recovered)
+        self.assertEqual({}, withheld)
+        self.assertEqual(data["items"], merged["items"])
 
 
 if __name__ == "__main__":

@@ -178,6 +178,7 @@ def _resolve_related(
     *,
     existing_ids: set[str],
     adopted_by_number: dict[int, str],
+    context: str,
 ) -> tuple[str | None, str | None]:
     """Map one observed GitHub relationship onto a manifest item id.
 
@@ -202,7 +203,7 @@ def _resolve_related(
     if adopted:
         return adopted, None
     return None, (
-        f"issue #{number} is neither managed nor part of this adoption"
+        f"issue #{number} is neither managed nor part of this {context}"
     )
 
 
@@ -210,11 +211,21 @@ def _infer_relationships(
     data: dict[str, Any],
     adopted: list[tuple[dict[str, Any], dict[str, Any]]],
     levels: dict[str, int],
+    *,
+    extra_resolvable_ids: frozenset[str] | set[str] = frozenset(),
+    context: str = "adoption",
 ) -> dict[str, list[str]]:
     """Propose the hierarchy and dependencies GitHub already records.
 
     `adopted` pairs each observed issue with the item proposed for it, which
     the caller already knows; this mutates those items in place.
+
+    `extra_resolvable_ids` names ids that will exist once this pass is written
+    but are not in the manifest yet, and that a relationship can already
+    identify by marker. Orphan recovery needs it, because one stranded issue can
+    be the parent of another and both carry markers the manifest has not
+    recorded. Adoption passes nothing, so an unrecorded marker keeps pointing
+    the operator at recovery instead of resolving to a proposal.
 
     Every relationship this cannot express is dropped and reported rather than
     forced: adoption must succeed against a repository shaped however it is
@@ -222,7 +233,7 @@ def _infer_relationships(
     narrower than what GitHub permits.
     """
 
-    existing_ids = {item["id"] for item in data["items"]}
+    existing_ids = {item["id"] for item in data["items"]} | set(extra_resolvable_ids)
     adopted_by_number = {
         int(issue["number"]): item["id"] for issue, item in adopted
     }
@@ -240,6 +251,7 @@ def _infer_relationships(
             issue.get("parent_issue"),
             existing_ids=existing_ids,
             adopted_by_number=adopted_by_number,
+            context=context,
         )
         if reason:
             withhold(item["id"], f"parent: {reason}")
@@ -269,6 +281,7 @@ def _infer_relationships(
                 related,
                 existing_ids=existing_ids,
                 adopted_by_number=adopted_by_number,
+                context=context,
             )
             if reason:
                 withhold(item["id"], f"blocked by: {reason}")
@@ -603,47 +616,90 @@ def find_orphans(
 
 
 def reconcile_orphans(
-    manifest: dict[str, Any], marked_issues: list[dict[str, Any]]
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    manifest: dict[str, Any],
+    marked_issues: list[dict[str, Any]],
+    *,
+    infer_relationships: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, list[str]]]:
     """Adopt stranded markers into the manifest without touching GitHub.
 
     The issue already carries the marker, so repair is purely local: build the
     item the interrupted import would have written and record it under the id
     GitHub is already using.
+
+    `infer_relationships` recovers the sub-issue parent and `blocked by` set
+    GitHub records for each orphan, under the same rules adoption uses. Without
+    it a recovered item claims no structure while GitHub still holds one, and
+    because synchronization is additive nothing ever reconciles that - the same
+    divergence adoption stopped producing. It stays opt-in on the same terms,
+    because it is the same two extra reads per issue.
+
+    Recovery never writes to GitHub either way. GitHub is already correct.
     """
 
     data = validate_manifest(manifest)
-    hierarchy_types = {
-        level_type
-        for level in data["workflow"].get("hierarchy", [])
+    hierarchy = data["workflow"].get("hierarchy", [])
+    hierarchy_types = {level_type for level in hierarchy for level_type in level}
+    levels = {
+        level_type: index
+        for index, level in enumerate(hierarchy)
         for level_type in level
     }
-    recovered: list[dict[str, Any]] = []
-    for issue in find_orphans(data, marked_issues):
-        title = str(issue.get("title") or "").strip()
-        recovered.append(
-            {
-                "id": issue["abk_id"],
-                "title": title or issue["abk_id"],
-                "type": _resolve_type(issue.get("type"), hierarchy_types),
-                "description": _import_description(issue),
-                "acceptance_criteria": [],
-                "parent": None,
-                "depends_on": [],
-                "impact": NEUTRAL_SCORE,
-                "effort": NEUTRAL_SCORE,
-                "business_value": NEUTRAL_SCORE,
-                "enabler_value": 0,
-                "status": _resolve_status(
-                    str(issue.get("state", "open")), data["workflow"]
-                ),
-                "maturity": DEFAULT_IMPORT_MATURITY,
-                "sprint": None,
-            }
+    orphans = find_orphans(data, marked_issues)
+
+    if infer_relationships:
+        unread = sorted(
+            int(issue["number"])
+            for issue in orphans
+            if "parent_issue" not in issue or "blocked_by" not in issue
         )
+        if unread:
+            raise ManifestError(
+                "Relationship inference needs issues read with relationships; "
+                "these carry none: "
+                + ", ".join(f"#{number}" for number in unread)
+            )
+
+    recovered: list[dict[str, Any]] = []
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for issue in orphans:
+        title = str(issue.get("title") or "").strip()
+        item = {
+            "id": issue["abk_id"],
+            "title": title or issue["abk_id"],
+            "type": _resolve_type(issue.get("type"), hierarchy_types),
+            "description": _import_description(issue),
+            "acceptance_criteria": [],
+            "parent": None,
+            "depends_on": [],
+            "impact": NEUTRAL_SCORE,
+            "effort": NEUTRAL_SCORE,
+            "business_value": NEUTRAL_SCORE,
+            "enabler_value": 0,
+            "status": _resolve_status(
+                str(issue.get("state", "open")), data["workflow"]
+            ),
+            "maturity": DEFAULT_IMPORT_MATURITY,
+            "sprint": None,
+        }
+        recovered.append(item)
+        pairs.append((issue, item))
+
     if not recovered:
-        return data, []
-    return merge_imported_items(data, recovered), recovered
+        return data, [], {}
+
+    withheld: dict[str, list[str]] = {}
+    if infer_relationships:
+        # One stranded issue can be the parent of another, so the ids this pass
+        # is about to write must already be resolvable by marker.
+        withheld = _infer_relationships(
+            data,
+            pairs,
+            levels,
+            extra_resolvable_ids={item["id"] for item in recovered},
+            context="recovery",
+        )
+    return merge_imported_items(data, recovered), recovered, withheld
 
 
 def merge_imported_items(

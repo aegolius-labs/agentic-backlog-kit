@@ -96,7 +96,8 @@ evaluation.
 
 ### F2 - `import-reconcile` recovers an orphan flat
 
-**Owner:** new item, filed against R11. **Status:** open.
+**Owner:** S-R11-4 ([#72](https://github.com/aegolius-labs/agentic-backlog-kit/issues/72)).
+**Status:** fixed on 2026-09-22, and validated against this same fixture.
 
 Recovery records a stranded marker under the id GitHub already uses, with
 neutral defaults and no relationships - including when GitHub records a parent
@@ -105,8 +106,21 @@ GitHub holding `#3 -> #2` throughout.
 
 That is exactly the divergence GH-63 removed from adoption, still present in the
 recovery path: additive synchronization will never reconcile it, so a recovered
-item disagrees with its own repository permanently and silently. Adoption is now
-honest about structure and recovery is not.
+item disagrees with its own repository permanently and silently. Adoption was
+honest about structure and recovery was not.
+
+**The fix**, and how it was validated here. `import-reconcile
+--infer-relationships` recovers the parent and `blocked by` set GitHub records,
+under the same rules and the same opt-in cost as adoption. `GH-3` and `GH-4`
+were stranded together and recovered in one pass: `GH-3` regained a parent that
+was still in the manifest, `GH-4` regained a parent recovered in the *same
+pass*, and its dependency came back with it. Nothing was withheld. Seven of the
+ten fixture items then matched GitHub exactly.
+
+One orphan being the parent of another is why recovery resolves against the ids
+it is about to write, not only against the manifest. Adoption deliberately does
+not: there, an unrecorded marker still means "run recovery first", which is the
+correct instruction rather than a guess.
 
 ## Limits of this run
 
@@ -117,8 +131,13 @@ honest about structure and recovery is not.
 - No Project exists for the fixture, because adoption never reads or writes one.
   `sync-plan` was therefore not run against it, and convergence was verified by
   comparing the manifest to GitHub's structure directly.
-- `GH-4` appears to disagree with GitHub in the final state of the fixture. That
-  is an artifact of this evaluation, not of the product: stranding `GH-3` for the
-  orphan test also cleared the references to it that `GH-4` held. `GH-4` adopted
-  correctly, with parent and dependency both proposed, as the state recorded
-  immediately after the first apply shows.
+- Some items appear to disagree with GitHub in the final state of the fixture.
+  That is an artifact of this evaluation, not of the product: stranding an issue
+  to test recovery also cleared the references other items held to it. Each
+  adopted correctly when it was adopted, as the state recorded immediately after
+  each apply shows.
+- Recovery repairs the items it recovers, and nothing else. An item already in
+  the manifest whose local intent disagrees with GitHub stays as it is, and
+  nothing reconciles it. That is deliberate here - recovery must not rewrite
+  work the operator already owns - and the general case belongs to R10, reverse
+  reconciliation, which is still open.

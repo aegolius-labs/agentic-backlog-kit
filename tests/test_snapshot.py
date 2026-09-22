@@ -234,6 +234,42 @@ class UnmanagedReaderTests(unittest.TestCase):
         self.assertIsNone(unmanaged[0]["parent_issue"])
         self.assertEqual([], unmanaged[0]["blocked_by"])
 
+    def test_marked_issues_read_no_relationship_requests_by_default(self) -> None:
+        transport = RoutedTransport()
+        transport.rest_responses = {
+            ("GET", self.ISSUES_PATH): [
+                self._issue(7, body="<!-- agentic-backlog-kit:id=T-ONE;schema=1 -->")
+            ]
+        }
+
+        marked = self._reader(transport).read_marked_issues()
+
+        self.assertEqual(["T-ONE"], [issue["abk_id"] for issue in marked])
+        self.assertNotIn("parent_issue", marked[0])
+
+    def test_marked_issues_carry_relationships_when_asked(self) -> None:
+        transport = RoutedTransport()
+        parent = self._issue(
+            5, body="<!-- agentic-backlog-kit:id=T-PARENT;schema=1 -->"
+        )
+        transport.rest_responses = {
+            ("GET", self.ISSUES_PATH): [
+                self._issue(7, body="<!-- agentic-backlog-kit:id=T-ONE;schema=1 -->")
+            ],
+            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): parent,
+            (
+                "GET",
+                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
+            ): [],
+        }
+
+        marked = self._reader(transport).read_marked_issues(with_relationships=True)
+
+        self.assertEqual(
+            {"number": 5, "abk_id": "T-PARENT"}, marked[0]["parent_issue"]
+        )
+        self.assertEqual([], marked[0]["blocked_by"])
+
     def test_a_managed_issue_is_never_offered_for_adoption(self) -> None:
         transport = RoutedTransport()
         transport.rest_responses = {

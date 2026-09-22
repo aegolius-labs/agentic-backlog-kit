@@ -141,6 +141,12 @@ abk import-reconcile
 This records the stranded markers in the manifest under the ids GitHub is
 already using. It touches nothing on GitHub, because GitHub is already correct.
 
+Pass `--infer-relationships` here too. Recovery without it produces exactly the
+divergence relationship inference exists to prevent: the item claims no parent
+while GitHub still holds one, and additive synchronization will never reconcile
+that. Recovery resolves against the ids it is about to write as well as the
+manifest, because one stranded issue can be the parent of another.
+
 This is not hypothetical: the first live adoption hit exactly this, and the
 recovery path exists because of it.
 
@@ -161,6 +167,9 @@ the issue's formatting exactly as it is.
   no batched or GraphQL route yet.
 - A withheld relationship is reported, not repaired. Retyping the items and
   re-planning is manual.
+- Recovery repairs only the items it recovers. An already-managed item whose
+  local intent disagrees with GitHub is left alone, and reconciling that
+  direction is R10's scope, not adoption's.
 - Scores and maturity are neutral defaults, not inferred from labels or
   milestones.
 - Adoption reads every issue in the repository; there is no incremental mode
