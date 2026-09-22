@@ -15,6 +15,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   missing capability instead of failing partway through.
 - `abk capabilities` reports what the selected route can and cannot do without
   planning anything.
+- A `backlog-adopt` skill, so adoption is reachable from the installed plugin
+  and not only from the CLI. Previously `skills/` covered initialization,
+  ingestion, prioritization, sprint planning and synchronization, and said
+  nothing about adoption, so an agent working through the plugin could manage a
+  backlog it had created but could not take on a repository that already had
+  issues. Four activation cases cover it.
 - `abk import-plan --infer-relationships` proposes the sub-issue parent and
   `blocked_by` dependencies GitHub already records, instead of adopting every
   issue flat. It is opt-in because it costs two extra reads per unmanaged

@@ -163,9 +163,10 @@ The evidence and command-level limits are recorded in
 
 ## Plugin UX
 
-The plugin contains five focused skills:
+The plugin contains six focused skills:
 
 - `$backlog-init` initializes the manifest and scaffolds the GitHub Project.
+- `$backlog-adopt` takes a repository's existing issues under management, optionally proposing the structure GitHub already records.
 - `$backlog-ingest` turns ideas or requests into one validated backlog item at a time.
 - `$backlog-prioritize` ranks work and selects the next executable item.
 - `$backlog-sprint-plan` creates a dependency-safe capacity plan.

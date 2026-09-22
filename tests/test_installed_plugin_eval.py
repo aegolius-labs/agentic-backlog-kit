@@ -39,6 +39,7 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(
             {
+                "backlog-adopt",
                 "backlog-init",
                 "backlog-ingest",
                 "backlog-prioritize",
@@ -111,7 +112,7 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
     def test_static_pickup_check_resolves_skills_and_bundled_references(self) -> None:
         result = self.harness.inspect_installation(ROOT)
         self.assertTrue(result["passed"], result["failures"])
-        self.assertEqual(5, result["skill_count"])
+        self.assertEqual(6, result["skill_count"])
         self.assertEqual([], result["missing_references"])
         self.assertTrue(result["manifest"]["skills_path_valid"])
 
@@ -868,7 +869,7 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertTrue(summary["passed"])
         self.assertEqual(1, summary["record_count"])
         self.assertEqual(1, len(records))
-        self.assertEqual(33, len(summary["remaining_full_corpus_pairs"]))
+        self.assertEqual(41, len(summary["remaining_full_corpus_pairs"]))
         report = self.harness.verify_trace_records(
             suite,
             records,

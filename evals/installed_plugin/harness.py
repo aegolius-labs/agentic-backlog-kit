@@ -26,6 +26,7 @@ PROMPT_CATEGORIES = (
 )
 EXECUTOR_MODES = ("mcp_available", "mcp_unavailable")
 EXPECTED_SKILLS = (
+    "backlog-adopt",
     "backlog-init",
     "backlog-ingest",
     "backlog-prioritize",
