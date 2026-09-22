@@ -844,6 +844,27 @@
       "sprint": null
     },
     {
+      "id": "S-R11-4",
+      "title": "Recover an orphan with the structure GitHub records, not flat",
+      "type": "Story",
+      "description": "`import-reconcile` records a stranded marker under the id GitHub already uses, with neutral defaults and no relationships, even when GitHub records a parent and dependencies for that issue.\n\nThat is the divergence GH-63 removed from adoption, still present in the recovery path. Synchronization is additive and never removes a parent or a dependency, so a recovered item disagrees with its own repository permanently and silently. Adoption is now honest about structure and recovery is not.\n\nRecovery is deliberately local and must stay that way: GitHub is already correct, so nothing here may write. Reading the parent and blocked-by set of the orphans being recovered is a read, and the same withholding rules that adoption uses apply unchanged.\n\nFound on 2026-09-22 during the GH-63 live validation against aegolius-labs/abk-adopt-eval-20260922. See docs/adoption-live-validation-2026-09-22.md finding F2.",
+      "acceptance_criteria": [
+        "Recovery proposes the parent and dependencies GitHub records for each orphan, under the same hierarchy and acyclic rules adoption uses",
+        "A relationship the manifest cannot express is withheld with its reason rather than forced",
+        "Recovery still writes nothing to GitHub",
+        "Reading relationships during recovery is opt-in on the same terms as adoption, so the default request cost is unchanged"
+      ],
+      "parent": "R11",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 2,
+      "status": "Inbox",
+      "maturity": "idea",
+      "sprint": null
+    },
+    {
       "id": "S-R14-1",
       "title": "Enforce the release baseline prerequisite without auto-tagging",
       "type": "Bug",
