@@ -273,7 +273,9 @@ class GitHubSnapshotReader:
                     return matched
         return None
 
-    def read_marked_issues(self) -> list[dict[str, Any]]:
+    def read_marked_issues(
+        self, *, with_relationships: bool = False
+    ) -> list[dict[str, Any]]:
         """Return every issue carrying the kit's marker, with its content.
 
         Adoption writes the marker to GitHub before the manifest records it, so
@@ -281,6 +283,11 @@ class GitHubSnapshotReader:
         as GitHub is concerned and unknown to the manifest. Reading the markers
         is what makes that state recoverable, and it costs no request beyond the
         listing the reader already performs.
+
+        `with_relationships` adds the sub-issue parent and `blocked by` set, on
+        the same terms as `read_unmanaged`: two extra requests per issue, opt-in,
+        and the keys are absent entirely when it is off. Orphan recovery needs
+        them to restore the structure GitHub still holds.
         """
 
         marked: list[dict[str, Any]] = []
@@ -293,17 +300,35 @@ class GitHubSnapshotReader:
             labels = self._label_names(issue)
             if not issue_type:
                 issue_type = self._fallback_issue_type(labels)
-            marked.append(
-                {
-                    "abk_id": item_id,
-                    "number": int(issue["number"]),
-                    "title": issue.get("title", ""),
-                    "body": issue.get("body") or "",
-                    "state": str(issue.get("state", "open")),
-                    "labels": labels,
-                    "type": issue_type,
-                }
-            )
+            number = int(issue["number"])
+            observed = {
+                "abk_id": item_id,
+                "number": number,
+                "title": issue.get("title", ""),
+                "body": issue.get("body") or "",
+                "state": str(issue.get("state", "open")),
+                "labels": labels,
+                "type": issue_type,
+            }
+            if with_relationships:
+                parent, dependencies = self._relationships(number)
+                observed.update(
+                    {
+                        "parent_issue": self._related(parent),
+                        "blocked_by": [
+                            related
+                            for related in (
+                                self._related(dependency)
+                                for dependency in sorted(
+                                    dependencies,
+                                    key=lambda value: int(value["number"]),
+                                )
+                            )
+                            if related is not None
+                        ],
+                    }
+                )
+            marked.append(observed)
         return marked
 
     def read_unmanaged(self, *, with_relationships: bool = False) -> list[dict[str, Any]]:

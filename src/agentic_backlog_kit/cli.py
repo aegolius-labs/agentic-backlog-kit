@@ -263,6 +263,14 @@ def _parser() -> argparse.ArgumentParser:
     import_reconcile.add_argument(
         "--backend", choices=("auto", "gh", "api"), default="auto"
     )
+    import_reconcile.add_argument(
+        "--infer-relationships",
+        action="store_true",
+        help=(
+            "Recover the sub-issue parent and blocked-by dependencies GitHub "
+            "records for each orphan; costs two extra reads per marked issue"
+        ),
+    )
 
     import_apply = commands.add_parser(
         "import-apply", help="Adopt one exact reviewed import plan"
@@ -737,8 +745,12 @@ def _dispatch(args: argparse.Namespace) -> int:
             return 0
 
         if args.command == "import-reconcile":
-            merged, recovered = reconcile_orphans(
-                manifest, reader.read_marked_issues()
+            merged, recovered, withheld = reconcile_orphans(
+                manifest,
+                reader.read_marked_issues(
+                    with_relationships=args.infer_relationships
+                ),
+                infer_relationships=args.infer_relationships,
             )
             if recovered:
                 save_manifest(
@@ -750,6 +762,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                 {
                     "manifest": args.manifest,
                     "recovered": [entry["id"] for entry in recovered],
+                    "withheld_relationships": withheld,
                 }
             )
             return 0

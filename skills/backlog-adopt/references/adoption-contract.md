@@ -52,4 +52,8 @@ Adoption writes the issue body marker and the local manifest. It does not change
 
 Adoption marks GitHub before the manifest records the item, so an interruption can strand a marked issue that no item claims. `import-plan` reports those as `orphans`; `import-reconcile` records them locally under the ids GitHub already uses and writes nothing remote. Adopting a stranded issue again forks it.
 
+`import-reconcile --infer-relationships` recovers the parent and `blocked by` set GitHub records for each orphan, under the same withholding rules and the same two-reads-per-issue cost. Recovery resolves a relationship against the ids it is about to write as well as the manifest, because one stranded issue can be the parent of another. Adoption deliberately does not: there, a marker the manifest has not recorded means recovery has not run yet, and saying so is better than guessing.
+
+Recovery repairs the items it recovers and nothing else. An item already in the manifest whose local intent disagrees with GitHub is left alone; reconciling that direction is not part of adoption.
+
 Adoption is idempotent. A marked issue is no longer unmanaged, so a second `import-plan` proposes nothing.
