@@ -168,7 +168,7 @@ The plugin contains six focused skills:
 - `$backlog-init` initializes the manifest and scaffolds the GitHub Project.
 - `$backlog-adopt` takes a repository's existing issues under management, optionally proposing the structure GitHub already records.
 - `$backlog-ingest` turns ideas or requests into one validated backlog item at a time.
-- `$backlog-prioritize` ranks work and selects the next executable item.
+- `$backlog-prioritize` ranks work, selects the next executable item with the reasons it passed others over, and projects the backlog as a Gantt chart.
 - `$backlog-sprint-plan` creates a dependency-safe capacity plan.
 - `$backlog-sync-github` previews, validates, applies, and verifies GitHub reconciliation.
 
@@ -182,7 +182,7 @@ Run the complete test suite without installing dependencies:
 python -c "import sys, unittest; sys.path.insert(0, 'src'); suite=unittest.defaultTestLoader.discover('tests'); result=unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(not result.wasSuccessful())"
 ```
 
-See [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
+See [docs/handoff.md](docs/handoff.md) for how to pick this repository up, [docs/roadmap-gantt.md](docs/roadmap-gantt.md) for the current generated schedule projection, [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
 The deterministic payload benchmark and its byte/token budgets are documented in [docs/benchmarks.md](docs/benchmarks.md).
 Release-candidate Windows and local Linux/WSL validation evidence is recorded in [docs/validation.md](docs/validation.md).
 The offline preparation and evidence contract for disposable live GitHub testing are documented in [evals/live_github/README.md](evals/live_github/README.md).

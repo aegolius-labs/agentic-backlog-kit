@@ -135,6 +135,7 @@ What shipped is recorded after the fact.
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
 | Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R10 and R25 open |
+| Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
@@ -173,7 +174,8 @@ effort, production readiness, or safety approval.
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
 | Reconciliation and reach R10, R13, GH-63, R25 | 2/4 | 50% |
-| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25 | **18/20** | **90%** |
+| Planning and handoff R26, R27 | 2/2 | 100% |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25-R27 | **20/22** | **91%** |
 | Operations R14, R19, R20 | 1/3 | 33% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
@@ -459,6 +461,48 @@ The gate on anyone other than the maintainer using the kit.
   created before it. That is cheap at fifty issues and expensive at five
   thousand. Standalone use is a supported configuration, so this blocks nothing
   today - it only gets more expensive.
+
+### Planning and handoff
+
+The theme is one requirement: a backlog must be pickupable by whoever arrives
+next, who did not watch the last session work. See
+[handoff](docs/handoff.md).
+
+#### R26 - Make the next task answerable by the kit rather than by prose
+
+- **Status:** Complete on 2026-09-22
+- **Importance:** High
+- **Complexity:** Easy
+- **Context:** `next` returned one id and silently discarded everything ranked
+  above it - container types, completed work, explicit blocks, unrefined
+  maturity, and unmet dependencies all dropped without a record. An operator saw
+  an answer that looked wrong and could not tell why. The cost was paid by prose
+  instead: every activation checkpoint in `docs/task-handoff.md` restated a
+  ranking by hand and every one went stale, the 2026-09-22 one naming an item
+  that shipped the same day.
+- **Done when:** `next --explain N` names what it passed over and why; completed
+  work is not reported as an obstacle; `select_next` is unchanged for its
+  callers; and a tracked document states that a handoff may not restate anything
+  the kit can compute. **Met.**
+
+#### R27 - Project the backlog onto a timeline and render a Gantt chart
+
+- **Status:** Complete on 2026-09-22
+- **Importance:** High
+- **Complexity:** Medium
+- **Context:** The manifest already carries effort, a proven-acyclic dependency
+  graph, computed priority and an iteration start date - everything a schedule
+  needs - and sequence over time still had to be reconstructed by hand, which is
+  the artifact this kit exists to replace.
+- **Done when:** the schedule is deterministic and dependency-respecting;
+  concurrency never reorders a dependency; exclusions are reported with reasons;
+  rendering adds no runtime dependency; every chart states its basis and that it
+  is a projection rather than an estimate; and the committed projection is
+  guarded by a test. **Met.** See [scheduling](docs/scheduling.md).
+- **Found while building it:** a container is excluded because its children
+  carry the work, but a container with *no* children is the largest thing left,
+  and excluding it projected this roadmap's undecomposed features onto an empty
+  timeline. A childless container is now scheduled.
 
 ### Unscheduled
 

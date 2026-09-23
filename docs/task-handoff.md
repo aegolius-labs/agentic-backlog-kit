@@ -3,7 +3,58 @@
 The user transferred continuation of **Create agentic backlog kit** into
 **Review project roadmap** and approved carryover policy A.
 
-## Current activation checkpoint (2026-09-21)
+## Current activation checkpoint (2026-09-22)
+
+GH-63 shipped in `v0.7.0` and is live-validated against
+`aegolius-labs/abk-adopt-eval-20260922`; see
+[the validation record](adoption-live-validation-2026-09-22.md). The
+`backlog-adopt` skill and structural orphan recovery shipped alongside it, the
+latter in `v0.8.0`.
+
+**This file no longer lists what to do next.** Every previous checkpoint here
+restated a ranking in prose, the ranking changed, and the prose did not - the
+version written earlier today named S-R11-4 as the next work and was wrong
+within hours, because S-R11-4 shipped the same day. Ask the kit instead:
+
+```bash
+abk snapshot --output .agentic-backlog/cache/remote.json
+abk next --explain 5 --operational-snapshot .agentic-backlog/cache/remote.json
+abk gantt --lanes 1 --days-per-effort 2
+```
+
+`next --explain` returns the selection *and* the higher-ranked items it passed
+over with the reason for each, so the answer can be audited by someone who was
+not here. [docs/handoff.md](handoff.md) states the rule and why it exists.
+
+What follows is only what the kit cannot compute.
+
+### Decisions the owner still owes
+
+- **R10** cannot start until a removal and reverse-sync authority policy per
+  managed field is recorded. Its scope grew on 2026-09-22: recovery repairs only
+  the items it recovers, so an already-managed item whose local intent disagrees
+  with GitHub stays diverged, and reconciling that direction is R10's.
+- **R25** bumps the manifest schema version. Confirm the migration shape before
+  starting it.
+
+### Authorization gates
+
+- **R14** hosted draft/partial-upload recovery needs its own authorized
+  evaluation against a disposable fixture. Local tests cannot close it.
+- **R20** needs refreshed resource identities and a separately confirmed cleanup
+  plan. Its scope now includes `aegolius-labs/abk-adopt-eval-20260922`, retained
+  because this session's token carried no `delete_repo` scope.
+
+### Standing limitations
+
+- GitHub refuses to create a dependency cycle, so adoption's cycle-withholding
+  branch could not be exercised live and rests on unit tests alone.
+- The adoption evidence is synthetic and small. It says nothing about request
+  cost or rate limits on a repository with hundreds of unmanaged issues.
+- Activation cases for `backlog-adopt` are declared, not executed. Running the
+  corpus against an installed plugin is its own authorized evaluation.
+
+## Superseded activation checkpoint (2026-09-21)
 
 R15, R16, R11, R22, R23 and R13 have all shipped since the checkpoint below,
 which is retained but no longer describes the next work. GH-63 lands adoption
@@ -12,41 +63,7 @@ sub-issue parent and `blocked_by` dependencies GitHub already records, withholds
 whatever the manifest's hierarchy and acyclic rules cannot express, and reports
 why. Suite: 358 tests passing.
 
-## Current activation checkpoint (2026-09-22, later)
-
-GH-63 shipped in `v0.7.0` and is now live-validated against
-`aegolius-labs/abk-adopt-eval-20260922`; see
-[the validation record](adoption-live-validation-2026-09-22.md). The
-`backlog-adopt` skill shipped alongside it, closing the gap the earlier
-checkpoint recorded: adoption is now reachable from the installed plugin and not
-only from the CLI.
-
-Three items were filed through the kit's own backlog during this work, each with
-`item-add` then a reviewed, digest-confirmed sync: R25 (#69), S-R11-3 (#70,
-since closed) and S-R11-4 (#72). Every sync converged to zero on its second
-plan.
-
-**Next work, in order:**
-
-1. **S-R11-4**, the one open item that needs nothing from the owner.
-   `import-reconcile` recovers a stranded marker flat, which is the divergence
-   GH-63 removed from adoption still present in the recovery path. Adoption is
-   honest about structure and recovery is not.
-2. **R10**, the last open scheduled feature. It needs an owner decision first: a
-   removal and reverse-sync authority policy per managed field. Do not start
-   implementation before that policy is recorded.
-3. **R25**, the Seam A traceability carrier. It bumps the manifest schema
-   version, so confirm the migration shape with the owner before starting.
-4. **Operations**, both needing an authorized evaluation rather than more code:
-   R14 hosted draft/partial-upload recovery, and R20 disposable-resource
-   cleanup - whose scope now includes the retained adoption fixture, recorded by
-   exact name in the roadmap.
-
-**Standing limitation of the adoption evidence:** GitHub refuses to create a
-dependency cycle, so the cycle-withholding branch could not be exercised live
-and stays covered by unit tests alone.
-
-## Current activation checkpoint (2026-09-18)
+## Superseded activation checkpoint (2026-09-18)
 
 The roadmap was re-cut from one flat twenty-item list into release lines, each
 counted against its own membership. R17 and R18 are implemented and verified,
@@ -143,13 +160,6 @@ Both product decisions are now approved:
 
 ## Next work
 
-Superseded by the 2026-09-18 checkpoint above. R17 and R18 are complete, and R19
-is published. The remaining sequence is R15, then R16, then R11, with R22 and R23
-available as small independent work. R14-F7 baseline handling and its hosted
-failure-recovery evaluation remain open at the operations level, as does R20,
-which still requires fresh identity discovery and its own cleanup approval. No
-product-policy answer is outstanding for D1 or D2.
-
-See [the roadmap](../ROADMAP.md) for current release lines and the completion
-basis, and [the 2026-09-13 progress report](overall-progress-2026-09-13.md) for
-the R01-R20 evidence recorded before this re-cut.
+Superseded by the 2026-09-22 checkpoint, and deliberately not restated here.
+Run `abk next --explain` against a fresh snapshot. See
+[docs/handoff.md](handoff.md) for why this file no longer carries a ranking.

@@ -15,6 +15,20 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   missing capability instead of failing partway through.
 - `abk capabilities` reports what the selected route can and cannot do without
   planning anything.
+- `abk gantt` projects the backlog onto a timeline and renders it as a Mermaid
+  Gantt chart, in Markdown, bare Mermaid, or JSON. Durations come from effort
+  points times one declared factor and order from the dependency graph the
+  manifest already proves acyclic, so the projection is deterministic and can be
+  regenerated and diffed rather than maintained by hand. Every chart states its
+  basis and that it is a projection rather than an estimate. Mermaid renders
+  natively on GitHub, so this adds no runtime dependency.
+  `docs/roadmap-gantt.md` is the generated projection of this repository's own
+  backlog, and a test fails when it no longer matches the manifest.
+- `abk next --explain N` reports the higher-ranked items it passed over, each
+  with the reason: unrefined, waiting on a named dependency, explicitly blocked,
+  or a container whose children carry the work. Selection previously discarded
+  all of those silently, so an answer that looked wrong could not be audited by
+  anyone who had not read the engine.
 - `abk import-reconcile --infer-relationships` recovers the sub-issue parent and
   `blocked by` dependencies GitHub records for each stranded marker, instead of
   recovering it flat. Recovering flat reproduced exactly the divergence
