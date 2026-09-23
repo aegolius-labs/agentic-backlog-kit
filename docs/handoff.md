@@ -20,6 +20,16 @@ that reports one id and silently drops everything above it cannot be audited by
 someone who was not there, and that silence is what made the ranking look wrong
 when it was right.
 
+Reasons an operator can act on are reported before structural ones. A container
+outranking the selection is how the hierarchy is shaped, not something in
+anyone's way, and letting those fill the budget pushes out the unrefined item or
+the named dependency that is the actual answer.
+
+A container with **no children** is not a grouping - it is undecomposed work and
+the largest thing left, so `next` will hand you one and the schedule projection
+draws it. Both apply the same rule, because a roadmap of whole features would
+otherwise report nothing to do and project an empty timeline.
+
 Always pass a fresh operational snapshot. Without one the answer is computed
 from local intent, which lags whatever GitHub now says; the result labels itself
 `"operational_state": "local-intent"` when that happens, so check that field
