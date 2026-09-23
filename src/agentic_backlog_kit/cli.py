@@ -47,7 +47,13 @@ from .iterations import (
     verify_iteration_apply,
 )
 from .mutations import add_item, file_sha256, save_manifest, update_item
-from .priority import prioritize, select_next
+from .priority import explain_next, prioritize, select_next
+from .schedule import (
+    DEFAULT_DAYS_PER_EFFORT,
+    build_schedule,
+    render_markdown,
+    render_mermaid,
+)
 from .scaffold import (
     apply_scaffold_plan,
     build_scaffold_plan,
@@ -178,6 +184,16 @@ def _parser() -> argparse.ArgumentParser:
 
     next_item = commands.add_parser("next", help="Return the next executable item")
     next_item.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    next_item.add_argument(
+        "--explain",
+        type=int,
+        default=5,
+        metavar="COUNT",
+        help=(
+            "Report up to this many higher-ranked items that were not selected, "
+            "each with the reason. Pass 0 to report only the selection."
+        ),
+    )
     _add_operational_arguments(next_item)
 
     sprint = commands.add_parser("sprint-plan", help="Plan a dependency-safe sprint")
@@ -202,6 +218,44 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         help="Project the skipped-item reasons to this many entries",
     )
+
+    gantt = commands.add_parser(
+        "gantt", help="Project the backlog onto a timeline and render a Gantt chart"
+    )
+    gantt.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    gantt.add_argument("--output")
+    gantt.add_argument(
+        "--format",
+        choices=("markdown", "mermaid", "json"),
+        default="markdown",
+        help="markdown renders the chart with its basis and its limits stated",
+    )
+    gantt.add_argument(
+        "--start",
+        help=(
+            "ISO date for day zero; defaults to workflow.iteration.start_date "
+            "when the manifest declares one"
+        ),
+    )
+    gantt.add_argument(
+        "--days-per-effort",
+        type=int,
+        default=DEFAULT_DAYS_PER_EFFORT,
+        help="Calendar days one effort point represents",
+    )
+    gantt.add_argument(
+        "--lanes",
+        type=int,
+        default=1,
+        help="How many items may run at once; one lane is a single worker",
+    )
+    gantt.add_argument(
+        "--include-completed",
+        action="store_true",
+        help="Draw bars for completed work, which has no remaining duration",
+    )
+    gantt.add_argument("--title", default="Backlog projection")
+    _add_operational_arguments(gantt)
 
     show = commands.add_parser("show", help="Return one compact backlog item")
     show.add_argument("item_id")
@@ -610,9 +664,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "next":
         planning, differences = _operational_manifest(manifest, args)
-        item = select_next(planning)
+        item, passed_over = explain_next(planning, limit=max(args.explain, 0))
         payload = {
             "item": asdict(item) if item else None,
+            "passed_over": passed_over,
             "operational_state": (
                 "github" if differences is not None else "local-intent"
             ),
@@ -620,6 +675,55 @@ def _dispatch(args: argparse.Namespace) -> int:
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
+        return 0
+    if args.command == "gantt":
+        planning, differences = _operational_manifest(manifest, args)
+        schedule = build_schedule(
+            planning,
+            start=args.start,
+            days_per_effort=args.days_per_effort,
+            lanes=args.lanes,
+            include_completed=args.include_completed,
+        )
+        command = (
+            f"abk gantt --lanes {args.lanes} "
+            f"--days-per-effort {args.days_per_effort}"
+        )
+        if args.format == "json":
+            payload = schedule.as_dict()
+            payload["operational_state"] = (
+                "github" if differences is not None else "local-intent"
+            )
+            if args.report_operational_drift and differences is not None:
+                payload["operational_drift"] = differences
+            if args.output:
+                _write_json(Path(args.output), payload)
+                _print_json({"schedule": args.output, "items": len(schedule.items)})
+            else:
+                _print_json(payload)
+            return 0
+        rendered = (
+            render_mermaid(schedule, title=args.title)
+            if args.format == "mermaid"
+            else render_markdown(schedule, title=args.title, command=command)
+        )
+        if args.output:
+            path = Path(args.output)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not rendered.endswith("\n"):
+                rendered += "\n"
+            path.write_text(rendered, encoding="utf-8")
+            _print_json(
+                {
+                    "chart": args.output,
+                    "items": len(schedule.items),
+                    "start": schedule.start.isoformat(),
+                    "end": schedule.end.isoformat(),
+                    "critical_path": schedule.critical_path,
+                }
+            )
+        else:
+            print(rendered)
         return 0
     if args.command == "sprint-plan":
         project_snapshot = None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from agentic_backlog_kit.priority import prioritize, select_next
+from agentic_backlog_kit.priority import explain_next, prioritize, select_next
 
 from tests.helpers import item, manifest
 
@@ -80,3 +80,72 @@ class PriorityTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class ExplainNextTests(unittest.TestCase):
+    """R26 - a selection nobody can audit cannot be picked up."""
+
+    def test_reports_the_higher_ranked_item_it_passed_over(self) -> None:
+        data = manifest(
+            item("T-BLOCKER", impact=5, business_value=5, maturity="idea"),
+            item("T-READY", impact=1, business_value=1),
+        )
+
+        selected, passed_over = explain_next(data)
+
+        self.assertEqual("T-READY", selected.id)
+        self.assertEqual(["T-BLOCKER"], [entry["id"] for entry in passed_over])
+        self.assertIn("not refined", passed_over[0]["reason"])
+
+    def test_names_the_dependency_that_is_in_the_way(self) -> None:
+        data = manifest(
+            item("T-FIRST", impact=1, business_value=1, maturity="idea"),
+            item("T-SECOND", impact=5, business_value=5, depends_on=["T-FIRST"]),
+            item("T-READY", impact=1, business_value=1),
+        )
+
+        _, passed_over = explain_next(data)
+
+        reasons = {entry["id"]: entry["reason"] for entry in passed_over}
+        self.assertIn("waiting on T-FIRST", reasons["T-SECOND"])
+
+    def test_a_container_is_named_as_a_container(self) -> None:
+        data = manifest(
+            item("F-1", item_type="Feature", impact=5, business_value=5),
+            item("S-1", item_type="Story", parent="F-1", impact=1, business_value=1),
+        )
+
+        _, passed_over = explain_next(data)
+
+        self.assertIn("container", passed_over[0]["reason"])
+
+    def test_completed_work_is_not_reported_as_an_obstacle(self) -> None:
+        data = manifest(
+            item("T-DONE", status="Done", impact=5, business_value=5),
+            item("T-READY", impact=1, business_value=1),
+        )
+
+        _, passed_over = explain_next(data)
+
+        self.assertNotIn("T-DONE", [entry["id"] for entry in passed_over])
+
+    def test_nothing_executable_still_explains_the_whole_head(self) -> None:
+        data = manifest(item("T-1", maturity="idea"), item("T-2", status="Blocked"))
+
+        selected, passed_over = explain_next(data)
+
+        self.assertIsNone(selected)
+        self.assertEqual({"T-1", "T-2"}, {entry["id"] for entry in passed_over})
+
+    def test_the_explanation_can_be_turned_off(self) -> None:
+        data = manifest(item("T-BLOCKED", maturity="idea"), item("T-READY"))
+
+        selected, passed_over = explain_next(data, limit=0)
+
+        self.assertEqual("T-READY", selected.id)
+        self.assertEqual([], passed_over)
+
+    def test_select_next_still_answers_the_same_item(self) -> None:
+        data = manifest(item("T-BLOCKED", maturity="idea"), item("T-READY"))
+
+        self.assertEqual(select_next(data).id, explain_next(data)[0].id)

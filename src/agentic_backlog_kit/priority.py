@@ -134,28 +134,109 @@ def prioritize(manifest: dict[str, Any]) -> list[ScoredItem]:
     ]
 
 
-def select_next(manifest: dict[str, Any]) -> ScoredItem | None:
-    """Select the highest-ranked executable work item, or None when none is ready."""
+def _not_executable(
+    item: dict[str, Any],
+    *,
+    by_id: dict[str, dict[str, Any]],
+    done_statuses: set[str],
+    work_item_types: set[str],
+) -> str | None:
+    """Return why this item cannot be worked next, or None when it can.
+
+    Selection used to drop each of these silently, which left the honest
+    answer - what the backlog would have handed you, and what stands in the
+    way - unavailable to anyone who had not read the engine.
+    """
+
+    if item["type"] not in work_item_types:
+        return (
+            f"type '{item['type']}' is a container, not work; "
+            "its children carry the work"
+        )
+    if item["status"] in done_statuses:
+        return f"already complete: status '{item['status']}'"
+    if item["status"] == "Blocked":
+        return "explicitly blocked; unblock it before it can be selected"
+    if item["maturity"] != "ready":
+        return (
+            f"not refined: maturity is '{item['maturity']}'. Refine it with "
+            "item-update before it can be selected"
+        )
+    waiting = sorted(
+        dependency
+        for dependency in item["depends_on"]
+        if by_id[dependency]["status"] not in done_statuses
+    )
+    if waiting:
+        return "waiting on " + ", ".join(waiting)
+    return None
+
+
+def explain_next(
+    manifest: dict[str, Any], *, limit: int = 5
+) -> tuple[ScoredItem | None, list[dict[str, Any]]]:
+    """Select the next executable item, and say what outranked it and why.
+
+    A ranking that reports one id and silently discards everything above it
+    cannot be picked up by anyone who was not present when it was produced.
+    `passed_over` names the higher-scoring items that were not selected, in
+    rank order, each with the reason, so the next agent sees the same backlog
+    the engine saw.
+    """
 
     data = validate_manifest(manifest)
     by_id = {item["id"]: item for item in data["items"]}
     done_statuses = set(data["workflow"]["done_statuses"])
     work_item_types = set(data["workflow"]["work_item_types"])
 
+    def blocked_because(item_id: str) -> str | None:
+        return _not_executable(
+            by_id[item_id],
+            by_id=by_id,
+            done_statuses=done_statuses,
+            work_item_types=work_item_types,
+        )
+
+    ranked = prioritize(data)
     best: ScoredItem | None = None
-    for scored in prioritize(data):
-        item = by_id[scored.id]
-        if item["type"] not in work_item_types:
-            continue
-        if item["status"] in done_statuses or item["status"] == "Blocked":
-            continue
-        if item["maturity"] != "ready":
-            continue
-        if any(by_id[dependency]["status"] not in done_statuses for dependency in item["depends_on"]):
-            continue
+    for scored in ranked:
         # Take the highest-scoring executable item rather than the first one
         # the dependency order happens to reach; ties keep that order.
-        if best is None or scored.priority_score > best.priority_score:
+        if blocked_because(scored.id) is None and (
+            best is None or scored.priority_score > best.priority_score
+        ):
             best = scored
-    return best
 
+    passed_over: list[dict[str, Any]] = []
+    if limit > 0:
+        threshold = best.priority_score if best else None
+        for scored in sorted(
+            ranked, key=lambda entry: (-entry.priority_score, entry.id)
+        ):
+            if threshold is not None and scored.priority_score <= threshold:
+                break
+            if by_id[scored.id]["status"] in done_statuses:
+                # Completed work already scores zero. Naming it here would bury
+                # the reasons that actually stand between an operator and the
+                # work under reasons that are only bookkeeping.
+                continue
+            reason = blocked_because(scored.id)
+            if reason is None:
+                continue
+            passed_over.append(
+                {
+                    "id": scored.id,
+                    "title": scored.title,
+                    "priority_score": scored.priority_score,
+                    "reason": reason,
+                }
+            )
+            if len(passed_over) >= limit:
+                break
+    return best, passed_over
+
+
+def select_next(manifest: dict[str, Any]) -> ScoredItem | None:
+    """Select the highest-ranked executable work item, or None when none is ready."""
+
+    return explain_next(manifest, limit=0)[0]

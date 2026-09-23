@@ -98,6 +98,26 @@
       "sprint": null
     },
     {
+      "id": "EPIC-PLAN",
+      "title": "Planning and handoff - leave a backlog another agent can pick up",
+      "type": "Epic",
+      "description": "A backlog is used across sessions and across agents. Whoever arrives next did not watch the last one work, so what to do next has to be answerable from the repository rather than from memory or from prose somebody remembered to update.\n\nThis line covers what the kit must compute so prose does not have to: an auditable next selection, and a timeline projection of the work behind it.",
+      "acceptance_criteria": [
+        "What to work on next is answerable by running the kit, with the reasoning visible",
+        "The backlog can be projected onto a timeline and rendered without adding a dependency",
+        "No tracked document restates a ranking the kit can compute"
+      ],
+      "parent": "INIT-ABK",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "In Progress",
+      "maturity": "refined",
+      "sprint": null
+    },
+    {
       "id": "EPIC-UNSCHED",
       "title": "Unscheduled - portfolio scale",
       "type": "Epic",
@@ -778,6 +798,50 @@
       "enabler_value": 5,
       "status": "Inbox",
       "maturity": "idea",
+      "sprint": null
+    },
+    {
+      "id": "R26",
+      "title": "R26 - Make the next task answerable by the kit rather than by prose",
+      "type": "Feature",
+      "description": "`next` returned one id and silently discarded everything ranked above it. Four separate conditions - a container type, completed status, an explicit block, and unrefined maturity - plus unmet dependencies each dropped an item with no record, so an operator who ran it saw an answer that looked wrong and could not tell why. It also defaults to local intent, which lags GitHub.\n\nThe cost was borne by the prose instead. Every activation checkpoint in docs/task-handoff.md restated a ranking by hand, and every one went stale; the 2026-09-22 checkpoint named an item that shipped the same day.\n\nFound on 2026-09-22 while assessing whether this repository could be picked up by another agent.",
+      "acceptance_criteria": [
+        "`next --explain N` reports the higher-ranked items it passed over, each with the reason it was not selectable",
+        "Completed work is not reported as an obstacle, because it is bookkeeping rather than something in the way",
+        "The existing `select_next` contract is unchanged for its callers",
+        "A tracked document states that a handoff may not restate anything the kit can compute"
+      ],
+      "parent": "EPIC-PLAN",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 4,
+      "status": "In Review",
+      "maturity": "ready",
+      "sprint": null
+    },
+    {
+      "id": "R27",
+      "title": "R27 - Project the backlog onto a timeline and render a Gantt chart",
+      "type": "Feature",
+      "description": "The manifest carries effort, a proven-acyclic dependency graph, computed priority and an iteration start date - everything a schedule needs - and the kit could not draw one. Sequence over time had to be reconstructed by hand from `prioritize` output, which is exactly the hand-maintained artifact this kit exists to replace.\n\nThe projection must stay honest. Effort points are an ordinal scale, so converting them to duration is a declared convention rather than a measurement, and the chart has to say so rather than read as a delivery date.",
+      "acceptance_criteria": [
+        "A deterministic schedule places every schedulable item after the dependencies it declares",
+        "Concurrency is explicit and never reorders a dependency",
+        "Containers and completed work are excluded with their reasons rather than silently dropped",
+        "Rendering adds no runtime dependency and renders where the backlog already lives",
+        "Every chart states its duration basis, its lane count, and that it is a projection rather than an estimate",
+        "A committed projection is regenerable and a test fails when it no longer matches the manifest"
+      ],
+      "parent": "EPIC-PLAN",
+      "depends_on": [],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 2,
+      "status": "In Review",
+      "maturity": "ready",
       "sprint": null
     },
     {
