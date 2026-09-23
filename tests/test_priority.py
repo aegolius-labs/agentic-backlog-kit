@@ -109,7 +109,7 @@ class ExplainNextTests(unittest.TestCase):
         reasons = {entry["id"]: entry["reason"] for entry in passed_over}
         self.assertIn("waiting on T-FIRST", reasons["T-SECOND"])
 
-    def test_a_container_is_named_as_a_container(self) -> None:
+    def test_a_container_with_children_is_named_as_a_container(self) -> None:
         data = manifest(
             item("F-1", item_type="Feature", impact=5, business_value=5),
             item("S-1", item_type="Story", parent="F-1", impact=1, business_value=1),
@@ -118,6 +118,39 @@ class ExplainNextTests(unittest.TestCase):
         _, passed_over = explain_next(data)
 
         self.assertIn("container", passed_over[0]["reason"])
+
+    def test_an_undecomposed_container_is_selectable_work(self) -> None:
+        """It is the largest thing left, and the schedule already treats it so."""
+
+        data = manifest(
+            item("F-WHOLE", item_type="Feature", impact=5, business_value=5),
+            item("T-SMALL", impact=1, business_value=1),
+        )
+
+        selected, _ = explain_next(data)
+
+        self.assertEqual("F-WHOLE", selected.id)
+
+    def test_an_actionable_reason_outranks_a_structural_one(self) -> None:
+        """A container row nobody can act on must not crowd out the real answer."""
+
+        data = manifest(
+            item("E-1", item_type="Epic", impact=5, business_value=5),
+            item(
+                "F-1",
+                item_type="Feature",
+                parent="E-1",
+                impact=5,
+                business_value=5,
+                maturity="idea",
+            ),
+            item("S-1", item_type="Story", impact=1, business_value=1),
+        )
+
+        _, passed_over = explain_next(data, limit=1)
+
+        self.assertEqual("F-1", passed_over[0]["id"])
+        self.assertIn("not refined", passed_over[0]["reason"])
 
     def test_completed_work_is_not_reported_as_an_obstacle(self) -> None:
         data = manifest(

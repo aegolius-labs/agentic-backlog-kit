@@ -28,7 +28,9 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   with the reason: unrefined, waiting on a named dependency, explicitly blocked,
   or a container whose children carry the work. Selection previously discarded
   all of those silently, so an answer that looked wrong could not be audited by
-  anyone who had not read the engine.
+  anyone who had not read the engine. Reasons an operator can act on are
+  reported before structural ones, so container rows nobody can act on do not
+  crowd out the real answer.
 - `abk import-reconcile --infer-relationships` recovers the sub-issue parent and
   `blocked by` dependencies GitHub records for each stranded marker, instead of
   recovering it flat. Recovering flat reproduced exactly the divergence
@@ -52,6 +54,10 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Fixed
 
+- `next` refused to select a container that has no children, while the schedule
+  projection treated one as work. A childless container is undecomposed work and
+  the largest thing left, not a grouping, so a roadmap of whole features
+  reported nothing to do. Both now apply the same rule.
 - The CLI route reported a 403, 429 or 500 as exit code 1, so the hints that
   explain a failure fired on the direct API route and never on `gh`. The
   reported status is now taken as the status, except that a 404 is mapped only

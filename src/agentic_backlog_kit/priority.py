@@ -140,6 +140,7 @@ def _not_executable(
     by_id: dict[str, dict[str, Any]],
     done_statuses: set[str],
     work_item_types: set[str],
+    has_children: set[str],
 ) -> str | None:
     """Return why this item cannot be worked next, or None when it can.
 
@@ -148,7 +149,11 @@ def _not_executable(
     way - unavailable to anyone who had not read the engine.
     """
 
-    if item["type"] not in work_item_types:
+    if item["type"] not in work_item_types and item["id"] in has_children:
+        # A container with no children is not a grouping, it is undecomposed
+        # work and the largest thing left. Refusing to ever hand one over is
+        # what makes a roadmap of whole features look empty, and it is the same
+        # rule the schedule projection applies.
         return (
             f"type '{item['type']}' is a container, not work; "
             "its children carry the work"
@@ -188,6 +193,7 @@ def explain_next(
     by_id = {item["id"]: item for item in data["items"]}
     done_statuses = set(data["workflow"]["done_statuses"])
     work_item_types = set(data["workflow"]["work_item_types"])
+    has_children = {item["parent"] for item in data["items"] if item["parent"]}
 
     def blocked_because(item_id: str) -> str | None:
         return _not_executable(
@@ -195,6 +201,7 @@ def explain_next(
             by_id=by_id,
             done_statuses=done_statuses,
             work_item_types=work_item_types,
+            has_children=has_children,
         )
 
     ranked = prioritize(data)
@@ -210,6 +217,8 @@ def explain_next(
     passed_over: list[dict[str, Any]] = []
     if limit > 0:
         threshold = best.priority_score if best else None
+        actionable: list[dict[str, Any]] = []
+        structural: list[dict[str, Any]] = []
         for scored in sorted(
             ranked, key=lambda entry: (-entry.priority_score, entry.id)
         ):
@@ -223,16 +232,24 @@ def explain_next(
             reason = blocked_because(scored.id)
             if reason is None:
                 continue
-            passed_over.append(
-                {
-                    "id": scored.id,
-                    "title": scored.title,
-                    "priority_score": scored.priority_score,
-                    "reason": reason,
-                }
-            )
-            if len(passed_over) >= limit:
-                break
+            entry = {
+                "id": scored.id,
+                "title": scored.title,
+                "priority_score": scored.priority_score,
+                "reason": reason,
+            }
+            # A container outranking the selection is how a hierarchy is shaped,
+            # not something in anyone's way. Reporting those first fills the
+            # budget with rows nobody can act on and pushes out the unrefined
+            # item or the named dependency that is the real answer.
+            if (
+                by_id[scored.id]["type"] not in work_item_types
+                and scored.id in has_children
+            ):
+                structural.append(entry)
+            else:
+                actionable.append(entry)
+        passed_over = [*actionable, *structural][:limit]
     return best, passed_over
 
 
