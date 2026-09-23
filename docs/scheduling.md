@@ -61,6 +61,17 @@ The longest chain of scheduled dependencies, which is what actually sets the
 finish date. Only scheduled work counts: a chain running through work the
 projection excluded would describe a timeline the chart does not draw.
 
+## Fresh state versus committed state
+
+`gantt` accepts `--operational-snapshot`, which ranks and states the chart
+against what GitHub now says rather than local intent. Use it whenever the chart
+is for a person.
+
+The committed `roadmap-gantt.md` deliberately does **not** use one. It is the
+projection of the tracked manifest, so it can be regenerated identically in CI
+with no network and no credentials, which is what lets a test prove it is not
+stale. A chart of live GitHub state could not be verified that way.
+
 ## Rendering
 
 The Markdown and Mermaid formats emit a `gantt` block, which GitHub renders

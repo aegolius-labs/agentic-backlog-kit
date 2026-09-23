@@ -35,6 +35,10 @@ Every exclusion is reported under `excluded` with its reason. Nothing is dropped
 
 The longest chain of scheduled dependencies, which is what sets the finish date. Only scheduled work counts; a chain through excluded work would describe a timeline the chart does not draw.
 
+## Fresh state versus committed state
+
+Pass `--operational-snapshot` whenever the chart is for a person: without one the projection uses local intent, which lags GitHub. A chart committed to a repository is the exception — it must be reproducible offline, so it projects the tracked manifest alone.
+
 ## Persisting one
 
 A committed chart must be regenerable and must be regenerated. State the exact command in the file, and treat a chart that no longer matches its manifest as stale rather than as current.
