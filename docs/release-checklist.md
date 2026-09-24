@@ -46,8 +46,10 @@ gates for `0.1.0`, released on 2026-09-04.
 ## Post-`0.1.0` automation - R14 remediation gates
 
 The corrected caller and shared implementation pass local contract/failure tests
-and workflow syntax validation. Hosted happy-path proof passed on 2026-09-13;
-missing-baseline handling and hosted recovery remain open.
+and workflow syntax validation. Hosted happy-path proof passed on 2026-09-13,
+the missing-baseline guard landed on 2026-09-19, and hosted recovery after draft
+creation and partial upload passed on 2026-09-24
+([evidence](validation.md#r14-hosted-recovery-after-draft-creation-and-partial-upload-2026-09-24)).
 See [the remediation proposal](remediation-plan.md#r14-repair-shared-release-integration-f1f2).
 
 - [x] Implement a separate read-only compute workflow and draft-first shared publisher.
@@ -62,8 +64,8 @@ See [the remediation proposal](remediation-plan.md#r14-repair-shared-release-int
   the first release write; reject mismatch or drift.
 - [x] Create the draft, attach and verify both assets, then publish and verify
   immutability and the exact final inventory.
-- [ ] Reject missing stable baseline explicitly without writes and test tagged/untagged release intent (R14-F7).
-- [ ] Prove recovery after draft/partial upload failure without replacement of
+- [x] Reject missing stable baseline explicitly without writes and test tagged/untagged release intent (R14-F7).
+- [x] Prove recovery after draft/partial upload failure without replacement of
   unrelated, mismatched, or already published state.
 - [x] Preserve no-bump behavior and organization ownership of releases; require
   no secondary event-triggered workflow or PyPI publication.
