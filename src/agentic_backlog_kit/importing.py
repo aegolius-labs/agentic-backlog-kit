@@ -191,6 +191,12 @@ def _resolve_related(
     if related is None:
         return None, None
     number = int(related["number"])
+    if related.get("repository"):
+        # One manifest models one repository, and a number means nothing
+        # outside its own: matching it here would link an unrelated issue.
+        return None, (
+            f"issue {related['repository']}#{number} is in another repository"
+        )
     marker_id = related.get("abk_id")
     if marker_id:
         if marker_id in existing_ids:
@@ -632,7 +638,7 @@ def reconcile_orphans(
     it a recovered item claims no structure while GitHub still holds one, and
     because synchronization is additive nothing ever reconciles that - the same
     divergence adoption stopped producing. It stays opt-in on the same terms,
-    because it is the same two extra reads per issue.
+    because it is the same extra batched read.
 
     Recovery never writes to GitHub either way. GitHub is already correct.
     """

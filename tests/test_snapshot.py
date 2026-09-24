@@ -13,7 +13,7 @@ from agentic_backlog_kit.snapshot import (
     GitHubSnapshotReader,
 )
 
-from tests.helpers import manifest
+from tests.helpers import is_relationship_query, manifest, relationship_data
 
 
 class RoutedTransport:
@@ -21,6 +21,7 @@ class RoutedTransport:
         self.rest_responses: dict[tuple[str, str], object] = {}
         self.graphql_responses: list[dict] = []
         self.graphql_calls: list[tuple[str, dict]] = []
+        self.relationships: dict[int, tuple] = {}
 
     def rest(self, method: str, path: str, payload=None):
         response = self.rest_responses[(method, path)]
@@ -30,16 +31,14 @@ class RoutedTransport:
 
     def graphql(self, query: str, variables: dict):
         self.graphql_calls.append((query, variables))
+        if is_relationship_query(query):
+            return relationship_data(query, self.relationships)
         return self.graphql_responses.pop(0)
 
 
 class SnapshotReaderTests(unittest.TestCase):
-    def test_cli_parent_absence_is_read_as_an_unparented_issue(self) -> None:
+    def test_cli_route_reads_an_unparented_issue(self) -> None:
         issues_path = "repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
-        parent_path = "repos/aegolius-labs/example/issues/1/parent"
-        dependencies_path = (
-            "repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100"
-        )
         issue = {
             "id": 101,
             "node_id": "NODE_1",
@@ -66,12 +65,13 @@ class SnapshotReaderTests(unittest.TestCase):
             path = command[4]
             if path == issues_path:
                 return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
-            if path == parent_path:
+            if path == "graphql" and is_relationship_query(
+                json.loads(kwargs["input"])["query"]
+            ):
+                query = json.loads(kwargs["input"])["query"]
                 return subprocess.CompletedProcess(
-                    command, 1, "", "gh: No parent issue found (HTTP 404)"
+                    command, 0, json.dumps({"data": relationship_data(query)}), ""
                 )
-            if path == dependencies_path:
-                return subprocess.CompletedProcess(command, 0, "[]", "")
             if path == "graphql":
                 return subprocess.CompletedProcess(
                     command, 0, json.dumps({"data": project}), ""
@@ -114,10 +114,7 @@ class SnapshotReaderTests(unittest.TestCase):
             "type": {"name": "Task"},
         }
         transport.rest_responses[("GET", issues_path)] = [base, value]
-        transport.rest_responses[("GET", "/repos/aegolius-labs/example/issues/1/parent")] = GitHubApiError(404, "No parent")
-        transport.rest_responses[("GET", "/repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100")] = []
-        transport.rest_responses[("GET", "/repos/aegolius-labs/example/issues/2/parent")] = base
-        transport.rest_responses[("GET", "/repos/aegolius-labs/example/issues/2/dependencies/blocked_by?per_page=100")] = [base]
+        transport.relationships = {2: (base, [base])}
         transport.graphql_responses = [
             {
                 "organization": {
@@ -200,14 +197,8 @@ class UnmanagedReaderTests(unittest.TestCase):
         managed = self._issue(
             5, body="<!-- agentic-backlog-kit:id=T-PARENT;schema=1 -->"
         )
-        transport.rest_responses = {
-            ("GET", self.ISSUES_PATH): [self._issue(7)],
-            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): managed,
-            (
-                "GET",
-                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
-            ): [self._issue(6)],
-        }
+        transport.rest_responses = {("GET", self.ISSUES_PATH): [self._issue(7)]}
+        transport.relationships = {7: (managed, [self._issue(6)])}
 
         unmanaged = self._reader(transport).read_unmanaged(with_relationships=True)
 
@@ -218,16 +209,7 @@ class UnmanagedReaderTests(unittest.TestCase):
 
     def test_an_unparented_issue_reports_no_parent(self) -> None:
         transport = RoutedTransport()
-        transport.rest_responses = {
-            ("GET", self.ISSUES_PATH): [self._issue(7)],
-            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): GitHubApiError(
-                404, "No parent issue found"
-            ),
-            (
-                "GET",
-                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
-            ): [],
-        }
+        transport.rest_responses = {("GET", self.ISSUES_PATH): [self._issue(7)]}
 
         unmanaged = self._reader(transport).read_unmanaged(with_relationships=True)
 
@@ -256,12 +238,8 @@ class UnmanagedReaderTests(unittest.TestCase):
             ("GET", self.ISSUES_PATH): [
                 self._issue(7, body="<!-- agentic-backlog-kit:id=T-ONE;schema=1 -->")
             ],
-            ("GET", "/repos/aegolius-labs/example/issues/7/parent"): parent,
-            (
-                "GET",
-                "/repos/aegolius-labs/example/issues/7/dependencies/blocked_by?per_page=100",
-            ): [],
         }
+        transport.relationships = {7: (parent, [])}
 
         marked = self._reader(transport).read_marked_issues(with_relationships=True)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 
 
@@ -72,3 +73,36 @@ def manifest(*items: dict) -> dict:
         "items": deepcopy(list(items)),
     }
 
+
+
+RELATIONSHIP_ALIAS = re.compile(r"\bi(\d+): issue\(number: \d+\)")
+
+
+def is_relationship_query(query: str) -> bool:
+    return "query Relationships" in query
+
+
+def relationship_data(
+    query: str, relationships: dict | None = None
+) -> dict:
+    """Answer the batched relationship query the snapshot reader sends.
+
+    `relationships` maps an issue number to `(parent, [blocked_by, ...])`, each
+    an issue-shaped dict with at least `number` and `body`. Issues the query
+    names but the mapping omits have neither.
+    """
+
+    known = relationships or {}
+    numbers = [int(number) for number in RELATIONSHIP_ALIAS.findall(query)]
+    return {
+        "repository": {
+            f"i{number}": {
+                "parent": known.get(number, (None, []))[0],
+                "blockedBy": {
+                    "nodes": list(known.get(number, (None, []))[1]),
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                },
+            }
+            for number in numbers
+        }
+    }

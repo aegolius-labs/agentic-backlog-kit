@@ -305,7 +305,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Propose the sub-issue parent and blocked-by dependencies GitHub "
-            "already records; costs two extra reads per unmanaged issue"
+            "already records; costs one extra batched read per 50 unmanaged issues"
         ),
     )
 
@@ -322,7 +322,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Recover the sub-issue parent and blocked-by dependencies GitHub "
-            "records for each orphan; costs two extra reads per marked issue"
+            "records for each orphan; costs one extra batched read per 50 marked issues"
         ),
     )
 

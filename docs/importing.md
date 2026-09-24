@@ -63,10 +63,15 @@ flattens them by default, and `--infer-relationships` proposes them instead:
 abk import-plan --infer-relationships --output .agentic-backlog/import.json
 ```
 
-It is opt-in because it costs two extra reads per unmanaged issue — one for the
-parent, one for the dependencies — on top of the single listing adoption
-otherwise performs. On a repository of any size that is the difference between
-one request and hundreds.
+It is opt-in because it changes the plan and its digest. It costs one extra
+batched GraphQL read per 50 unmanaged issues, carrying each issue's parent and
+dependencies, on top of the single listing adoption otherwise performs. Before
+S-R28-1 it cost two REST reads per issue, which on a repository of any size was
+the difference between one request and hundreds.
+
+A relationship into another repository is withheld with its reason rather than
+matched: one manifest models one repository, and an issue number means nothing
+outside its own.
 
 Flattening was not merely incomplete, it was a divergence: synchronization is
 additive and never removes a parent or a dependency, so an adopted issue kept
@@ -163,7 +168,7 @@ the issue's formatting exactly as it is.
 
 ## Known limits
 
-- Relationship inference reads two extra requests per unmanaged issue and has
+- Relationship inference costs one extra batched read per 50 unmanaged issues and has
   no batched or GraphQL route yet.
 - A withheld relationship is reported, not repaired. Retyping the items and
   re-planning is manual.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from .github import GitHubApiError, GitHubTransport
@@ -7,6 +8,10 @@ from .iterations import normalize_iteration_field
 from .sync import extract_guid, extract_item_id
 from .views import normalize_project_views
 
+
+# Issues per relationship query. Each carries up to 100 dependencies, so a batch
+# stays far inside GitHub's per-query node limit and costs about one point.
+RELATIONSHIP_BATCH_SIZE = 50
 
 VIEW_GRAPHQL_FRAGMENT = """
   id number name layout filter
@@ -117,42 +122,134 @@ class GitHubSnapshotReader:
                 return issues
             page += 1
 
-    def _relationships(
-        self, number: int
-    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-        """Read one issue's parent and blocking dependencies.
-
-        Two requests per issue, which is why no caller reads them for every
-        issue in the repository unless it was asked to.
+    def _relationship_query(self, numbers: list[int]) -> str:
+        aliases = "\n".join(
+            f"i{number}: issue(number: {number}) {{ ...Relationships }}"
+            for number in numbers
+        )
+        return f"""
+            query Relationships($owner: String!, $name: String!) {{
+              repository(owner: $owner, name: $name) {{
+                {aliases}
+              }}
+            }}
+            fragment Related on Issue {{
+              number
+              body
+              repository {{ nameWithOwner }}
+            }}
+            fragment Relationships on Issue {{
+              parent {{ ...Related }}
+              blockedBy(first: 100) {{
+                nodes {{ ...Related }}
+                pageInfo {{ hasNextPage endCursor }}
+              }}
+            }}
         """
 
-        try:
-            parent = self.transport.rest(
-                "GET", f"{self.repository_path}/issues/{number}/parent"
+    def _remaining_blocked_by(self, number: int, cursor: str) -> list[dict[str, Any]]:
+        """Page through one issue's dependencies past the first hundred."""
+
+        dependencies: list[dict[str, Any]] = []
+        while cursor:
+            data = self.transport.graphql(
+                """
+                query BlockedBy($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+                  repository(owner: $owner, name: $name) {
+                    issue(number: $number) {
+                      blockedBy(first: 100, after: $cursor) {
+                        nodes { number body repository { nameWithOwner } }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }
+                }
+                """,
+                {
+                    "owner": self.owner,
+                    "name": self.repository,
+                    "number": number,
+                    "cursor": cursor,
+                },
             )
-        except GitHubApiError as exc:
-            if exc.status != 404:
-                raise
-            parent = None
-        dependencies = self.transport.rest(
-            "GET",
-            f"{self.repository_path}/issues/{number}/dependencies/blocked_by?per_page=100",
-        )
-        return parent, list(dependencies or [])
+            issue = ((data.get("repository") or {}).get("issue")) or {}
+            connection = issue.get("blockedBy") or {}
+            dependencies.extend(connection.get("nodes") or [])
+            page_info = connection.get("pageInfo") or {}
+            cursor = page_info.get("endCursor") if page_info.get("hasNextPage") else None
+        return dependencies
+
+    def _relationships(
+        self, numbers: Iterable[int]
+    ) -> dict[int, tuple[dict[str, Any] | None, list[dict[str, Any]]]]:
+        """Read the parent and blocking dependencies of many issues at once.
+
+        One GraphQL request covers a batch of issues, so the cost grows with
+        batches rather than with issues. The per-issue REST reads this replaces
+        cost two requests an issue and, repeated by the refresh before apply,
+        capped a repository at roughly 1,200 issues an hour.
+        """
+
+        wanted = sorted({int(number) for number in numbers})
+        result: dict[int, tuple[dict[str, Any] | None, list[dict[str, Any]]]] = {}
+        for start in range(0, len(wanted), RELATIONSHIP_BATCH_SIZE):
+            batch = wanted[start : start + RELATIONSHIP_BATCH_SIZE]
+            data = self.transport.graphql(
+                self._relationship_query(batch),
+                {"owner": self.owner, "name": self.repository},
+            )
+            repository = data.get("repository")
+            if not repository:
+                raise GitHubApiError(
+                    404, f"Repository {self.owner}/{self.repository} was not found"
+                )
+            for number in batch:
+                issue = repository.get(f"i{number}")
+                if issue is None:
+                    raise GitHubApiError(404, f"Issue #{number} was not found")
+                connection = issue.get("blockedBy") or {}
+                dependencies = list(connection.get("nodes") or [])
+                page_info = connection.get("pageInfo") or {}
+                if page_info.get("hasNextPage"):
+                    dependencies.extend(
+                        self._remaining_blocked_by(number, page_info.get("endCursor"))
+                    )
+                result[number] = (issue.get("parent"), dependencies)
+        return result
+
+    def _is_foreign(self, issue: dict[str, Any]) -> bool:
+        name = ((issue.get("repository") or {}).get("nameWithOwner")) or ""
+        return bool(name) and name.casefold() != f"{self.owner}/{self.repository}".casefold()
 
     def _related(self, issue: dict[str, Any] | None) -> dict[str, Any] | None:
         """Identify a related issue by number, and by item id when it is marked.
 
         Both are needed: an unmanaged issue can be related to one this kit
         already manages, and only the marker says which item that is.
+
+        GitHub relationships can cross repositories and a number means nothing
+        outside its own, so an issue elsewhere keeps its repository and carries
+        no item id: one manifest models one repository, and matching it by
+        number would link an unrelated local issue.
         """
 
         if issue is None:
             return None
+        if self._is_foreign(issue):
+            return {
+                "number": int(issue["number"]),
+                "abk_id": None,
+                "repository": issue["repository"]["nameWithOwner"],
+            }
         return {
             "number": int(issue["number"]),
             "abk_id": self._item_id_from_issue(issue),
         }
+
+    def _local_item_id(self, issue: dict[str, Any] | None) -> str | None:
+        if issue is None or self._is_foreign(issue):
+            return None
+        return self._item_id_from_issue(issue)
 
     def _project_items(self) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = {}
@@ -285,16 +382,24 @@ class GitHubSnapshotReader:
         listing the reader already performs.
 
         `with_relationships` adds the sub-issue parent and `blocked by` set, on
-        the same terms as `read_unmanaged`: two extra requests per issue, opt-in,
+        the same terms as `read_unmanaged`: one extra batched request per 50 issues, opt-in,
         and the keys are absent entirely when it is off. Orphan recovery needs
         them to restore the structure GitHub still holds.
         """
 
+        marked_issues = [
+            issue
+            for issue in sorted(self._list_issues(), key=lambda value: int(value["number"]))
+            if self._item_id_from_issue(issue) is not None
+        ]
+        relationships = (
+            self._relationships(int(issue["number"]) for issue in marked_issues)
+            if with_relationships
+            else {}
+        )
         marked: list[dict[str, Any]] = []
-        for issue in sorted(self._list_issues(), key=lambda value: int(value["number"])):
+        for issue in marked_issues:
             item_id = self._item_id_from_issue(issue)
-            if item_id is None:
-                continue
             raw_type = issue.get("type")
             issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
             labels = self._label_names(issue)
@@ -311,7 +416,7 @@ class GitHubSnapshotReader:
                 "type": issue_type,
             }
             if with_relationships:
-                parent, dependencies = self._relationships(number)
+                parent, dependencies = relationships[number]
                 observed.update(
                     {
                         "parent_issue": self._related(parent),
@@ -341,16 +446,24 @@ class GitHubSnapshotReader:
 
         `with_relationships` additionally reads each unmanaged issue's sub-issue
         parent and `blocked_by` dependencies, so an import can propose the shape
-        GitHub already records instead of flattening it.  It costs two extra
-        requests per unmanaged issue and is therefore opt-in.  The relationship
+        GitHub already records instead of flattening it.  It costs one extra
+        batched request per 50 unmanaged issues and is opt-in.  The relationship
         keys are absent entirely when it is off, so a consumer can tell "not
         read" from "read, and there was nothing".
         """
 
+        unmanaged_issues = [
+            issue
+            for issue in sorted(self._list_issues(), key=lambda value: int(value["number"]))
+            if self._item_id_from_issue(issue) is None
+        ]
+        relationships = (
+            self._relationships(int(issue["number"]) for issue in unmanaged_issues)
+            if with_relationships
+            else {}
+        )
         unmanaged: list[dict[str, Any]] = []
-        for issue in sorted(self._list_issues(), key=lambda value: int(value["number"])):
-            if self._item_id_from_issue(issue) is not None:
-                continue
+        for issue in unmanaged_issues:
             number = int(issue["number"])
             raw_type = issue.get("type")
             issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
@@ -368,7 +481,7 @@ class GitHubSnapshotReader:
                 "type": issue_type,
             }
             if with_relationships:
-                parent, dependencies = self._relationships(number)
+                parent, dependencies = relationships[number]
                 observed.update(
                     {
                         "parent_issue": self._related(parent),
@@ -394,11 +507,12 @@ class GitHubSnapshotReader:
             issue for issue in all_issues if self._item_id_from_issue(issue) is not None
         ]
         project_items = self._project_items()
+        relationships = self._relationships(int(issue["number"]) for issue in managed)
         snapshot_issues: list[dict[str, Any]] = []
 
         for issue in sorted(managed, key=lambda value: int(value["number"])):
             number = int(issue["number"])
-            parent, dependencies = self._relationships(number)
+            parent, dependencies = relationships[number]
             project_state = project_items.get(str(issue["node_id"]), {})
             raw_type = issue.get("type")
             issue_type = raw_type.get("name") if isinstance(raw_type, dict) else raw_type
@@ -419,11 +533,11 @@ class GitHubSnapshotReader:
                 "in_project": bool(project_state),
                 "project_item_id": project_state.get("project_item_id"),
                 "project_fields": project_state.get("project_fields", {}),
-                "parent_abk_id": self._item_id_from_issue(parent),
+                "parent_abk_id": self._local_item_id(parent),
                 "depends_on_abk_ids": sorted(
                     item_id
                     for item_id in (
-                        self._item_id_from_issue(dependency)
+                        self._local_item_id(dependency)
                         for dependency in dependencies
                     )
                     if item_id

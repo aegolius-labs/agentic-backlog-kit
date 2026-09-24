@@ -19,7 +19,7 @@ An organization defines its own issue types. `User Story` and `Tech Story` map t
 
 ## Relationships
 
-`--infer-relationships` reads each unmanaged issue's sub-issue parent and `blocked by` set and proposes them. It costs two extra reads per unmanaged issue, which is why it is opt-in.
+`--infer-relationships` reads each unmanaged issue's sub-issue parent and `blocked by` set and proposes them. It changes the plan and costs one extra batched read per 50 unmanaged issues, which is why it is opt-in. A relationship into another repository is withheld with its reason, never matched by number.
 
 A relationship is proposed only when the manifest can express it. Everything else is reported under `withheld_relationships`, keyed by item:
 
