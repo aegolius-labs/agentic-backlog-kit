@@ -237,3 +237,63 @@ The first local read-only preflight attempt lacked sandbox network access; it
 made no external write. Its recorded infrastructure failure was followed by an
 authorized network-enabled read-only refresh. The baseline tag and dispatch each
 occurred exactly once. No workflow failure or recovery was injected in Plan L.
+
+## R14 hosted recovery after draft creation and partial upload (2026-09-24)
+
+Approved Plan M (digest
+`e8964ea97ece2bd9c14f5200e2c5612649725bdef6f6775e0b5c8f510e6e3e0f`) closed
+S-R14-2 against the same retained fixture. Production repositories, protections,
+immutability settings and the shared pin `9f323e5` were not touched.
+
+1. Fixture commit `213442a3a2187f07590ae35e3cfaf118d0319c18`
+   (`fix: record R14 recovery proof fixture`) passed
+   [test](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/35951466135)
+   on a branch and was fast-forwarded onto fixture `main`. The fixture predates
+   computed version stamping, so the commit stamps `0.1.1` into its version
+   files, changelog and version-bound tests by hand; the approved plan named only
+   a documentation file, and this was the one deviation.
+2. [Release run 35951524172](https://github.com/aegolius-labs/abk-release-eval-20260908/actions/runs/35951524172)
+   computed `v0.1.1`, and preflight passed and uploaded bundle artifact
+   `10788962030` with inventory SHA-256
+   `fa6c3d73e44d95b009e42601edd7eecb447b936640413b201054dd45a09076c9`.
+   The run was cancelled while the publish job was still in `Set up job`, so
+   attempt 1 made no GitHub write: no tag, no draft, no asset.
+3. The partial state was then produced by hand, from that exact downloaded
+   bundle, using the pinned publisher's own `GitHub` transport methods after the
+   same head, tag-state and no-existing-release checks: tag `v0.1.1` at the
+   candidate, draft release `395291910` whose body is the inventory notes plus
+   the inventory marker, and the wheel only. The uploaded wheel read back as
+   `uploaded`, 60952 bytes, with the inventory hash.
+4. Re-running the failed jobs produced attempt 2. Compute and preflight were
+   carried over, not re-executed, and the publisher downloaded the same artifact
+   `10788962030` with the same inventory hash. It accepted the matching draft,
+   verified the existing wheel before any write, uploaded only the sdist,
+   verified the draft, published and verified. The attempt-2 receipt's completed
+   steps are exactly `asset_uploaded:agentic_backlog_kit-0.1.1.tar.gz`,
+   `draft_assets_verified`, `publication_requested`,
+   `published_assets_verified` - no `tag_created`, no `draft_created`, no
+   replacement.
+
+Independent readback afterwards: release `395291910` is published, not a
+prerelease, `immutable: true`, marked latest, targets the candidate, and has
+exactly the two inventory assets. Tag `v0.1.1` points at the candidate; `v0.1.0`
+(release `388026880`, `1bba7e6`) and `v0.0.0` are unchanged. Downloaded assets
+matched the inventory, and an isolated no-dependency wheel install ran
+`abk --help`. Immutability remains enabled and owner-enforced.
+
+| Published file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| agentic_backlog_kit-0.1.1-py3-none-any.whl | 60952 | 405cd50490e8484b44c1c8e232d8173973b647dfbfdc25e6d955146edc0b499d |
+| agentic_backlog_kit-0.1.1.tar.gz | 94322 | 7f20d1b97ae8a1569d1a49bf7c2412620284a8792946c483af5b0d464f9fe7e2 |
+
+What this proves and what it does not: the organization publisher, on hosted
+infrastructure, resumes a failed publication from a matching draft that holds a
+subset of verified assets, using the original bundle and inputs, without
+recreating or replacing anything. The partial state was written by the operator
+rather than left by a publisher that failed mid-upload, because the publisher has
+no fault-injection hook and a mid-upload cancellation cannot be timed reliably.
+The writes were the publisher's own calls in the publisher's own order, so the
+state is the one a mid-upload failure leaves. A half-uploaded asset (state other
+than `uploaded`) is not auto-recovered by design: the publisher stops for
+reviewed remediation, which the shared suite covers locally. These are
+evaluation assets, not product releases. The fixture is retained for R20.

@@ -30,7 +30,8 @@ merge and automatic branch deletion. The corrected caller pins both workflows
 and publisher source to the merged shared commit. CI verifies that the pin is in
 shared main history and that workflow contents match the reviewed fixtures.
 The corrected caller merged in ABK PR #2. Hosted no-bump and Plan L immutable
-publication passed; missing-baseline handling and hosted failure recovery remain.
+publication passed, the missing-baseline guard landed on 2026-09-19, and Plan M
+proved hosted recovery after draft creation and partial upload on 2026-09-24.
 
 ### Versions are stamped, never predicted
 
@@ -104,7 +105,11 @@ unit suite and packaged engine remain dependency-free.
 Keep bundles and receipts for 30 days. Recover by rerunning only the failed
 publisher job with its original bundle and inputs. A matching draft resumes;
 identical published state is a verified no-op. Changed assets, identities, tags,
-or unrelated releases stop for reviewed remediation. Never clobber/delete assets
+or unrelated releases stop for reviewed remediation. Plan M exercised the resume
+path on a hosted run: a re-run of the failed publisher job with the original
+bundle found a matching draft holding only the wheel, verified it, uploaded only
+the sdist, and published
+([evidence](validation.md#r14-hosted-recovery-after-draft-creation-and-partial-upload-2026-09-24)). Never clobber/delete assets
 or rewrite tags. After bundle expiry, rebuilding is not proof of byte identity.
 
 Before rollout, separately read the immutability setting with the release owner's

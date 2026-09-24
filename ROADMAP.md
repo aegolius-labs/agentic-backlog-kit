@@ -106,9 +106,10 @@ synchronization never removed the relationships a flat adoption denied.
 Outstanding product work: **R10** alone, and it is the one open item that still
 needs a product decision from the owner — a removal and reverse-sync authority
 policy per managed field. Outstanding operations work, excluded from the
-product completion basis: R14 hosted draft/partial-upload recovery proof, and
-R20 disposable-resource cleanup. Both need an authorized evaluation against a
-disposable fixture rather than more local code. See
+product completion basis: R20 disposable-resource cleanup, which needs a
+separately confirmed plan rather than more local code. R14 closed on 2026-09-24
+when Plan M proved hosted draft/partial-upload recovery against the retained
+release fixture. See
 [the overall progress report](docs/overall-progress-2026-09-13.md) and
 [remediation proposal](docs/remediation-plan.md).
 
@@ -176,7 +177,7 @@ effort, production readiness, or safety approval.
 | Reconciliation and reach R10, R13, GH-63, R25 | 2/4 | 50% |
 | Planning and handoff R26, R27 | 2/2 | 100% |
 | **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25-R27 | **20/22** | **91%** |
-| Operations R14, R19, R20 | 1/3 | 33% |
+| Operations R14, R19, R20 | 2/3 | 67% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
 R12, which is explicitly deferred, and three operations chores. The scheduled
@@ -546,7 +547,7 @@ misleading.
 
 #### R14 - Adopt organization-managed semantic releases
 
-- **Status:** Ongoing. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. R14-F8 was found and fixed on 2026-09-19, and the missing-baseline guard (R14-F7) landed on 2026-09-19. Hosted draft/partial-upload recovery proof remains, and needs its own authorized evaluation against a disposable fixture.
+- **Status:** Complete 2026-09-24. Shared/caller correction merged; hosted no-bump and Plan L immutable publication/download/install checks passed. R14-F8 was found and fixed on 2026-09-19, the missing-baseline guard (R14-F7) landed on 2026-09-19, and Plan M proved hosted draft/partial-upload recovery on 2026-09-24.
 - **R14-F8 - the packaged version is not synchronized with the computed version (fixed 2026-09-19):** the first real release-bearing merge computed `v0.1.1` while `pyproject.toml`, both plugin manifests, the marketplace entry, and `__init__.py` still declared `0.1.0`. Preflight refused with `tag 'v0.1.1' does not match package version '0.1.0'`, and no tag, draft, or asset was created - the fail-closed contract held exactly as intended. But it means every release-bearing merge fails until a human bumps five declarations and adds a CHANGELOG entry by hand, which is the opposite of delegating version calculation to the organization. Several release tests also hardcoded the current version, so a bump required editing tests. **Fixed:** `scripts/set_version.py` stamps the computed version across all five declarations and promotes the changelog's Unreleased section, and release preflight runs it against the candidate checkout before building. Nothing is committed or pushed - the tag stays the record of what a version means - so the computed version reaches the package without anyone predicting it. Contributors write under `## [Unreleased]` and the release stamps the heading.
 - **Importance:** High
 - **Complexity:** Medium
@@ -554,7 +555,7 @@ misleading.
 - **High-level approach:** Added organization-owned `compute-release.yml` with read-only permission and `publish-release-assets.yml` with a draft-first publisher, preserving the existing no-asset workflow. Bind preflight to the candidate SHA/tag and exact distributions; create a draft, attach and verify assets, then publish. Preserve organization ownership of tagging and releases. See [R14 design and reference-project comparison](docs/remediation-plan.md#r14-repair-shared-release-integration-f1f2).
 - **Done when:** The shared interface and caller pass permission/identity/recovery contract tests; hosted no-bump and separately authorized immutable-release evaluations pass; then protected publication and exact asset verification are recorded. Local test success alone is insufficient.
 - **R14-F7 closed on 2026-09-19:** a `baseline-guard` job runs on exactly the runs preflight does not, so no calculator outcome is unexamined. It fails a no-bump that has no version tag behind it, passes one that does, and never creates a tag - where version history starts is a decision, not a default. The contract rejects removing the guard, granting it write access, inverting its condition, dropping its check, letting it run `git tag`, or giving it a shallow checkout that would hide the tags it judges by.
-- **Still open:** hosted recovery after draft creation and partial upload. That needs its own authorized evaluation against a disposable fixture; local tests cannot close it.
+- **Hosted recovery proven on 2026-09-24 (S-R14-2):** approved Plan M cancelled a fixture `v0.1.1` release run before its publisher wrote anything, placed a tag, a marked draft and the wheel alone from the run's own bundle, then re-ran the failed job. The publisher accepted the draft, verified the wheel, uploaded only the sdist and published an immutable release; its receipt records no tag or draft creation and no replacement. The partial state was operator-written, because the publisher has no fault-injection hook - see [the evidence](docs/validation.md#r14-hosted-recovery-after-draft-creation-and-partial-upload-2026-09-24) for exactly what this does and does not prove.
 
 #### R19 - Publish accurate release and remediation status
 
@@ -573,6 +574,10 @@ misleading.
   token carries no `delete_repo` scope. Deleting it needs a token that does, and
   it is safe to delete - nothing references it but
   [the validation record](docs/adoption-live-validation-2026-09-22.md).
+  The public release fixture `aegolius-labs/abk-release-eval-20260908` gained
+  tag `v0.1.1` and immutable release `395291910` on 2026-09-24 for the R14
+  recovery proof; they are evaluation assets, recorded in
+  [validation.md](docs/validation.md#r14-hosted-recovery-after-draft-creation-and-partial-upload-2026-09-24).
 - **Importance:** Low; not a release blocker
 - **Complexity:** Easy, subject to permissions
 - **Approach:** Refresh exact identities from the prior receipt, confirm absence of Project #4, plan only remaining resources, and stop/journal on first failure.
@@ -636,7 +641,7 @@ release lines above; those are sequenced by the dependency notes in each line.
    - The separately approved evaluation cleanup stopped on its first failure after deleting Project #4; no retry or API-target cleanup occurred, and a fresh plan is required for the three remaining resources.
 
 5. **Wave E - Post-release parallel tracks**
-   - R14 corrections are merged; 185 ABK tests and 18 shared tests passed in the prior validation. Hosted no-bump and Plan L immutable publication/download/install evidence now pass. Complete the missing-baseline guard and hosted failure-recovery evaluation before closure.
+   - R14 corrections are merged; 185 ABK tests and 18 shared tests passed in the prior validation. Hosted no-bump and Plan L immutable publication/download/install evidence pass, the missing-baseline guard landed on 2026-09-19, and Plan M proved hosted failure recovery on 2026-09-24. R14 is closed.
    - Complete R15 operational authority and R16 commitment/carryover correctness before R10 destructive work or R11 import. R17/R18 graph/scoring fixes may proceed independently with coordinated integration.
    - Publish accurate status through R19; keep separately confirmed R20 cleanup off the product critical path.
    - Begin R12 only after single-repository behavior and import/reconciliation policies stabilize.
