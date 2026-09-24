@@ -103,11 +103,15 @@ proposes the sub-issue and dependency structure GitHub already records instead
 of flattening it, which also closes a divergence, because additive
 synchronization never removed the relationships a flat adoption denied.
 
-Outstanding product work: **R10** alone, and it is the one open item that still
-needs a product decision from the owner — a removal and reverse-sync authority
-policy per managed field. Outstanding operations work, excluded from the
-product completion basis: R20 disposable-resource cleanup, which needs a
-separately confirmed plan rather than more local code. R14 closed on 2026-09-24
+**2026-09-24.** The owner decided the three open questions. R25 is approved
+with a concrete design and is the next item. R10 is reframed from destructive
+and reverse reconciliation to closing the work lifecycle from evidence, and
+decomposed into four stories. R20 deletes four resources and retains the
+release fixture.
+
+Outstanding product work: **R25**, then **R10**. Outstanding operations work,
+excluded from the product completion basis: R20 disposable-resource cleanup,
+blocked until the owner grants a token with `delete_repo`. R14 closed on 2026-09-24
 when Plan M proved hosted draft/partial-upload recovery against the retained
 release fixture. See
 [the overall progress report](docs/overall-progress-2026-09-13.md) and
@@ -135,7 +139,7 @@ What shipped is recorded after the fact.
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
-| Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R10 and R25 open |
+| Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R25 ready, R10 refined into four stories |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
@@ -371,13 +375,19 @@ The gate on anyone other than the maintainer using the kit.
 
 ### Reconciliation and reach
 
-#### R10 - Add destructive and reverse reconciliation
+#### R10 - Close the work lifecycle from evidence
 
+- **Status:** Refined 2026-09-24 by owner decision; decomposed into S-R10-1 to S-R10-4.
 - **Importance:** Medium
-- **Complexity:** Hard
-- **Context:** Synchronization is deliberately additive and update-only. It does not close deleted work, remove obsolete parents or dependencies, archive Project items, or reconcile remote-only changes back into local intent.
-- **High-level approach:** Define authority and conflict policies for every managed field. Introduce explicit destructive action types with stronger confirmations, remote preconditions, soft-delete/archive defaults, recovery information, and comprehensive audit tests.
-- **Done when:** Every removal or reverse-sync behavior has an explicit policy, preview, confirmation boundary, audit trail, and recovery path.
+- **Complexity:** Medium
+- **Context:** Synchronization is deliberately additive and update-only. As first written, R10 would have added closing deleted work, removing relationships, archiving Project items, and reconciling remote changes back into local intent. aio-agentic-sdlc's authority model cites the absence of exactly those operations as what makes the projection one-way, and GitHub state must come back as evidence, never as intent.
+- **Decision (2026-09-24):** automate the lifecycle from evidence, never from the manifest's silence. GitHub already closes an issue when a PR carrying `Closes #N` merges, and Project 6's built-in workflows then mark it Done. That is evidence-based and stays GitHub's job. The kit makes it dependable, finishes the loop where the evidence is unambiguous, and never closes, deletes, or archives an issue because the manifest stopped listing it. Pulling GitHub edits back into the manifest is dropped from scope.
+- **Stories:**
+  - S-R10-1 - the skills tell agents to link each PR to the kit issues it completes with a closing keyword.
+  - S-R10-2 - propose closing a parent once every child is closed, through plan, digest confirmation, apply, and receipt.
+  - S-R10-3 - remove parent and dependency links the manifest no longer declares, between kit-managed issues only, with recovery information; amend the authority model in the same change.
+  - S-R10-4 - a plan made only of Priority field updates is recognized by the engine and applied without a separate confirmation. The owner pre-authorized this on 2026-09-24.
+- **Done when:** All four stories are verified, and no path closes, deletes, or archives an issue because it is absent from the manifest.
 
 #### R13 - Complete native transport parity and decide whether to build a dedicated MCP server
 
@@ -437,8 +447,16 @@ The gate on anyone other than the maintainer using the kit.
 
 #### R25 - Carry a canonical GUID through to GitHub for Seam A traceability
 
-- **Status:** Open; filed 2026-09-22 through this kit's own backlog as
-  [#69](https://github.com/aegolius-labs/agentic-backlog-kit/issues/69)
+- **Status:** Ready; filed 2026-09-22 through this kit's own backlog as
+  [#69](https://github.com/aegolius-labs/agentic-backlog-kit/issues/69), design
+  approved by the owner on 2026-09-24
+- **Approved design:** an optional item field `guid` holding a canonical
+  lowercase UUID, validated exactly as aio-agentic-sdlc canonicalizes it.
+  Manifest `schema_version` becomes 2 with a tested migration from 1. The marker
+  gains `;guid=<uuid>` only on items that carry one and keeps `schema=1`: older
+  parsers read the id only up to the first `;`, so existing bodies need no
+  rewrite. An older kit that rewrites a body drops the key; that limit is
+  documented rather than engineered around.
 - **Importance:** High as an enabler; nothing today depends on it
 - **Complexity:** Medium
 - **Context:** `aio-agentic-sdlc/doc/authority-model.md` requires that a
