@@ -118,6 +118,25 @@
       "sprint": null
     },
     {
+      "id": "EPIC-PROD",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Epic",
+      "parent": "INIT-ABK",
+      "title": "Production readiness - usable by a team other than ours",
+      "description": "The 2026-09-24 readiness report met 3 of 12 production gates and partly met 3. The engine is correct and safe, but it does not stay within GitHub rate limits at real sizes, treats GitHub's read-after-write lag as drift, installs only from a clone, has not had its agent behavior re-verified since 0.1.0, and makes no stability promise. See docs/production-readiness-2026-09-24.md.",
+      "acceptance_criteria": [
+        "Every gate in the readiness report is met, or explicitly waived with a recorded reason",
+        "A team outside Aegolius Labs completes adoption and a sprint without maintainer help"
+      ],
+      "impact": 5,
+      "effort": 5,
+      "business_value": 4,
+      "enabler_value": 4
+    },
+    {
       "id": "EPIC-UNSCHED",
       "title": "Unscheduled - portfolio scale",
       "type": "Epic",
@@ -851,6 +870,145 @@
       "sprint": null
     },
     {
+      "id": "R28",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R28 - Stay within GitHub rate limits at real backlog sizes",
+      "description": "A snapshot makes two REST calls per managed issue, and apply refreshes the snapshot again, so a sync cycle costs about four calls per issue. At GitHub's 5,000 requests an hour that caps a repository at roughly 1,200 issues an hour, and a throttled request fails the run with a hint but no retry. The payload benchmark measures bytes, not calls, so none of this is budgeted.",
+      "acceptance_criteria": [
+        "Relationship reads are batched so calls grow with pages, not with issues",
+        "Throttled requests are retried within a bounded budget",
+        "API calls per sync are benchmarked and budgeted at 100, 1,000 and 5,000 issues"
+      ],
+      "impact": 5,
+      "effort": 4,
+      "business_value": 4,
+      "enabler_value": 4
+    },
+    {
+      "id": "R29",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R29 - Tell GitHub's read-after-write lag apart from real drift",
+      "description": "On 2026-09-24 GitHub's Project item list omitted three items for over 25 minutes after they were added, while each issue already reported its Project membership. The snapshot trusts the list, so the verification plan re-proposed adding them. The README tells users to wait and re-plan by hand.",
+      "acceptance_criteria": [
+        "A managed issue missing from the Project item list is resolved from the issue's own Project membership",
+        "Post-apply verification distinguishes propagation lag from drift and says which it saw"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "R30",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R30 - Install without cloning, and start from a quickstart",
+      "description": "The README installs the plugin only from a local path, and nothing walks a new user from zero to a first converged sync.",
+      "acceptance_criteria": [
+        "Both hosts install the plugin from the GitHub repository without a local clone",
+        "A quickstart takes a new user from install to a converged first sync"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 3
+    },
+    {
+      "id": "R31",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R31 - Re-verify agent behavior on the current release in both hosts",
+      "description": "The installed-plugin evaluation last ran on 0.1.0 in Codex (2026-08-31). Eleven releases and new skills later, nothing shows agents still use the skills correctly, and Claude Code has never had an end-to-end evaluation.",
+      "acceptance_criteria": [
+        "The installed-plugin evaluation passes on the current release in Codex",
+        "An equivalent evaluation passes in Claude Code"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "R32",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R32 - Test every supported platform and Python version in CI",
+      "description": "CI runs only Ubuntu with Python 3.11, while the package claims Python 3.11 and later and users run Windows and macOS. Windows has been validated by hand only.",
+      "acceptance_criteria": [
+        "CI runs the suite on Linux, Windows and macOS",
+        "CI covers every Python minor version the package claims, or the claim is narrowed"
+      ],
+      "impact": 3,
+      "effort": 1,
+      "business_value": 2,
+      "enabler_value": 3
+    },
+    {
+      "id": "R33",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R33 - State what is supported and promise compatibility",
+      "description": "Every Project query uses organization(login:), so personal accounts cannot use the kit, and the README implies this without saying it. The kit is 0.x with an Alpha classifier and the manifest schema just moved to 2, with no written compatibility policy.",
+      "acceptance_criteria": [
+        "Supported account types and repository scope are stated up front",
+        "A written compatibility policy covers the manifest schema, marker, and receipts",
+        "1.0 criteria are recorded"
+      ],
+      "impact": 3,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "R34",
+      "depends_on": [
+        "S-R30-2",
+        "S-R31-1",
+        "S-R31-2"
+      ],
+      "sprint": null,
+      "status": "Inbox",
+      "maturity": "refined",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "title": "R34 - Prove it with one outside pilot",
+      "description": "Nobody outside Aegolius Labs has used the kit: no external issues, and clone traffic is mostly our own automation. One pilot team adopting an existing backlog and running a sprint is the evidence that separates a working prototype from a product. Needs the owner to recruit the pilot.",
+      "acceptance_criteria": [
+        "One team outside Aegolius Labs adopts an existing backlog and completes a sprint cycle",
+        "Their friction is recorded against the responsible items"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 2
+    },
+    {
       "type": "Story",
       "depends_on": [],
       "sprint": null,
@@ -1314,6 +1472,229 @@
       "status": "Ready",
       "maturity": "refined",
       "sprint": null
+    },
+    {
+      "id": "S-R28-1",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R28",
+      "title": "Read parent and dependency relationships in batched GraphQL",
+      "description": "Replace the two REST calls per issue (parent, blocked_by) with paginated GraphQL that reads the relationships of many issues per request, on both the gh and direct-API transports.",
+      "acceptance_criteria": [
+        "A snapshot of N managed issues makes a number of relationship requests bounded by pages, not N",
+        "Snapshot output is identical to the per-issue reader on the existing fixtures",
+        "Both transports use the batched reader and transport parity still passes"
+      ],
+      "impact": 5,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 4
+    },
+    {
+      "id": "S-R28-2",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R28",
+      "title": "Retry throttled GitHub requests with bounded backoff",
+      "description": "A 429, or a 403 that GitHub marks as a secondary rate limit, should wait as Retry-After or the rate-limit reset says and retry, within a bounded total wait, instead of failing the apply.",
+      "acceptance_criteria": [
+        "Primary and secondary rate-limit responses are retried after the wait GitHub specifies",
+        "Total waiting is bounded and the run fails with the existing hint once the bound is exceeded",
+        "Retries never repeat a write whose outcome is unknown without re-reading state first"
+      ],
+      "impact": 5,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 4
+    },
+    {
+      "id": "S-R28-3",
+      "depends_on": [
+        "S-R28-1"
+      ],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R28",
+      "title": "Budget API calls per sync at 100, 1,000 and 5,000 issues",
+      "description": "Extend the deterministic benchmark to count transport calls for snapshot, plan and apply, and fail CI when a size exceeds its budget, the same way the byte budgets work.",
+      "acceptance_criteria": [
+        "The benchmark reports calls per phase at 100, 1,000 and 5,000 issues",
+        "Budgets are enforced in CI and documented in docs/benchmarks.md"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 4
+    },
+    {
+      "id": "S-R29-1",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R29",
+      "title": "Resolve Project membership from the issue when the item list omits it",
+      "description": "When a managed issue is absent from ProjectV2.items, read the issue's projectItems for the configured Project before reporting it as not in the Project.",
+      "acceptance_criteria": [
+        "An issue present in its own projectItems but absent from the list is reported in the Project with its fields",
+        "An issue absent from both is still reported as not in the Project",
+        "The fallback costs one batched read, not one call per missing issue"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "S-R29-2",
+      "depends_on": [
+        "S-R29-1"
+      ],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R29",
+      "title": "Re-read within a bounded window before calling post-apply residuals drift",
+      "description": "After apply, residual actions that match what was just written are re-read a bounded number of times before verification reports failure, and the receipt records that lag was observed.",
+      "acceptance_criteria": [
+        "Residuals matching just-applied actions trigger a bounded re-read, not an immediate failure",
+        "Residuals that persist past the bound, or that were not just applied, are reported as drift",
+        "The receipt records whether lag was observed and how long convergence took"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "S-R30-1",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R30",
+      "title": "Install from the GitHub marketplace on both hosts, verified",
+      "description": "Verify and document installing from aegolius-labs/agentic-backlog-kit directly in Claude Code and Codex, from a machine with no clone, and record the evidence.",
+      "acceptance_criteria": [
+        "Claude Code installs and lists all six skills from the remote marketplace",
+        "Codex installs from the remote repository following its documented flow",
+        "The README's install section uses the remote route first"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 3
+    },
+    {
+      "id": "S-R30-2",
+      "depends_on": [
+        "S-R30-1",
+        "S-R28-1",
+        "S-R28-2",
+        "S-R29-1"
+      ],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R30",
+      "title": "Write a quickstart from install to first converged sync",
+      "description": "One page: prerequisites (org Project, token scopes), install, init, scaffold, ingest or adopt, sync, and how to read a plan and its digest, tested by following it on a fresh fixture repository. It waits on the scale and lag work because a quickstart invites real users, who should not meet rate-limit failures or false drift on their first sync.",
+      "acceptance_criteria": [
+        "The quickstart is followed end to end on a fresh fixture and the evidence is recorded",
+        "It states the required token scopes and account type up front"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 2
+    },
+    {
+      "id": "S-R31-1",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R31",
+      "title": "Re-run the installed-plugin evaluation in Codex on the current release",
+      "description": "Re-run the R06 installed-plugin corpus against the latest release, including the adoption skill added since.",
+      "acceptance_criteria": [
+        "The corpus covers every current skill",
+        "Results are recorded against the exact release version"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "S-R31-2",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R31",
+      "title": "Run the first end-to-end evaluation in Claude Code",
+      "description": "Run the same corpus in Claude Code, where skills are invoked by description or /agentic-backlog-kit:name.",
+      "acceptance_criteria": [
+        "The corpus runs in Claude Code against the current release",
+        "Host-specific differences are recorded as findings against the responsible item"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3
+    },
+    {
+      "id": "S-R33-1",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R33",
+      "title": "State supported account types and repository scope up front",
+      "description": "Say plainly in the README, quickstart and skills that organization-owned Projects and one repository are supported, and what happens otherwise.",
+      "acceptance_criteria": [
+        "README and the init skill state that only organization Projects are supported",
+        "Pointing the kit at a personal account fails with a message that says so"
+      ],
+      "impact": 3,
+      "effort": 1,
+      "business_value": 3,
+      "enabler_value": 2
+    },
+    {
+      "id": "S-R33-2",
+      "depends_on": [],
+      "sprint": null,
+      "status": "Ready",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R33",
+      "title": "Publish a compatibility policy and 1.0 criteria",
+      "description": "Define what a minor and a major release may change in the manifest schema, the issue marker, plans and receipts, and what must be true to call a release 1.0.",
+      "acceptance_criteria": [
+        "The policy covers the manifest schema, marker, plan and receipt formats",
+        "1.0 criteria reference the production readiness gates"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 3
     }
   ]
 }

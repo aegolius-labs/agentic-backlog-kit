@@ -109,7 +109,14 @@ and reverse reconciliation to closing the work lifecycle from evidence, and
 decomposed into four stories. R20 deletes four resources and retains the
 release fixture.
 
-Outstanding product work: **R25**, then **R10**. Outstanding operations work,
+**2026-09-24, later.** R25 shipped in v0.11.0. A
+[production readiness report](docs/production-readiness-2026-09-24.md) found the
+engine ready and the product not: 3 of 12 gates met and 3 partly met. The gaps are
+filed as R28-R34 under `EPIC-PROD`, and the owner put scale ahead of R10.
+
+Outstanding product work: **R28** and **R29** (scale and GitHub lag), then
+installation and evaluation (**R30**-**R32**), then **R10**, then the stability
+policy and an outside pilot (**R33**, **R34**). Outstanding operations work,
 excluded from the product completion basis: R20 disposable-resource cleanup,
 blocked until the owner grants a token with `delete_repo`. R14 closed on 2026-09-24
 when Plan M proved hosted draft/partial-upload recovery against the retained
@@ -141,6 +148,7 @@ What shipped is recorded after the fact.
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
 | Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R25 ready, R10 refined into four stories |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
+| Production readiness | R28-R34 | pending | Filed 2026-09-24 from the [readiness report](docs/production-readiness-2026-09-24.md); scale first |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
