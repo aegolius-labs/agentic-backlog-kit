@@ -297,3 +297,46 @@ state is the one a mid-upload failure leaves. A half-uploaded asset (state other
 than `uploaded`) is not auto-recovered by design: the publisher stops for
 reviewed remediation, which the shared suite covers locally. These are
 evaluation assets, not product releases. The fixture is retained for R20.
+
+## R20 fresh resource discovery (2026-09-24)
+
+S-R20-1 re-enumerated `aegolius-labs` repositories (all visibilities) and every
+organization Project including closed ones, read-only, and matched them against
+the Wave C cleanup receipt in
+[the capability record](../evals/live_github/capability-gap.wave-c-r02.json).
+Nothing was deleted or changed.
+
+Project #4 is absent: the organization Project list does not contain it and
+`projectV2(number: 4)` resolves `NOT_FOUND`. The four `-native` and `-mcp-`
+scenario repositories named in the record return 404; those scenarios stopped
+at preflight before any write, so they were never created.
+
+Remaining disposable evaluation resources:
+
+| Resource | Node ID | Visibility | Created | Contents | Receipt match |
+| --- | --- | --- | --- | --- | --- |
+| repository `abk-eval-wave-c-r02-20260827-gh-26c954aa-labels` | `R_kgDOUKTD5Q` | private | 2026-09-01 | 8 issues; no releases, tags or hooks | yes - failed deletion target |
+| Project #5 `ABK Eval wave-c-r02-20260827-api-3f546dc6 [labels]` | `PVT_kwDOD0x0U84BiD-Q` | private, open | 2026-09-01 | 8 items, linked only to the API repository below | yes |
+| repository `abk-eval-wave-c-r02-20260827-api-3f546dc6-labels` | `R_kgDOUKTEpg` | private | 2026-09-01 | 8 issues; no releases, tags or hooks | yes |
+| repository `abk-adopt-eval-20260922` | `R_kgDOUmapPg` | private | 2026-09-22 | 10 issues; no releases, tags or hooks | added after the receipt (GH-63) |
+| repository `abk-release-eval-20260908` | `R_kgDOUSpIDA` | public | 2026-09-08 | release fixture: tags `v0.0.0`, `v0.1.0`, `v0.1.1`; immutable releases `388026880`, `395291910` | added after the receipt (R14) |
+
+No other forks, hooks or matching repositories or Projects exist, and the
+authenticated user owns no repository or Project with an `abk` or `eval` name.
+
+Not evaluation resources, and out of R20 scope: Projects #2 and #3 ("Agentic
+Backlog", created 2026-06-16, linked only to `aio-agentic-sdlc`), and the empty
+Project #1 (created 2026-05-23, no linked repository). All three predate every
+kit evaluation. Project #6 is this repository's own backlog.
+
+The authenticated token's scopes are `admin:org`, `gist`, `project`,
+`read:packages`, `repo` and `workflow`. Deleting Project #5 is within `project`;
+deleting any repository needs `delete_repo`, which this token lacks - the same
+gap behind the original `repository_delete_request_failed` stop and the GH-63
+retention.
+
+R20 is now a decision rather than discovery. Each resource above needs either an
+explicit retention election or a new identity-bound deletion plan confirmed by
+digest, executed with a token that carries `delete_repo`, stopping on the first
+failure. The release fixture in particular may be worth retaining: it is the only
+place the hosted release path can be exercised without producing product releases.

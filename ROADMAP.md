@@ -567,8 +567,13 @@ misleading.
 
 #### R20 - Resolve remaining disposable evaluation resources
 
-- **Status:** Pending fresh identity discovery and separately confirmed cleanup
-  plan. One resource was added on 2026-09-22 and its identity is recorded rather
+- **Status:** Fresh discovery done 2026-09-24 (S-R20-1); awaiting the owner's
+  per-resource choice between retention and a separately confirmed deletion
+  plan. Project #4 is verified absent. Five resources remain, each identified by
+  node ID in [the discovery record](docs/validation.md#r20-fresh-resource-discovery-2026-09-24):
+  the two Wave C repositories and Project #5 from the original receipt, plus the
+  adoption and release fixtures below. Repository deletion needs a token with
+  `delete_repo`, which the current one lacks. One resource was added on 2026-09-22 and its identity is recorded rather
   than left to be rediscovered: `aegolius-labs/abk-adopt-eval-20260922`, private,
   created for the GH-63 live validation and retained because the authenticated
   token carries no `delete_repo` scope. Deleting it needs a token that does, and
