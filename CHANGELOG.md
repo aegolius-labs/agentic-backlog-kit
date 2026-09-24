@@ -8,6 +8,24 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- An item can carry an optional canonical `guid`, linking it to the
+  aio-agentic-sdlc Intention DAG node it projects (R25, Seam A). It must be a
+  lowercase UUID exactly as `str(UUID(value))` renders it and unique across the
+  manifest; any other spelling is rejected before planning. The issue marker
+  carries it as `;guid=` after `schema=1`, only on items that have one, so no
+  existing issue is rewritten and every released kit still reads the id.
+  Snapshots report it, orphan recovery keeps it, and `--preserve-body` corrects
+  only the marker. A Seam A fixture pins the identity contract on both sides.
+
+### Changed
+
+- Manifest `schema_version` is now 2. Version 1 manifests are still read and are
+  written back as version 2 on the next save; a version 1 manifest that carries a
+  `guid` is rejected rather than silently upgraded. Kits older than this release
+  cannot read a version 2 manifest.
+
+### Added
+
 - Capability preflight for execution routes (R13). Every action kind declares
   the capabilities it requires and every transport declares what it provides,
   so sync, scaffold, iteration, bootstrap and import all refuse before their

@@ -27,5 +27,11 @@ python <plugin-root>/scripts/backlog.py item-update ITEM_ID --input .agentic-bac
 python <plugin-root>/scripts/backlog.py validate
 ```
 
-An add payload contains every item field except `id`, which may be omitted for deterministic generation. An update payload contains only changed fields and cannot change `id`.
+Optional canonical GUID:
+
+- `guid` links an item to the aio-agentic-sdlc Intention DAG node it projects. Supply it only when that framework hands the work over; standalone use owns no Intention DAG and leaves it out.
+- It must be a canonical lowercase UUID exactly as `str(UUID(value))` renders it, unique across the manifest, and it needs `schema_version` 2. The kit reads version 1 manifests and writes them back as version 2.
+- Never invent one. A GUID that points at no Intention DAG node is worse than none.
+
+An add payload contains every item field except `id`, which may be omitted for deterministic generation, and the optional `guid`. An update payload contains only changed fields and cannot change `id`.
 

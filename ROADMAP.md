@@ -447,7 +447,10 @@ The gate on anyone other than the maintainer using the kit.
 
 #### R25 - Carry a canonical GUID through to GitHub for Seam A traceability
 
-- **Status:** Ready; filed 2026-09-22 through this kit's own backlog as
+- **Status:** Implemented 2026-09-24. The aio-agentic-sdlc counterpart fixture
+  is in [aio-agentic-sdlc#103](https://github.com/aegolius-labs/aio-agentic-sdlc/pull/103)
+  and closes the last acceptance criterion when it merges. Filed 2026-09-22 through this
+  kit's own backlog as
   [#69](https://github.com/aegolius-labs/agentic-backlog-kit/issues/69), design
   approved by the owner on 2026-09-24
 - **Approved design:** an optional item field `guid` holding a canonical
