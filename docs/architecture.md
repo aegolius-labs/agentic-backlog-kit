@@ -29,7 +29,7 @@ GitHub-owned operational data such as issue numbers, node IDs, Project item IDs,
 2. `scripts/backlog.py` exposes concise commands over the local engine.
 3. Manifest validation rejects invalid references, hierarchy jumps, duplicate IDs, bad dimensions, and dependency cycles.
 4. Scoring and capacity packing are pure local computations; a named sprint commitment additionally requires refreshed iteration identity and lifecycle state.
-5. Snapshot readers retrieve only kit-managed issues, marked by `<!-- agentic-backlog-kit:id=...;schema=1 -->`, plus their Project fields, complete managed view configuration, active/completed iterations, and relationships.
+5. Snapshot readers retrieve only kit-managed issues, marked by `<!-- agentic-backlog-kit:id=...;schema=1 -->` (with `;guid=...` appended when the item carries a canonical GUID), plus their Project fields, complete managed view configuration, active/completed iterations, and relationships.
 6. Reconciliation emits a canonical plan whose SHA-256 digest binds normalized manifest and remote-state fingerprints, planning options, action payloads, and action preconditions.
 7. Executors accept only the exact reviewed digest, refresh GitHub, rebuild the plan from the freshly validated local manifest, and abort before mutation on any drift.
 8. Apply journals its completed prefix after every action and records the failed action and error on interruption. Resumption always refreshes, replans, and requires confirmation of the new remaining plan rather than replaying the old plan.

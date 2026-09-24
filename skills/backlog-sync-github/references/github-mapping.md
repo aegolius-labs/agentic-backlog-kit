@@ -2,6 +2,8 @@
 
 Only issues containing `<!-- agentic-backlog-kit:id=ITEM_ID;schema=1 -->` are managed. Unmarked issues and Project items are ignored.
 
+An item with a `guid` carries it in the same marker: `<!-- agentic-backlog-kit:id=ITEM_ID;schema=1;guid=GUID -->`. Items without one keep the plain marker, so existing issues are never rewritten for it. With `--preserve-body`, only the marker is corrected when its GUID differs; the rest of the body is left alone. A kit older than schema 2 that rewrites a body drops the key, and the next plan from a current kit restores it.
+
 Mapping:
 
 - Item type: native organization issue type when available, otherwise `type:*` label.

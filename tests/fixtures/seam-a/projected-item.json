@@ -1,0 +1,26 @@
+{
+  "contract": "seam-a-identity",
+  "contract_version": 1,
+  "note": "One aio-agentic-sdlc work item as it arrives in an Agentic Backlog Kit manifest, and the issue-body marker the kit writes for it. Only identity is pinned: the canonical GUID must survive from the Intention DAG node into the item and into the marker unchanged. The type and scoring mapping between the two models is not part of this contract yet.",
+  "guid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "item": {
+    "id": "F-SEAM-A",
+    "title": "Project one Intention DAG node onto GitHub",
+    "type": "Feature",
+    "description": "A work item derived from an accepted Intention DAG node.",
+    "acceptance_criteria": [
+      "The projected issue can be traced back to its Intention DAG node"
+    ],
+    "parent": null,
+    "depends_on": [],
+    "impact": 3,
+    "effort": 3,
+    "business_value": 3,
+    "enabler_value": 2,
+    "status": "Ready",
+    "maturity": "ready",
+    "sprint": null,
+    "guid": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+  },
+  "marker": "<!-- agentic-backlog-kit:id=F-SEAM-A;schema=1;guid=7c9e6679-7425-40de-944b-e07fc1f90ae7 -->"
+}

@@ -22,7 +22,7 @@ from typing import Any, Callable, Iterable
 
 from .execution import ApplyReceipt, Journal, failure_hint, receipt, state_fingerprint
 from .manifest import ManifestError, validate_manifest
-from .sync import ApplyAuthorizationError, extract_item_id
+from .sync import ApplyAuthorizationError, extract_guid, extract_item_id
 
 
 ITEM_ID_PREFIX = "GH-"
@@ -682,6 +682,11 @@ def reconcile_orphans(
             "maturity": DEFAULT_IMPORT_MATURITY,
             "sprint": None,
         }
+        guid = issue.get("guid") or extract_guid(issue.get("body"))
+        if guid:
+            # The marker is the only place a lost item's GUID survives, so
+            # recovery that dropped it would sever the trace it exists for.
+            item["guid"] = guid
         recovered.append(item)
         pairs.append((issue, item))
 

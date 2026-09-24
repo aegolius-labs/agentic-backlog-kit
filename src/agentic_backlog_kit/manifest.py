@@ -7,9 +7,14 @@ from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+# Version 1 predates the optional canonical GUID. It is still read, and it is
+# migrated on load: the only difference is that version 1 cannot carry a GUID,
+# so a version 1 manifest that does is rejected rather than silently upgraded.
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
 DEFAULT_HIERARCHY = (
     ("Initiative",),
     ("Epic",),
@@ -63,6 +68,7 @@ ITEM_FIELDS = {
     "maturity",
     "sprint",
 }
+OPTIONAL_ITEM_FIELDS = {"guid"}
 
 
 class ManifestError(ValueError):
@@ -95,6 +101,24 @@ def _validate_dimension(item: dict[str, Any], name: str, minimum: int) -> None:
         raise ManifestError(
             f"Item '{item.get('id', '?')}' {name} must be an integer from {minimum} to 5"
         )
+
+
+def canonical_guid(value: Any) -> str | None:
+    """Return the GUID when it is exactly canonical, otherwise None.
+
+    aio-agentic-sdlc owns canonical GUID traceability and accepts a GUID only
+    when `str(UUID(value))` reproduces it: lowercase, hyphenated, no braces or
+    URN prefix. Accepting a looser spelling here would let two text forms of one
+    node project as two different identities.
+    """
+
+    if not isinstance(value, str):
+        return None
+    try:
+        canonical = str(UUID(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return value if value == canonical else None
 
 
 def _hierarchy_levels(hierarchy: list[list[str]] | tuple[tuple[str, ...], ...]) -> dict[str, int]:
@@ -174,10 +198,13 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
     root = deepcopy(_require_mapping(data, "manifest"))
     _reject_unknown(root, ROOT_FIELDS, "manifest")
-    if root.get("schema_version") != SCHEMA_VERSION:
+    source_version = root.get("schema_version")
+    if isinstance(source_version, bool) or source_version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ManifestError(
-            f"schema_version must be {SCHEMA_VERSION}; got {root.get('schema_version')!r}"
+            f"schema_version must be one of {list(SUPPORTED_SCHEMA_VERSIONS)}; "
+            f"got {source_version!r}"
         )
+    root["schema_version"] = SCHEMA_VERSION
 
     github = _require_mapping(root.get("github"), "github")
     _reject_unknown(github, GITHUB_FIELDS, "github")
@@ -290,9 +317,12 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
         raise ManifestError("items must be an array")
 
     by_id: dict[str, dict[str, Any]] = {}
+    guids: dict[str, str] = {}
     for index, raw_item in enumerate(raw_items):
         backlog_item = _require_mapping(raw_item, f"items[{index}]")
-        _reject_unknown(backlog_item, ITEM_FIELDS, f"items[{index}]")
+        _reject_unknown(
+            backlog_item, ITEM_FIELDS | OPTIONAL_ITEM_FIELDS, f"items[{index}]"
+        )
         item_id = _require_nonempty_string(backlog_item.get("id"), f"items[{index}].id")
         if not ID_PATTERN.fullmatch(item_id):
             raise ManifestError(
@@ -362,6 +392,26 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
             raise ManifestError(f"Item '{item_id}' sprint must be a non-empty string or null")
         if isinstance(sprint, str):
             backlog_item["sprint"] = sprint.strip()
+        if "guid" in backlog_item:
+            guid = backlog_item["guid"]
+            if guid is None:
+                # Absent and null mean the same thing; keep the manifest compact.
+                del backlog_item["guid"]
+            elif source_version == 1:
+                raise ManifestError(
+                    f"Item '{item_id}' carries a guid, which schema_version 1 cannot "
+                    "express; set schema_version to 2"
+                )
+            elif canonical_guid(guid) is None:
+                raise ManifestError(
+                    f"Item '{item_id}' guid must be a canonical lowercase UUID; got {guid!r}"
+                )
+            elif guid in guids:
+                raise ManifestError(
+                    f"Items '{guids[guid]}' and '{item_id}' carry the same guid {guid}"
+                )
+            else:
+                guids[guid] = item_id
         by_id[item_id] = backlog_item
 
     for item_id, backlog_item in by_id.items():

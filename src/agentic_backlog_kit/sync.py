@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any, Callable, Iterable
 
 from .execution import ApplyReceipt, Journal, failure_hint, receipt, state_fingerprint
-from .manifest import ManifestError, validate_manifest
+from .manifest import ManifestError, canonical_guid, validate_manifest
 from .priority import prioritize
 
 
@@ -53,6 +53,72 @@ class SyncPlan:
         }
 
 
+MARKER_PREFIX = "<!-- agentic-backlog-kit:"
+MARKER_SUFFIX = "-->"
+
+
+def render_marker(item: dict[str, Any]) -> str:
+    """Render the hidden marker, carrying the canonical GUID only when present.
+
+    The GUID is appended after `schema=1` rather than bumping the marker schema:
+    every reader since 0.1.0 takes the id only up to the first `;`, so existing
+    issue bodies stay valid and none has to be rewritten. An older kit that
+    rewrites a body regenerates the marker without the key; that is the one
+    loss, and it is documented rather than engineered around.
+    """
+
+    marker = f"id={item['id']};schema=1"
+    if item.get("guid"):
+        marker += f";guid={item['guid']}"
+    return f"{MARKER_PREFIX}{marker} {MARKER_SUFFIX}"
+
+
+def _marker_span(body: str | None) -> tuple[int, int] | None:
+    if not body:
+        return None
+    start = body.find(MARKER_PREFIX + "id=")
+    if start < 0:
+        return None
+    end = body.find(MARKER_SUFFIX, start)
+    if end < 0:
+        return None
+    return start, end + len(MARKER_SUFFIX)
+
+
+def extract_marker_fields(body: str | None) -> dict[str, str]:
+    """Return the marker's `key=value` pairs, or an empty mapping without one."""
+
+    span = _marker_span(body)
+    if span is None:
+        return {}
+    inner = body[span[0] + len(MARKER_PREFIX) : span[1] - len(MARKER_SUFFIX)]
+    fields: dict[str, str] = {}
+    for part in inner.strip().split(";"):
+        key, separator, value = part.partition("=")
+        if separator and key.strip() and key.strip() not in fields:
+            fields[key.strip()] = value.strip()
+    return fields
+
+
+def extract_guid(body: str | None) -> str | None:
+    """Return the marker's GUID when it is canonical, otherwise None.
+
+    A non-canonical value is treated as absent rather than trusted, so the next
+    plan proposes correcting it instead of projecting a second identity.
+    """
+
+    return canonical_guid(extract_marker_fields(body).get("guid"))
+
+
+def with_marker(body: str, item: dict[str, Any]) -> str:
+    """Replace only the marker, preserving every other character of the body."""
+
+    span = _marker_span(body)
+    if span is None:
+        return f"{render_marker(item)}\n\n{body}" if body.strip() else render_marker(item)
+    return body[: span[0]] + render_marker(item) + body[span[1] :]
+
+
 def render_issue_body(item: dict[str, Any]) -> str:
     criteria = "\n".join(
         f"- [ ] {criterion}" for criterion in item["acceptance_criteria"]
@@ -60,7 +126,7 @@ def render_issue_body(item: dict[str, Any]) -> str:
     dependencies = ", ".join(item["depends_on"]) or "None"
     parent = item["parent"] or "None"
     return (
-        f"<!-- agentic-backlog-kit:id={item['id']};schema=1 -->\n\n"
+        f"{render_marker(item)}\n\n"
         f"## Outcome\n\n{item['description']}\n\n"
         f"## Acceptance criteria\n\n{criteria or '- [ ] Define acceptance criteria'}\n\n"
         "## Backlog metadata\n\n"
@@ -376,6 +442,10 @@ def build_sync_plan(
                 issue_changes["title"] = item["title"]
             if manage_body and remote.get("body", "") != desired_body:
                 issue_changes["body"] = desired_body
+            elif not manage_body and extract_guid(remote.get("body")) != item.get("guid"):
+                # A preserved body still carries the kit's marker, so the GUID is
+                # corrected in place without touching anything else in it.
+                issue_changes["body"] = with_marker(remote.get("body") or "", item)
             if remote.get("type") != item["type"]:
                 issue_changes["type"] = item["type"]
                 fallback_label = f"type:{item['type'].lower()}"

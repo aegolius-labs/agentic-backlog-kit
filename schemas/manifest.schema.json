@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "github", "items"],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "enum": [1, 2] },
     "github": {
       "type": "object",
       "additionalProperties": false,
@@ -129,7 +129,17 @@
         "enabler_value": { "type": "integer", "minimum": 0, "maximum": 5 },
         "status": { "type": "string", "minLength": 1 },
         "maturity": { "enum": ["idea", "refined", "ready"] },
-        "sprint": { "type": ["string", "null"] }
+        "sprint": { "type": ["string", "null"] },
+        "guid": {
+          "description": "Optional canonical GUID of the aio-agentic-sdlc Intention DAG node this item projects. Lowercase, hyphenated, exactly as str(UUID(value)) renders it. Requires schema_version 2.",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            { "type": "null" }
+          ]
+        }
       }
     }
   }

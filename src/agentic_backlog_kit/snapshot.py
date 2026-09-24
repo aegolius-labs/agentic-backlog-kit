@@ -4,7 +4,7 @@ from typing import Any
 
 from .github import GitHubApiError, GitHubTransport
 from .iterations import normalize_iteration_field
-from .sync import extract_item_id
+from .sync import extract_guid, extract_item_id
 from .views import normalize_project_views
 
 
@@ -405,32 +405,36 @@ class GitHubSnapshotReader:
             labels = self._label_names(issue)
             if not issue_type:
                 issue_type = self._fallback_issue_type(labels)
-            snapshot_issues.append(
-                {
-                    "abk_id": self._item_id_from_issue(issue),
-                    "number": number,
-                    "id": int(issue["id"]),
-                    "node_id": str(issue["node_id"]),
-                    "url": str(issue.get("html_url") or issue.get("url") or ""),
-                    "title": issue.get("title", ""),
-                    "body": issue.get("body") or "",
-                    "type": issue_type,
-                    "labels": labels,
-                    "state": issue.get("state"),
-                    "in_project": bool(project_state),
-                    "project_item_id": project_state.get("project_item_id"),
-                    "project_fields": project_state.get("project_fields", {}),
-                    "parent_abk_id": self._item_id_from_issue(parent),
-                    "depends_on_abk_ids": sorted(
-                        item_id
-                        for item_id in (
-                            self._item_id_from_issue(dependency)
-                            for dependency in dependencies
-                        )
-                        if item_id
-                    ),
-                }
-            )
+            entry = {
+                "abk_id": self._item_id_from_issue(issue),
+                "number": number,
+                "id": int(issue["id"]),
+                "node_id": str(issue["node_id"]),
+                "url": str(issue.get("html_url") or issue.get("url") or ""),
+                "title": issue.get("title", ""),
+                "body": issue.get("body") or "",
+                "type": issue_type,
+                "labels": labels,
+                "state": issue.get("state"),
+                "in_project": bool(project_state),
+                "project_item_id": project_state.get("project_item_id"),
+                "project_fields": project_state.get("project_fields", {}),
+                "parent_abk_id": self._item_id_from_issue(parent),
+                "depends_on_abk_ids": sorted(
+                    item_id
+                    for item_id in (
+                        self._item_id_from_issue(dependency)
+                        for dependency in dependencies
+                    )
+                    if item_id
+                ),
+            }
+            guid = extract_guid(issue.get("body"))
+            if guid:
+                # Present only when the marker carries one, so snapshots of
+                # repositories that never use a GUID are unchanged.
+                entry["guid"] = guid
+            snapshot_issues.append(entry)
         return {
             "schema_version": 1,
             "github": {
