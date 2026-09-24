@@ -6,6 +6,21 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Snapshots read issue relationships in batched GraphQL instead of two REST
+  requests per issue (S-R28-1). A relationship request covers 50 issues, so the
+  cost grows with batches rather than issues: this repository's 81-issue
+  snapshot fell from about 165 requests to 5. Output is unchanged.
+
+### Fixed
+
+- A parent or `blocked by` relationship into another repository was matched by
+  issue number alone, so adoption could link an unrelated local issue with the
+  same number, and a snapshot could attribute a foreign marker to a local item.
+  Such relationships are now withheld with their reason, because one manifest
+  models one repository.
+
 ### Added
 
 - An item can carry an optional canonical `guid`, linking it to the

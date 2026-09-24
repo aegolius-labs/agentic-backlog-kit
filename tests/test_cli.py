@@ -16,16 +16,12 @@ from agentic_backlog_kit.iterations import build_iteration_plan
 from agentic_backlog_kit.scaffold import build_scaffold_plan
 from agentic_backlog_kit.sync import build_sync_plan
 
-from tests.helpers import item, manifest
+from tests.helpers import is_relationship_query, item, manifest, relationship_data
 
 
 class CliTests(unittest.TestCase):
-    def test_snapshot_command_succeeds_with_cli_parent_absence(self) -> None:
+    def test_snapshot_command_succeeds_on_the_cli_route(self) -> None:
         issues_path = "repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
-        parent_path = "repos/aegolius-labs/example/issues/1/parent"
-        dependencies_path = (
-            "repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100"
-        )
         issue = {
             "id": 101,
             "node_id": "NODE_1",
@@ -54,12 +50,13 @@ class CliTests(unittest.TestCase):
             path = command[4]
             if path == issues_path:
                 return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
-            if path == parent_path:
+            if path == "graphql" and is_relationship_query(
+                json.loads(kwargs["input"])["query"]
+            ):
+                query = json.loads(kwargs["input"])["query"]
                 return subprocess.CompletedProcess(
-                    command, 1, "", "gh: No parent issue found (HTTP 404)"
+                    command, 0, json.dumps({"data": relationship_data(query)}), ""
                 )
-            if path == dependencies_path:
-                return subprocess.CompletedProcess(command, 0, "[]", "")
             if path == "graphql":
                 return subprocess.CompletedProcess(command, 0, json.dumps(project), "")
             raise AssertionError(f"unexpected gh path: {path}")

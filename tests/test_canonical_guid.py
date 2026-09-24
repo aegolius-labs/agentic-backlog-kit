@@ -26,7 +26,7 @@ from agentic_backlog_kit.sync import (
     render_marker,
 )
 
-from tests.helpers import item, manifest
+from tests.helpers import is_relationship_query, item, manifest, relationship_data
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -250,10 +250,6 @@ class GuidSyncTests(unittest.TestCase):
 class GuidReadAndRecoveryTests(unittest.TestCase):
     def _read(self, body: str) -> dict:
         issues_path = "repos/aegolius-labs/example/issues?state=all&per_page=100&page=1"
-        parent_path = "repos/aegolius-labs/example/issues/1/parent"
-        dependencies_path = (
-            "repos/aegolius-labs/example/issues/1/dependencies/blocked_by?per_page=100"
-        )
         issue = {
             "id": 101,
             "node_id": "NODE_1",
@@ -280,12 +276,13 @@ class GuidReadAndRecoveryTests(unittest.TestCase):
             path = command[4]
             if path == issues_path:
                 return subprocess.CompletedProcess(command, 0, json.dumps([issue]), "")
-            if path == parent_path:
+            if path == "graphql" and is_relationship_query(
+                json.loads(kwargs["input"])["query"]
+            ):
+                query = json.loads(kwargs["input"])["query"]
                 return subprocess.CompletedProcess(
-                    command, 1, "", "gh: No parent issue found (HTTP 404)"
+                    command, 0, json.dumps({"data": relationship_data(query)}), ""
                 )
-            if path == dependencies_path:
-                return subprocess.CompletedProcess(command, 0, "[]", "")
             if path == "graphql":
                 return subprocess.CompletedProcess(
                     command, 0, json.dumps({"data": project}), ""
