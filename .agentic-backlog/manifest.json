@@ -470,11 +470,15 @@
     },
     {
       "id": "R10",
-      "title": "R10 - Add destructive and reverse reconciliation",
+      "title": "R10 - Close the work lifecycle from evidence",
       "type": "Feature",
-      "description": "Synchronization is deliberately additive and update-only: it does not close deleted work, remove obsolete parents, archive Project items, or reconcile remote-only changes back into local intent.",
+      "description": "Synchronization was additive and update-only. Owner decision 2026-09-24: the lifecycle is automated from evidence, never from the manifest's silence. GitHub already closes an issue when a PR carrying `Closes #N` merges, and Project 6's built-in workflows mark it Done. The kit makes that reliable, finishes the loop for parents, removes relationships the manifest dropped, and treats Priority-only housekeeping as pre-authorized. It never closes, deletes, or archives an issue because the manifest no longer lists it.",
       "acceptance_criteria": [
-        "Every removal has explicit policy, preview, confirmation, audit, and recovery"
+        "Agents following the kit's skills link every PR to its kit-managed issues with a closing keyword",
+        "A parent whose children are all closed is proposed for closure through plan, digest confirmation, apply, and receipt",
+        "A parent or dependency link the manifest no longer declares is proposed for removal through the same contract, with recovery information",
+        "A plan made only of Priority field updates is recognized mechanically and may be applied without a separate confirmation",
+        "No issue is closed, deleted, or archived because it is absent from the manifest"
       ],
       "parent": "EPIC-V040",
       "depends_on": [
@@ -486,8 +490,8 @@
       "effort": 5,
       "business_value": 3,
       "enabler_value": 3,
-      "status": "Refining",
-      "maturity": "idea",
+      "status": "Ready",
+      "maturity": "refined",
       "sprint": null
     },
     {
@@ -683,9 +687,10 @@
       "id": "R20",
       "title": "R20 - Resolve remaining disposable evaluation resources",
       "type": "Feature",
-      "description": "Cleanup stopped safely on its first repository-deletion failure. Project #4 is deleted, its private repository remains, and the API Project #5 and repository were untouched. No deletion is authorized yet.",
+      "description": "Fresh discovery on 2026-09-24 (S-R20-1) verified Project #4 absent and found five resources. Owner decision 2026-09-24: delete the two Wave C repositories, Project #5, and abk-adopt-eval-20260922; retain abk-release-eval-20260908 as the hosted release test bed.",
       "acceptance_criteria": [
-        "Remaining resources are verified absent or retention is elected"
+        "The four retired resources are verified absent",
+        "The release fixture's retention is recorded as an explicit election"
       ],
       "parent": "EPIC-OPS",
       "depends_on": [],
@@ -783,11 +788,12 @@
       "id": "R25",
       "title": "R25 - Carry a canonical GUID through to GitHub for Seam A traceability",
       "type": "Feature",
-      "description": "The authority model in aio-agentic-sdlc requires that a canonical GUID be carried into the ABK item and into the GitHub issue body marker, so a projected issue can always be traced back to its Intention DAG node. This kit cannot do that. `$defs.item` in schemas/manifest.schema.json sets `additionalProperties: false` over a fixed fourteen-field list with no GUID field, so an item carrying one fails validation. The marker is `<!-- agentic-backlog-kit:id=<id>;schema=1 -->`; the separator leaves room for a second key but nothing writes or reads one.\n\nSeam B (agentic-qa-kit to here) is implemented and pinned by fixtures on both sides. Seam A is documented and unbuilt: neither repository references the other in src or tests.\n\nThis does not block standalone use, which is a supported configuration, not a degraded one. It is a cost that grows. Adding the carrier later means a schema version bump, a marker extension, and a re-link pass over every issue created before it. That is cheap at fifty issues and expensive at five thousand, which is why it is recorded now rather than when the framework arrives.\n\nFound on 2026-09-21 while assessing whether aio-agentic-sdlc can be adopted after this kit is already in use.",
+      "description": "The authority model in aio-agentic-sdlc requires that a canonical GUID be carried into the ABK item and into the GitHub issue body marker, so a projected issue can always be traced back to its Intention DAG node. This kit cannot do that: `$defs.item` sets `additionalProperties: false` over a fixed field list with no GUID field, and nothing writes or reads a second marker key.\n\nDesign approved by the owner on 2026-09-24: an optional item field `guid`, holding a canonical lowercase UUID exactly as aio-agentic-sdlc canonicalizes it (`str(UUID(value)) == value`). Manifest `schema_version` becomes 2 with a tested migration from 1. The marker gains `;guid=<uuid>` only on items that carry one and keeps `schema=1`, because older parsers read the id only up to the first `;` and existing issue bodies need no rewrite. A known limit to document: an older kit that rewrites a body drops the key.\n\nThis does not block standalone use, which is a supported configuration. It is a cost that grows with every issue created before the carrier exists.",
       "acceptance_criteria": [
-        "A manifest item can carry an optional canonical GUID without failing validation, under a bumped schema version with a tested migration from version 1",
+        "A manifest item can carry an optional canonical GUID without failing validation, under schema version 2 with a tested migration from version 1",
+        "A GUID that is not a canonical lowercase UUID is rejected before planning",
         "The issue body marker carries the GUID when the item has one, and round-trips through read and adoption without loss",
-        "An item with no GUID stays valid, because standalone use owns no Intention DAG",
+        "An item with no GUID stays valid and its marker is unchanged, because standalone use owns no Intention DAG",
         "A Seam A fixture is committed here and its counterpart in aio-agentic-sdlc, so neither repository imports the other to test the contract"
       ],
       "parent": "EPIC-V040",
@@ -796,8 +802,8 @@
       "effort": 2,
       "business_value": 3,
       "enabler_value": 5,
-      "status": "Inbox",
-      "maturity": "idea",
+      "status": "Ready",
+      "maturity": "ready",
       "sprint": null
     },
     {
@@ -843,6 +849,88 @@
       "status": "In Review",
       "maturity": "ready",
       "sprint": null
+    },
+    {
+      "type": "Story",
+      "depends_on": [],
+      "sprint": null,
+      "maturity": "ready",
+      "status": "Ready",
+      "id": "S-R10-1",
+      "parent": "R10",
+      "title": "Make agents link PRs to kit issues with closing keywords",
+      "description": "GitHub closes an issue when a PR carrying `Closes #N` merges, and Project 6 marks it Done. Today that depends on habit: no skill tells an agent to do it. Make it part of the kit's guidance so evidence-based closure is dependable.",
+      "acceptance_criteria": [
+        "The skills that hand work to an agent instruct it to put a closing keyword for each kit-managed issue a PR completes",
+        "The guidance says not to close a parent this way unless the PR completes the parent's acceptance criteria"
+      ],
+      "impact": 3,
+      "effort": 1,
+      "business_value": 2,
+      "enabler_value": 3
+    },
+    {
+      "type": "Story",
+      "depends_on": [],
+      "sprint": null,
+      "maturity": "ready",
+      "status": "Ready",
+      "id": "S-R10-2",
+      "parent": "R10",
+      "title": "Propose closing a parent once every child is closed",
+      "description": "A Feature whose Stories all closed stays open until someone remembers it; R21 sat that way. Closing it is supported by evidence, the children's closure, so the kit may propose it. It still goes through plan, digest confirmation, apply, and receipt.",
+      "acceptance_criteria": [
+        "A sync plan proposes closing and marking Done a parent whose children are all closed",
+        "A parent with any open child, or with no children, is never proposed",
+        "The action has remote preconditions, a receipt, and is covered by tests",
+        "The sync skill no longer describes issue closure as out of scope for this case"
+      ],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 2,
+      "enabler_value": 2
+    },
+    {
+      "type": "Story",
+      "depends_on": [],
+      "sprint": null,
+      "maturity": "ready",
+      "status": "Ready",
+      "id": "S-R10-3",
+      "parent": "R10",
+      "title": "Remove relationships the manifest no longer declares",
+      "description": "When intent drops a parent or dependency, GitHub keeps showing it, so the board shows links the plan no longer has. Removing links the manifest no longer declares keeps the projection faithful without closing or deleting any issue. aio-agentic-sdlc's authority model currently cites 'never removes relationships' as satisfying one-way projection and must be amended in the same change.",
+      "acceptance_criteria": [
+        "A sync plan proposes removing parent and dependency links that the manifest no longer declares, only between kit-managed issues",
+        "Each removal records what is needed to restore it",
+        "Links to issues outside the manifest are never removed",
+        "aio-agentic-sdlc doc/authority-model.md is amended to state the new boundary"
+      ],
+      "impact": 3,
+      "effort": 5,
+      "business_value": 2,
+      "enabler_value": 2
+    },
+    {
+      "type": "Story",
+      "depends_on": [],
+      "sprint": null,
+      "maturity": "ready",
+      "status": "Ready",
+      "id": "S-R10-4",
+      "parent": "R10",
+      "title": "Recognize Priority-only plans as pre-authorized",
+      "description": "Owner decision 2026-09-24: a sync plan consisting solely of Priority field updates may be applied without a separate confirmation, like the release-workflow exception. Priority is derived by the kit and GitHub cannot compute it, so finished work otherwise keeps a stale score. The exemption must be checked by the engine, not by an agent reading the plan.",
+      "acceptance_criteria": [
+        "The plan reports whether it contains only Priority field updates",
+        "sync-apply accepts such a plan without --confirm, and refuses any other plan without it",
+        "The plan is still bound to fresh state, verified after apply, and receipted",
+        "The sync skill documents the exemption and its limit"
+      ],
+      "impact": 3,
+      "effort": 2,
+      "business_value": 2,
+      "enabler_value": 3
     },
     {
       "id": "S-R11-1",
@@ -1106,6 +1194,27 @@
       "status": "Ready",
       "maturity": "ready",
       "sprint": null
+    },
+    {
+      "type": "Story",
+      "depends_on": [],
+      "sprint": null,
+      "maturity": "ready",
+      "status": "Blocked",
+      "id": "S-R20-2",
+      "parent": "R20",
+      "title": "Delete the four retired evaluation resources under a confirmed plan",
+      "description": "Delete abk-eval-wave-c-r02-20260827-gh-26c954aa-labels, abk-eval-wave-c-r02-20260827-api-3f546dc6-labels, Project #5, and abk-adopt-eval-20260922, each bound to the node ID recorded on 2026-09-24. Repository deletion needs a token with delete_repo, which the owner must grant; blocked until then.",
+      "acceptance_criteria": [
+        "An identity-bound deletion plan is confirmed by digest before any deletion",
+        "Execution stops on the first failure without retry",
+        "Each resource is read back as absent",
+        "abk-release-eval-20260908 is untouched"
+      ],
+      "impact": 2,
+      "effort": 1,
+      "business_value": 1,
+      "enabler_value": 1
     },
     {
       "id": "S-R21-1",

@@ -3,8 +3,8 @@
 **Generated. Do not edit by hand.** Regenerate with `abk gantt --lanes 1 --days-per-effort 2`.
 
 - Projection start: `2026-09-18`
-- Projected finish: `2027-02-02`
-- Scheduled items: 25
+- Projected finish: `2027-02-16`
+- Scheduled items: 29
 - Duration basis: 2 day(s) per effort point
 - Parallel lanes: 1
 - Critical path: `S-R15-1 -> S-R15-2 -> S-R11-1 -> S-R11-2`
@@ -29,7 +29,7 @@ gantt
     Preview unmanaged issues read-only :S-R11-1, 2026-09-30, 6d
     Assign stable IDs and apply adoption in deterministic bat... :S-R11-2, 2026-10-18, 6d
     Cover adoption in the skills, not only the CLI :S-R11-3, 2026-11-01, 4d
-    Recover an orphan with the structure GitHub records, not... :S-R11-4, 2026-12-31, 4d
+    Recover an orphan with the structure GitHub records, not... :S-R11-4, 2026-12-23, 4d
     section R22 - Report actionable apply failures
     Name the item and rejected field on apply failure :S-R22-1, 2026-10-06, 6d
     Explain an unavailable native issue type :S-R22-2, 2026-10-30, 2d
@@ -43,20 +43,25 @@ gantt
     R27 - Project the backlog onto a timeline and render a Ga... :active, R27, 2026-11-27, 6d
     section R14 - Adopt organization-managed semantic releases
     Enforce the release baseline prerequisite without auto-ta... :S-R14-1, 2026-11-05, 6d
-    Prove hosted recovery after draft creation and partial up... :S-R14-2, 2027-01-04, 6d
+    Prove hosted recovery after draft creation and partial up... :S-R14-2, 2026-12-31, 6d
     section v0.4.0+ - Reconciliation and reach
     R25 - Carry a canonical GUID through to GitHub for Seam A... :R25, 2026-11-23, 4d
     R13 - Complete native transport parity and decide on a de... :R13, 2026-12-09, 10d
-    R10 - Add destructive and reverse reconciliation :R10, 2026-12-21, 10d
     section v0.1.2 - Apply ergonomics
     R23 - Converge a fresh Project in one scaffold apply :R23, 2026-12-03, 6d
+    section R10 - Close the work lifecycle from evidence
+    Make agents link PRs to kit issues with closing keywords :S-R10-1, 2026-12-21, 2d
+    Recognize Priority-only plans as pre-authorized :S-R10-4, 2026-12-27, 4d
+    Propose closing a parent once every child is closed :S-R10-2, 2027-01-12, 6d
+    Remove relationships the manifest no longer declares :S-R10-3, 2027-01-18, 10d
     section Unparented
-    Infer hierarchy and dependencies when importing existing... :GH-63, 2027-01-10, 6d
+    Infer hierarchy and dependencies when importing existing... :GH-63, 2027-01-06, 6d
     section Unscheduled - portfolio scale
-    R24 - Reconsider hierarchy expressiveness for small work :R24, 2027-01-16, 6d
-    R12 - Support multi-repository portfolio planning :R12, 2027-01-24, 10d
+    R24 - Reconsider hierarchy expressiveness for small work :R24, 2027-01-28, 6d
+    R12 - Support multi-repository portfolio planning :R12, 2027-02-07, 10d
     section R20 - Resolve remaining disposable evaluation resources
-    Refresh disposable resource identities before any cleanup... :S-R20-1, 2027-01-22, 2d
+    Refresh disposable resource identities before any cleanup... :S-R20-1, 2027-02-03, 2d
+    Delete the four retired evaluation resources under a conf... :crit, S-R20-2, 2027-02-05, 2d
 ```
 
 ## Not scheduled
@@ -83,6 +88,7 @@ gantt
 | `R07` | already complete: status 'Done' |
 | `R08` | already complete: status 'Done' |
 | `R09` | already complete: status 'Done' |
+| `R10` | type 'Feature' groups work its children carry |
 | `R11` | type 'Feature' groups work its children carry |
 | `R14` | type 'Feature' groups work its children carry |
 | `R15` | type 'Feature' groups work its children carry |
