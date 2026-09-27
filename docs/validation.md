@@ -340,3 +340,33 @@ explicit retention election or a new identity-bound deletion plan confirmed by
 digest, executed with a token that carries `delete_repo`, stopping on the first
 failure. The release fixture in particular may be worth retaining: it is the only
 place the hosted release path can be exercised without producing product releases.
+
+## R20 resolution (2026-09-26)
+
+The owner deleted the four retired resources by hand in the GitHub interface on
+2026-09-26 instead of granting the token `delete_repo`. That was an explicit
+choice: the kit does not hold a repository-deletion credential, and no deletion
+was performed by the kit or through the `gh` CLI. S-R20-2's confirmed-plan
+criteria therefore did not apply; what remains, and is recorded here, is the
+read-back.
+
+| Resource | Node ID | Read-back 2026-09-26 |
+| --- | --- | --- |
+| repository `abk-eval-wave-c-r02-20260827-gh-26c954aa-labels` | `R_kgDOUKTD5Q` | `GET /repos/...` 404 |
+| repository `abk-eval-wave-c-r02-20260827-api-3f546dc6-labels` | `R_kgDOUKTEpg` | `GET /repos/...` 404 |
+| repository `abk-adopt-eval-20260922` | `R_kgDOUmapPg` | `GET /repos/...` 404 |
+| Project #5 `ABK Eval wave-c-r02-20260827-api-3f546dc6 [labels]` | `PVT_kwDOD0x0U84BiD-Q` | `node(id:)` resolves `NOT_FOUND`; absent from the organization Project list |
+| repository `abk-release-eval-20260908` | `R_kgDOUSpIDA` | present, same node ID - retained |
+
+The organization Project list now holds only #1, #2, #3 and #6, none of them
+evaluation resources.
+
+**Retention election.** `abk-release-eval-20260908` is retained deliberately, per
+the owner's 2026-09-24 decision, as the hosted release test bed: it is the only
+place the organization release path can be exercised without producing product
+releases, and R14's recovery proof ran there. Its tags and immutable releases are
+evaluation assets, not product releases.
+
+[The GH-63 validation record](adoption-live-validation-2026-09-22.md) links to
+`abk-adopt-eval-20260922`; those links now 404, and the record's own evidence -
+command output and receipts - is unaffected.

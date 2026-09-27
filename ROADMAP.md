@@ -117,8 +117,8 @@ filed as R28-R34 under `EPIC-PROD`, and the owner put scale ahead of R10.
 Outstanding product work: **R28** and **R29** (scale and GitHub lag), then
 installation and evaluation (**R30**-**R32**), then **R10**, then the stability
 policy and an outside pilot (**R33**, **R34**). Outstanding operations work,
-excluded from the product completion basis: R20 disposable-resource cleanup,
-blocked until the owner grants a token with `delete_repo`. R14 closed on 2026-09-24
+excluded from the product completion basis: none. R20 closed on 2026-09-26 when the
+owner deleted the four retired resources by hand and each read back absent. R14 closed on 2026-09-24
 when Plan M proved hosted draft/partial-upload recovery against the retained
 release fixture. See
 [the overall progress report](docs/overall-progress-2026-09-13.md) and
@@ -189,7 +189,7 @@ effort, production readiness, or safety approval.
 | Reconciliation and reach R10, R13, GH-63, R25 | 2/4 | 50% |
 | Planning and handoff R26, R27 | 2/2 | 100% |
 | **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25-R27 | **20/22** | **91%** |
-| Operations R14, R19, R20 | 2/3 | 67% |
+| Operations R14, R19, R20 | 3/3 | 100% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
 R12, which is explicitly deferred, and three operations chores. The scheduled
@@ -596,9 +596,11 @@ misleading.
 
 #### R20 - Resolve remaining disposable evaluation resources
 
-- **Status:** Fresh discovery done 2026-09-24 (S-R20-1); awaiting the owner's
-  per-resource choice between retention and a separately confirmed deletion
-  plan. Project #4 is verified absent. Five resources remain, each identified by
+- **Status:** Done 2026-09-26. The owner deleted the two Wave C repositories,
+  Project #5 and `abk-adopt-eval-20260922` by hand, and each read back absent;
+  the release fixture is retained as an explicit election. See
+  [the resolution record](docs/validation.md#r20-resolution-2026-09-26).
+  History: fresh discovery done 2026-09-24 (S-R20-1). Project #4 is verified absent. Five resources remained, each identified by
   node ID in [the discovery record](docs/validation.md#r20-fresh-resource-discovery-2026-09-24):
   the two Wave C repositories and Project #5 from the original receipt, plus the
   adoption and release fixtures below. Repository deletion needs a token with

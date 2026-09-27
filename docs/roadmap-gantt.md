@@ -3,8 +3,8 @@
 **Generated. Do not edit by hand.** Regenerate with `abk gantt --lanes 1 --days-per-effort 2`.
 
 - Projection start: `2026-09-18`
-- Projected finish: `2027-04-15`
-- Scheduled items: 42
+- Projected finish: `2027-04-13`
+- Scheduled items: 41
 - Duration basis: 2 day(s) per effort point
 - Parallel lanes: 1
 - Critical path: `S-R15-1 -> S-R15-2 -> S-R11-1 -> S-R11-2`
@@ -77,10 +77,9 @@ gantt
     Infer hierarchy and dependencies when importing existing... :GH-63, 2027-03-05, 6d
     section Unscheduled - portfolio scale
     R24 - Reconsider hierarchy expressiveness for small work :R24, 2027-03-27, 6d
-    R12 - Support multi-repository portfolio planning :R12, 2027-04-06, 10d
+    R12 - Support multi-repository portfolio planning :R12, 2027-04-04, 10d
     section R20 - Resolve remaining disposable evaluation resources
     Refresh disposable resource identities before any cleanup... :S-R20-1, 2027-04-02, 2d
-    Delete the four retired evaluation resources under a conf... :crit, S-R20-2, 2027-04-04, 2d
 ```
 
 ## Not scheduled
@@ -124,5 +123,6 @@ gantt
 | `R30` | type 'Feature' groups work its children carry |
 | `R31` | type 'Feature' groups work its children carry |
 | `R33` | type 'Feature' groups work its children carry |
+| `S-R20-2` | already complete: status 'Done' |
 | `S-R21-1` | already complete: status 'Done' |
 | `S-R21-2` | already complete: status 'Done' |

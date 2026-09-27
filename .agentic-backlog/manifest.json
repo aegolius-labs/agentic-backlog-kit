@@ -717,7 +717,7 @@
       "effort": 1,
       "business_value": 1,
       "enabler_value": 1,
-      "status": "Ready",
+      "status": "Done",
       "maturity": "refined",
       "sprint": null
     },
@@ -1358,7 +1358,7 @@
       "depends_on": [],
       "sprint": null,
       "maturity": "ready",
-      "status": "Blocked",
+      "status": "Done",
       "id": "S-R20-2",
       "parent": "R20",
       "title": "Delete the four retired evaluation resources under a confirmed plan",
