@@ -49,6 +49,8 @@ Iteration lifecycle plans resolve exact titles, `@current`, or `@next` from cano
 
 Native GitHub Projects access is a transport invariant, not an MCP-only feature. A compatible Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API are peer execution routes over the same deterministic engine contract. Capability discovery must prove that a route exposes every operation and identity required by a plan. An incomplete MCP surface is reported and the workflow selects one complete route; writes from different transports are never silently mixed within one apply. The same canonical snapshot, plan, digest, receipt, and post-apply verification contract applies regardless of executor.
 
+Both native routes retry a request GitHub refused for a rate limit: a 429, a 403 that GitHub marks as a primary or secondary limit, or a GraphQL `RATE_LIMITED` error that returned no data. The wait is the one GitHub names - `retry-after`, then the quota reset - or, for a secondary limit that names none, one minute doubled on each repeat. All waits in a run share one budget (300 seconds, five attempts per request); a wait that would overrun it is not started, and the run fails with the ordinary rate-limit hint. A rate-limit refusal is issued before any work is done, so retrying it cannot repeat a write. A timeout, a dropped connection or a server error leaves a write's outcome unknown and is never retried: the action fails, the receipt journals it, and the next plan re-reads state first. The CLI route asks `gh api` for response headers so both routes are told the same wait.
+
 ## Backlog mapping
 
 | Backlog concept | GitHub representation |

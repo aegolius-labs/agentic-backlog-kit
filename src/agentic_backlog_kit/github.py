@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
+import time
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -62,10 +64,19 @@ def _cli_error_status(method: str, path: str, message: str) -> int | None:
 
 
 class GitHubApiError(RuntimeError):
-    def __init__(self, status: int, message: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        message: str,
+        *,
+        headers: dict[str, str] | None = None,
+        rate_limited: bool = False,
+    ) -> None:
         super().__init__(f"GitHub API error {status}: {message}")
         self.status = status
         self.message = message
+        self.headers = {key.lower(): value for key, value in (headers or {}).items()}
+        self.rate_limited = rate_limited
 
 
 class GitHubTransport(Protocol):
@@ -74,6 +85,122 @@ class GitHubTransport(Protocol):
     ) -> Any: ...
 
     def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]: ...
+
+
+# GitHub asks for at least a minute before retrying a secondary rate limit
+# that names no wait, and exponentially longer on each repeat.
+SECONDARY_RATE_LIMIT_WAIT = 60.0
+DEFAULT_RATE_LIMIT_WAIT_BUDGET = 300.0
+DEFAULT_RATE_LIMIT_ATTEMPTS = 5
+
+
+def is_rate_limited(error: GitHubApiError) -> bool:
+    """Tell a definite rate-limit refusal apart from every other failure.
+
+    A 403 is a rate limit only when GitHub says so, in its message or by
+    reporting no remaining quota; any other 403 is a permission failure.
+    """
+
+    if error.rate_limited or error.status == 429:
+        return True
+    if error.status != 403:
+        return False
+    return (
+        error.headers.get("x-ratelimit-remaining") == "0"
+        or "rate limit" in error.message.lower()
+    )
+
+
+def rate_limit_wait(error: GitHubApiError, now: float, attempt: int) -> float | None:
+    """Return how long GitHub asked us to wait, or None when it did not refuse.
+
+    `retry-after` wins, then the quota reset of an exhausted primary limit,
+    then GitHub's documented one-minute floor, doubled on each repeat.
+    """
+
+    if not is_rate_limited(error):
+        return None
+    retry_after = error.headers.get("retry-after", "").strip()
+    if retry_after.isdigit():
+        return max(float(retry_after), 1.0)
+    reset = error.headers.get("x-ratelimit-reset", "").strip()
+    if error.headers.get("x-ratelimit-remaining") == "0" and reset.isdigit():
+        return max(float(reset) - now, 0.0) + 1.0
+    return SECONDARY_RATE_LIMIT_WAIT * 2**attempt
+
+
+def _report_wait(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+class RateLimitBudget:
+    """Retry rate-limited requests within one bounded total wait per run.
+
+    Only a request GitHub definitely refused is retried. A rate-limit response
+    is a refusal before any work is done, so repeating it cannot repeat a write.
+    A timeout, a dropped connection or a server error leaves a write's outcome
+    unknown, and those are never retried here: the executor fails the action,
+    journals it, and the next plan re-reads state before anything is resent.
+
+    A wait that would overrun the budget is not started, so the run fails at
+    once with the existing rate-limit hint instead of sleeping and then failing.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_total_wait: float = DEFAULT_RATE_LIMIT_WAIT_BUDGET,
+        max_attempts: int = DEFAULT_RATE_LIMIT_ATTEMPTS,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.time,
+        report: Callable[[str], None] = _report_wait,
+    ) -> None:
+        self.max_total_wait = max_total_wait
+        self.max_attempts = max_attempts
+        self.sleep = sleep
+        self.clock = clock
+        self.report = report
+        self.waited = 0.0
+
+    def call(self, send: Callable[[], Any]) -> Any:
+        attempt = 0
+        while True:
+            try:
+                return send()
+            except GitHubApiError as error:
+                wait = rate_limit_wait(error, self.clock(), attempt)
+                if (
+                    wait is None
+                    or attempt + 1 >= self.max_attempts
+                    or self.waited + wait > self.max_total_wait
+                ):
+                    raise
+                self.report(
+                    f"GitHub rate limit ({error.status}); waiting {wait:.0f}s "
+                    f"before retry {attempt + 1} of {self.max_attempts - 1}."
+                )
+                self.sleep(wait)
+                self.waited += wait
+                attempt += 1
+
+
+def _graphql_data(response: Any, headers: dict[str, str]) -> dict[str, Any]:
+    errors = response.get("errors") if isinstance(response, dict) else None
+    data = response.get("data") if isinstance(response, dict) else None
+    if errors:
+        message = "; ".join(str(error.get("message", error)) for error in errors)
+        # GraphQL reports an exhausted point budget as HTTP 200. It is a
+        # refusal only when nothing ran, so a partial result is never retried.
+        refused = data is None and all(
+            isinstance(error, dict) and error.get("type") == "RATE_LIMITED"
+            for error in errors
+        )
+        raise GitHubApiError(
+            200, f"GraphQL: {message}", headers=headers, rate_limited=refused
+        )
+    if not isinstance(data, dict):
+        raise GitHubApiError(200, "GraphQL response did not contain data")
+    return data
 
 
 class GitHubHttpTransport:
@@ -93,16 +220,18 @@ class GitHubHttpTransport:
         *,
         api_url: str = "https://api.github.com",
         timeout: float = 30.0,
+        rate_limit: RateLimitBudget | None = None,
     ) -> None:
         if not token:
             raise ValueError("A GitHub token is required")
         self.token = token
         self.api_url = api_url.rstrip("/")
         self.timeout = timeout
+        self.rate_limit = rate_limit or RateLimitBudget()
 
-    def rest(
-        self, method: str, path: str, payload: dict[str, Any] | None = None
-    ) -> Any:
+    def _send(
+        self, method: str, path: str, payload: dict[str, Any] | None
+    ) -> tuple[Any, dict[str, str]]:
         body = (
             json.dumps(payload, separators=(",", ":")).encode("utf-8")
             if payload is not None
@@ -123,29 +252,55 @@ class GitHubHttpTransport:
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read()
-                return json.loads(raw.decode("utf-8")) if raw else {}
+                headers = dict(getattr(response, "headers", None) or {})
+                return (json.loads(raw.decode("utf-8")) if raw else {}), headers
         except HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
             try:
                 message = json.loads(raw).get("message", raw)
             except json.JSONDecodeError:
                 message = raw
-            raise GitHubApiError(exc.code, message or exc.reason) from exc
+            raise GitHubApiError(
+                exc.code, message or exc.reason, headers=dict(exc.headers or {})
+            ) from exc
         except URLError as exc:
             raise GitHubApiError(0, str(exc.reason)) from exc
 
+    def rest(
+        self, method: str, path: str, payload: dict[str, Any] | None = None
+    ) -> Any:
+        return self.rate_limit.call(lambda: self._send(method, path, payload)[0])
+
     def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
-        response = self.rest(
-            "POST", "/graphql", {"query": query, "variables": variables}
-        )
-        errors = response.get("errors") if isinstance(response, dict) else None
-        if errors:
-            message = "; ".join(str(error.get("message", error)) for error in errors)
-            raise GitHubApiError(200, f"GraphQL: {message}")
-        data = response.get("data") if isinstance(response, dict) else None
-        if not isinstance(data, dict):
-            raise GitHubApiError(200, "GraphQL response did not contain data")
-        return data
+        def send() -> dict[str, Any]:
+            response, headers = self._send(
+                "POST", "/graphql", {"query": query, "variables": variables}
+            )
+            return _graphql_data(response, headers)
+
+        return self.rate_limit.call(send)
+
+
+_CLI_STATUS_LINE = re.compile(r"^HTTP/\S+ (\d{3})")
+
+
+def _split_included(output: str) -> tuple[int | None, dict[str, str], str]:
+    """Separate `gh api --include` output into status, headers and body.
+
+    Output that does not start with a status line is taken as a bare body, so
+    a `gh` that omits the headers degrades to status-less parsing, not failure.
+    """
+
+    match = _CLI_STATUS_LINE.match(output)
+    if not match:
+        return None, {}, output
+    head, _, body = output.replace("\r\n", "\n").partition("\n\n")
+    headers: dict[str, str] = {}
+    for line in head.split("\n")[1:]:
+        name, separator, value = line.partition(":")
+        if separator:
+            headers[name.strip().lower()] = value.strip()
+    return int(match.group(1)), headers, body
 
 
 class GitHubCliTransport:
@@ -157,12 +312,17 @@ class GitHubCliTransport:
     route = "gh"
     capabilities = ALL_CAPABILITIES
 
-    def __init__(self, executable: str = "gh") -> None:
+    def __init__(
+        self, executable: str = "gh", *, rate_limit: RateLimitBudget | None = None
+    ) -> None:
         self.executable = executable
+        self.rate_limit = rate_limit or RateLimitBudget()
 
-    def rest(
-        self, method: str, path: str, payload: dict[str, Any] | None = None
-    ) -> Any:
+    def _send(
+        self, method: str, path: str, payload: dict[str, Any] | None
+    ) -> tuple[Any, dict[str, str]]:
+        # --include is what exposes `retry-after` and the quota reset; without
+        # it the CLI route could only guess at a wait the API route is told.
         command = [
             self.executable,
             "api",
@@ -171,6 +331,7 @@ class GitHubCliTransport:
             path.lstrip("/"),
             "--header",
             f"X-GitHub-Api-Version: {API_VERSION}",
+            "--include",
         ]
         stdin = None
         if payload is not None:
@@ -183,32 +344,37 @@ class GitHubCliTransport:
             capture_output=True,
             check=False,
         )
+        reported, headers, body = _split_included(result.stdout or "")
         if result.returncode != 0:
             message = result.stderr.strip() or "gh api failed"
             status = _cli_error_status(method, path, message)
+            if status is None and reported in (403, 429):
+                status = reported
             raise GitHubApiError(
                 result.returncode if status is None else status,
                 message,
+                headers=headers,
             )
-        if not result.stdout.strip():
-            return {}
+        if not body.strip():
+            return {}, headers
         try:
-            return json.loads(result.stdout)
+            return json.loads(body), headers
         except json.JSONDecodeError as exc:
             raise GitHubApiError(result.returncode, "gh api returned invalid JSON") from exc
 
+    def rest(
+        self, method: str, path: str, payload: dict[str, Any] | None = None
+    ) -> Any:
+        return self.rate_limit.call(lambda: self._send(method, path, payload)[0])
+
     def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
-        response = self.rest(
-            "POST", "graphql", {"query": query, "variables": variables}
-        )
-        errors = response.get("errors") if isinstance(response, dict) else None
-        if errors:
-            message = "; ".join(str(error.get("message", error)) for error in errors)
-            raise GitHubApiError(200, f"GraphQL: {message}")
-        data = response.get("data") if isinstance(response, dict) else None
-        if not isinstance(data, dict):
-            raise GitHubApiError(200, "GraphQL response did not contain data")
-        return data
+        def send() -> dict[str, Any]:
+            response, headers = self._send(
+                "POST", "graphql", {"query": query, "variables": variables}
+            )
+            return _graphql_data(response, headers)
+
+        return self.rate_limit.call(send)
 
 
 @dataclass(frozen=True, slots=True)

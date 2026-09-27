@@ -11,6 +11,7 @@ from agentic_backlog_kit.github import (
     GitHubPlanExecutor,
     GitHubScaffoldExecutor,
     GitHubService,
+    RateLimitBudget,
 )
 from agentic_backlog_kit.scaffold import ScaffoldAction
 from agentic_backlog_kit.sync import apply_plan, build_sync_plan
@@ -180,7 +181,10 @@ class GitHubCliTransportTests(unittest.TestCase):
         for method, path, message, expected in cases:
             with self.subTest(method=method, path=path, message=message):
                 result = CompletedProcess(["gh"], 1, stdout="", stderr=message)
-                transport = GitHubCliTransport("gh")
+                # Retrying the 429 is S-R28-2's concern; this asserts the status.
+                transport = GitHubCliTransport(
+                    "gh", rate_limit=RateLimitBudget(max_attempts=1)
+                )
                 with patch(
                     "agentic_backlog_kit.github.subprocess.run", return_value=result
                 ):

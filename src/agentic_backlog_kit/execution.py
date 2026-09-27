@@ -102,6 +102,16 @@ def failure_hint(kind: str, payload: dict[str, Any], error: BaseException) -> st
                 hint += f" to use the {fallback!r} label instead"
             return hint + "."
 
+    # Before the permission check: GitHub reports an exhausted or secondary
+    # rate limit as a 403 too, and naming scopes there sends the operator
+    # after the wrong cause.
+    if status == 429 or "rate limit" in message.lower():
+        return (
+            "GitHub rate-limited this write. The completed actions are "
+            "journaled; rebuild the plan and apply the remainder once the limit "
+            "resets."
+        )
+
     if status == 403 or "not accessible" in message.lower():
         return (
             "The token lacks permission for this write. Repository and Project "
@@ -113,13 +123,6 @@ def failure_hint(kind: str, payload: dict[str, Any], error: BaseException) -> st
         return (
             "GitHub reported the target as absent. Rebuild the plan so it binds "
             "current state, then reconfirm it."
-        )
-
-    if status == 429 or "rate limit" in message.lower():
-        return (
-            "GitHub rate-limited this write. The completed actions are "
-            "journaled; rebuild the plan and apply the remainder once the limit "
-            "resets."
         )
 
     return None

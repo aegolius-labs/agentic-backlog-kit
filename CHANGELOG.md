@@ -13,6 +13,16 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   cost grows with batches rather than issues: this repository's 81-issue
   snapshot fell from about 165 requests to 5. Output is unchanged.
 
+### Added
+
+- A request GitHub refuses for a rate limit is retried after the wait GitHub
+  names (`retry-after`, else the quota reset, else one minute doubled per
+  repeat), on both the CLI and direct API routes (S-R28-2). Waits share a
+  300-second budget per run; a wait that would overrun it is not started, and
+  the run fails with the existing rate-limit hint. Only definite rate-limit
+  refusals are retried: a timeout or server error, whose write outcome is
+  unknown, still fails the action for the next plan to re-read.
+
 ### Fixed
 
 - A parent or `blocked by` relationship into another repository was matched by
@@ -20,6 +30,8 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   same number, and a snapshot could attribute a foreign marker to a local item.
   Such relationships are now withheld with their reason, because one manifest
   models one repository.
+- A secondary rate limit, which GitHub reports as a 403, drew the "token lacks
+  permission" hint. It now draws the rate-limit hint.
 
 ### Added
 
