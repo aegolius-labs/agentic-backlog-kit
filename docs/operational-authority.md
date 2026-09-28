@@ -161,31 +161,39 @@ teammate edited a managed issue's title or body directly on GitHub, the next
 human's edit. R35 (2026-09-28) closes that gap by giving the kit a way to tell
 "the manifest changed" apart from "a human edited GitHub".
 
-**The baseline comment.** Whenever the kit writes an issue's title and/or
-body - on `issue.create`, and on `issue.update` whether the body is fully
-managed or only its identity marker is - it appends a second hidden comment
-after everything else in the body:
+**The baseline comment.** Title and body are held independently, because in
+`--preserve-body` mode the kit still owns the title while a human is expected
+to freely edit the body - a single combined digest could not tell those apart
+without either missing a held title or falsely holding an ordinary body edit.
+So whenever the kit writes an issue's title and/or body - on `issue.create`,
+and on `issue.update` whether the body is fully managed or only its identity
+marker is - it appends a second hidden comment, after everything else in the
+body, carrying one digest per field:
 
 ```
-<!-- agentic-backlog-kit:written=sha256:<16 hex chars> -->
+<!-- agentic-backlog-kit:written=v1;title=<16 hex chars>;body=<16 hex chars> -->
 ```
 
-The digest covers the exact title and body being written (with this comment
-itself excluded), after normalizing line endings and trailing whitespace so a
-GitHub-side CRLF/LF change alone never looks like an edit. This is separate
-bookkeeping from the identity marker (`agentic-backlog-kit:id=...`) - the two
-never overlap, and the identity marker byte layout does not change.
+The title digest covers the exact title being written; the body digest covers
+the exact body content being written (this comment itself excluded) - both
+after normalizing line endings and trailing whitespace, so a GitHub-side
+CRLF/LF change alone never looks like an edit. This is separate bookkeeping
+from the identity marker (`agentic-backlog-kit:id=...`) - the two never
+overlap, and the identity marker byte layout does not change. The comment is
+parsed defensively: an unrecognized version or anything malformed is treated
+as no baseline at all, the same as an issue that was never written this way.
 
-**Detection.** The next `sync-plan` recomputes the digest over the remote
-issue's *current* title and body and compares it with the digest the remote
-body still carries:
+**Detection, per field.** The next `sync-plan` recomputes each field's digest
+from the remote issue's *current* title and body content and compares it with
+the digest the remote's comment still carries for that field:
 
-- **Matches** - the remote is exactly as the kit left it. Any difference from
-  the manifest is planned as an ordinary `issue.update`, same as before.
-- **Does not match, and the remote now differs from what the manifest
-  wants** - a human changed the title or body since the kit's last write. The
-  title/body change is **held**: it is left out of the plan and reported
-  instead, under `held_remote_edits`:
+- **Matches** - that field is exactly as the kit left it. Any difference from
+  the manifest is planned as an ordinary part of `issue.update`, same as
+  before.
+- **Does not match, and the field now differs from what the manifest
+  wants** - a human changed it since the kit's last write. That field is
+  **held**: it is left out of the plan and reported instead, under
+  `held_remote_edits`, naming only the fields actually held:
 
   ```json
   {
@@ -197,15 +205,34 @@ body still carries:
   }
   ```
 
-  Type, label, and Project field actions for the same item are unaffected.
-- **Does not match, but the remote already equals what the manifest
-  wants** - nothing to do; no hold, no action.
-- **No baseline comment at all** - every issue written before this feature
-  falls here. The kit behaves exactly as it did previously: the update is
-  planned, and that write installs the first baseline.
+  A field that is not held is still planned - a held title does not stop an
+  unheld body update, and vice versa. Type, label, and Project field actions
+  for the same item are unaffected either way.
+- **Does not match, but the field already equals what the manifest
+  wants** - nothing to do for that field: no hold, no action.
+- **No baseline for that field** (comment missing or unreadable) - every
+  issue written before this feature falls here for both fields. The kit
+  behaves exactly as it did previously: the field is planned, and the next
+  write that touches this issue installs a baseline for it.
+
+When only one field is held and the other is being written anyway, the body
+still has to be rewritten to keep the held field's own digest legible: it is
+carried forward unchanged as the field's own *recorded* digest rather than
+refreshed to the field's current remote value. Concretely, if the body is
+held but the title is being renamed, the write keeps the human's body content
+untouched and keeps the *old* recorded body digest, so the body still reads
+as held on the next plan instead of the rename silently adopting the human's
+edit as a new baseline; symmetrically, if the title is held but the body is
+being updated, the write keeps the human's title untouched and keeps the old
+recorded title digest.
+
+`--preserve-body` never holds the body: the kit only ever touches the
+identity marker there, never arbitrary prose, so there is no kit-managed
+content for a human edit to conflict with. Its title is held on the same
+terms as a managed body's.
 
 Held edits are folded into the plan digest, so a plan reviewed with one held
-item cannot later be silently re-confirmed against a plan without it.
+field cannot later be silently re-confirmed against a plan without it.
 
 **Overriding a hold.** Once you have looked at the GitHub edit and decided the
 manifest's version should win anyway:
@@ -214,20 +241,33 @@ manifest's version should win anyway:
 abk sync-plan --overwrite-remote-edit R35
 ```
 
-repeatable per item. It is rejected before anything is planned if the named
-item does not exist or is not currently held. Applying the resulting plan
-writes a fresh baseline.
+repeatable per item, and it overrides every field currently held for that
+item (not just one of them). It is rejected before anything is planned if the
+named item does not exist or has nothing held. Applying the resulting plan
+writes a fresh baseline for whatever it overwrote.
 
 **Adopting the human edit instead** is not a command - the manifest is edited
 by a person - but it is the usual path: update the manifest item's title or
 description to match what is now on GitHub, and the next plan finds nothing
-to hold.
+to hold for that field.
 
 **Migration note.** An issue the kit wrote before 2026-09-28 has no baseline
-comment yet. Nothing breaks: the first `sync-plan` after upgrading plans that
-issue's update exactly as it would have before, and the write that applies it
+comment yet. Nothing breaks: the first `sync-plan` after upgrading plans its
+title/body exactly as it would have before, and the write that applies it
 installs the issue's first baseline. From then on, an edit made directly on
-GitHub is detected and held.
+GitHub is detected and held. There is no mass rewrite to backfill a baseline
+onto every existing issue at once, and that is intentional - an issue nobody
+is touching stays untouched, and the baseline arrives the same way every other
+correction does, as a side effect of the kit's next legitimate write to it.
+
+**Known limit: deleting the comment.** The baseline lives entirely inside the
+issue body, so a person who deletes that hidden comment (deliberately or by
+overwriting the whole body) removes the baseline along with it. The next
+`sync-plan` then reads that field as never having a baseline at all: it plans
+the update exactly as it would for an issue written before this feature, and
+that write installs a fresh one. This is visible in the plan, not a silent
+loss - there is simply nothing left for the kit to compare against, the same
+as any other issue mid-migration.
 
 ## Known limits
 

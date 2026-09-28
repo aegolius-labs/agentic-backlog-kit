@@ -50,9 +50,10 @@ OUTPUT_BUDGETS: dict[str, dict[str, int]] = {
     "sprint-plan": {"base_bytes": 8_192, "per_item_bytes": 58},
     "sprint-plan-compact": {"base_bytes": 8_192, "per_item_bytes": 0},
     "snapshot": {"base_bytes": 16_384, "per_item_bytes": 900},
-    # R35 appends a written-comment baseline (~60 bytes) to every created
-    # issue body, so a cold sync-plan of all-new items grew accordingly.
-    "sync-plan": {"base_bytes": 16_384, "per_item_bytes": 790},
+    # R35 appends a written-comment baseline (per-field title/body digests,
+    # ~85 bytes) to every created issue body, so a cold sync-plan of all-new
+    # items grew accordingly.
+    "sync-plan": {"base_bytes": 16_384, "per_item_bytes": 815},
 }
 # A short alias makes the public contract easy to discover for callers that
 # want to report the documented budgets alongside their measurements.

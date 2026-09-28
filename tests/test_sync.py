@@ -7,11 +7,14 @@ from agentic_backlog_kit.sync import (
     ApplyAuthorizationError,
     apply_plan,
     build_sync_plan,
+    compute_body_digest,
+    compute_title_digest,
     extract_item_id,
     extract_marker_fields,
-    extract_written_digest,
+    extract_written_digests,
     render_issue_body,
     render_marker,
+    render_written_comment,
     with_written_comment,
 )
 
@@ -274,19 +277,29 @@ class SyncPlanningTests(unittest.TestCase):
 
 
 class RemoteEditHoldTests(unittest.TestCase):
-    """R35: hold a title/body update GitHub reports a human changed since the
+    """R35: hold a title or body update GitHub reports a human changed since
 
-    kit's last write, rather than silently reverting it.
+    the kit's last write, rather than silently reverting it. Title and body
+    each carry their own written-comment digest, so one field can be held
+    while the other is planned normally.
     """
 
     def _baseline(self, local_item: dict) -> str:
         return with_written_comment(local_item["title"], render_issue_body(local_item))
 
+    def _write(self, content: str, *, title_digest: str, body_digest: str) -> str:
+        # Match sync.py's own canonicalization (CRLF -> LF, rstrip) before
+        # joining, so round-tripping through _strip_written_comment recovers
+        # exactly this content - a raw render_issue_body() string still has
+        # its own trailing newline, which would otherwise leave a stray blank
+        # line behind once the comment is stripped back off.
+        content = content.replace("\r\n", "\n").replace("\r", "\n").rstrip()
+        comment = render_written_comment(title_digest, body_digest)
+        return f"{content}\n{comment}" if content else comment
+
     def test_absent_baseline_plans_the_update_and_writes_one(self) -> None:
         local_item = item("T-1", title="Ship it")
-        remote = {
-            "issues": [_remote("T-1", title="Old title", body="")]
-        }
+        remote = {"issues": [_remote("T-1", title="Old title", body="")]}
 
         plan = build_sync_plan(manifest(local_item), remote)
 
@@ -297,7 +310,7 @@ class RemoteEditHoldTests(unittest.TestCase):
             with_written_comment("Ship it", render_issue_body(local_item)),
             update.payload["body"],
         )
-        self.assertIsNotNone(extract_written_digest(update.payload["body"]))
+        self.assertNotEqual((None, None), extract_written_digests(update.payload["body"]))
 
     def test_no_hold_when_baseline_matches_and_manifest_wants_a_further_change(
         self,
@@ -326,7 +339,10 @@ class RemoteEditHoldTests(unittest.TestCase):
 
         plan = build_sync_plan(manifest(local_item), remote)
 
-        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+        update = next(
+            (a for a in plan.actions if a.kind == "issue.update"), None
+        )
+        self.assertIsNone(update)
         self.assertEqual(
             [
                 {
@@ -362,13 +378,16 @@ class RemoteEditHoldTests(unittest.TestCase):
         self,
     ) -> None:
         local_item = item("T-1", title="Ship it")
-        correct_body = self._baseline(local_item)
-        real_digest = extract_written_digest(correct_body)
-        bogus_digest = ("0" if real_digest[0] != "0" else "1") + real_digest[1:]
-        # A stale/bogus baseline digest: on its own it looks like the remote
-        # was edited since the kit's last write, but the content already is
-        # exactly what the manifest wants, so there is nothing to hold or plan.
-        tampered_body = correct_body.replace(real_digest, bogus_digest)
+        content = render_issue_body(local_item)
+        # A stale/bogus body digest: on its own it looks like the body was
+        # edited since the kit's last write, but the content already is
+        # exactly what the manifest wants, so there is nothing to hold or
+        # plan for either field.
+        tampered_body = self._write(
+            content,
+            title_digest=compute_title_digest("Ship it"),
+            body_digest="0" * 16 if compute_body_digest(content) != "0" * 16 else "1" * 16,
+        )
         remote = {"issues": [_remote("T-1", title="Ship it", body=tampered_body)]}
 
         plan = build_sync_plan(manifest(local_item), remote)
@@ -406,8 +425,8 @@ class RemoteEditHoldTests(unittest.TestCase):
         self.assertEqual("Renamed", update.payload["title"])
         self.assertIn("body", update.payload)
         self.assertNotEqual(
-            extract_written_digest(baseline_body),
-            extract_written_digest(update.payload["body"]),
+            extract_written_digests(baseline_body),
+            extract_written_digests(update.payload["body"]),
         )
 
     def test_override_restores_the_manifests_version_of_a_held_item(self) -> None:
@@ -463,6 +482,137 @@ class RemoteEditHoldTests(unittest.TestCase):
         self.assertEqual({"id": "T-1", "schema": "1"}, fields)
         self.assertNotIn("written", fields)
         self.assertEqual(render_marker(local_item), body.splitlines()[0])
+
+    def test_preserve_mode_still_holds_a_title_edited_on_github(self) -> None:
+        # Even with --preserve-body, the kit still owns the title (see the
+        # authority table), so a title edited on GitHub is held on the same
+        # terms as it is in managed-body mode.
+        local_item = item("T-1", title="Ship it")
+        original_body = "Written by a person.\n\nSome content."
+        baseline_body = with_written_comment("Original title", original_body)
+        remote = {
+            "issues": [
+                _remote(
+                    "T-1", title="Edited on GitHub", body=baseline_body, number=9
+                )
+            ]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote, manage_body=False)
+
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+        self.assertEqual(1, len(plan.held_remote_edits))
+        self.assertEqual("T-1", plan.held_remote_edits[0]["item_id"])
+        self.assertEqual(["title"], plan.held_remote_edits[0]["fields"])
+
+    def test_preserve_mode_never_holds_the_body(self) -> None:
+        # The kit never manages preserved-body content, so an arbitrary human
+        # edit to it is not something to protect - and is not held.
+        local_item = item("T-1", title="Ship it")
+        original_body = f"{render_marker(local_item)}\n\nOriginal content."
+        baseline_body = with_written_comment("Ship it", original_body)
+        edited_body = baseline_body.replace("Original content.", "Edited content.")
+        remote = {"issues": [_remote("T-1", title="Ship it", body=edited_body)]}
+
+        plan = build_sync_plan(manifest(local_item), remote, manage_body=False)
+
+        self.assertEqual([], plan.held_remote_edits)
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+
+    def test_a_held_body_edit_stays_held_through_a_legitimate_title_only_write(
+        self,
+    ) -> None:
+        # The body is held (a human edited it) while the title is not (it is
+        # unchanged on GitHub, so the manifest's rename is free to apply).
+        # Writing the title must not silently adopt the human's body edit as
+        # the new baseline: the body must still read as held afterwards.
+        written_before = item("T-1", title="Old title")
+        original_content = render_issue_body(written_before)
+        edited_content = original_content.replace(
+            "## Outcome", "## Outcome\n\nA human added this.\n"
+        )
+        # The comment still records the *original* content's digest: it has
+        # not been touched since the human's edit, which is exactly what
+        # makes the edit detectable as held.
+        human_edited_body = self._write(
+            edited_content,
+            title_digest=compute_title_digest("Old title"),
+            body_digest=compute_body_digest(original_content),
+        )
+        remote_first = {
+            "issues": [_remote("T-1", title="Old title", body=human_edited_body)]
+        }
+        local_item = item("T-1", title="New title")
+
+        first_plan = build_sync_plan(manifest(local_item), remote_first)
+
+        update = next(a for a in first_plan.actions if a.kind == "issue.update")
+        self.assertEqual("New title", update.payload["title"])
+        self.assertEqual(
+            [{"fields": ["body"], "item_id": "T-1"}],
+            [
+                {"item_id": e["item_id"], "fields": e["fields"]}
+                for e in first_plan.held_remote_edits
+            ],
+        )
+        # The body written alongside the title change must be the human's
+        # content, untouched, with the *original* recorded body digest kept -
+        # not a fresh digest of the human's edit.
+        new_body = update.payload["body"]
+        new_title_digest, new_body_digest = extract_written_digests(new_body)
+        self.assertEqual(compute_title_digest("New title"), new_title_digest)
+        self.assertEqual(compute_body_digest(original_content), new_body_digest)
+
+        # Replaying against the state the title-only write left behind: the
+        # body is still held, because its digest was preserved rather than
+        # refreshed to match the human's edit.
+        remote_second = {
+            "issues": [_remote("T-1", title="New title", body=new_body)]
+        }
+        second_plan = build_sync_plan(manifest(local_item), remote_second)
+
+        self.assertEqual([], [a for a in second_plan.actions if a.kind == "issue.update"])
+        self.assertEqual(1, len(second_plan.held_remote_edits))
+        self.assertEqual(["body"], second_plan.held_remote_edits[0]["fields"])
+
+    def test_title_held_while_body_updates_keeps_the_recorded_title_digest(
+        self,
+    ) -> None:
+        # The title is held (a human renamed it on GitHub) while the body is
+        # not (its content is unchanged on GitHub, so the manifest's content
+        # change is free to apply). The comment written alongside that body
+        # update must keep the recorded (stale) title digest rather than
+        # adopting the human's new title as a fresh baseline.
+        written_before = item("T-1", title="Old title")
+        original_content = render_issue_body(written_before)
+        baseline_body = with_written_comment("Old title", original_content)
+        remote = {
+            "issues": [
+                _remote("T-1", title="Edited title", body=baseline_body)
+            ]
+        }
+        local_item = item(
+            "T-1", title="Old title", parent=None
+        )
+        local_item["description"] = "A different outcome than before."
+        manifest_data = manifest(local_item)
+
+        plan = build_sync_plan(manifest_data, remote)
+
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertNotIn("title", update.payload)
+        new_title_digest, new_body_digest = extract_written_digests(
+            update.payload["body"]
+        )
+        self.assertEqual(compute_title_digest("Old title"), new_title_digest)
+        self.assertNotEqual(compute_body_digest(original_content), new_body_digest)
+        self.assertEqual(
+            [{"fields": ["title"], "item_id": "T-1"}],
+            [
+                {"item_id": e["item_id"], "fields": e["fields"]}
+                for e in plan.held_remote_edits
+            ],
+        )
 
 
 if __name__ == "__main__":

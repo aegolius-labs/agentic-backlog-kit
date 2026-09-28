@@ -123,8 +123,10 @@ def with_marker(body: str, item: dict[str, Any]) -> str:
     return body[: span[0]] + render_marker(item) + body[span[1] :]
 
 
-WRITTEN_PREFIX = "<!-- agentic-backlog-kit:written=sha256:"
+WRITTEN_PREFIX = "<!-- agentic-backlog-kit:written="
 WRITTEN_SUFFIX = " -->"
+WRITTEN_VERSION = "v1"
+_HEX16 = frozenset("0123456789abcdef")
 
 
 def _canonical_text(text: str) -> str:
@@ -164,62 +166,82 @@ def _strip_written_comment(body: str | None) -> str:
     return content
 
 
-def compute_written_digest(title: str, content: str) -> str:
-    """Return the first 16 hex characters of sha256(title + content), canonicalized."""
+def compute_title_digest(title: str) -> str:
+    """Return the first 16 hex characters of sha256(canonical title)."""
 
-    canonical = _canonical_text(title) + "\n" + _canonical_text(content)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(_canonical_text(title).encode("utf-8")).hexdigest()[:16]
 
 
-def render_written_comment(digest: str) -> str:
-    return f"{WRITTEN_PREFIX}{digest}{WRITTEN_SUFFIX}"
+def compute_body_digest(content: str) -> str:
+    """Return the first 16 hex characters of sha256(canonical content).
+
+    `content` is the body with the written-comment already removed.
+    """
+
+    return hashlib.sha256(_canonical_text(content).encode("utf-8")).hexdigest()[:16]
+
+
+def render_written_comment(title_digest: str, body_digest: str) -> str:
+    return (
+        f"{WRITTEN_PREFIX}{WRITTEN_VERSION};title={title_digest};body={body_digest}"
+        f"{WRITTEN_SUFFIX}"
+    )
 
 
 def with_written_comment(title: str, body: str) -> str:
     """Return `body` with a fresh written-comment baseline appended.
 
-    The comment records a digest of exactly the (title, content) pair being
-    written, so the next planning pass can tell whether GitHub still holds
-    what the kit last wrote or whether a human changed it since.
+    Both the title and body digests are computed fresh from exactly the
+    (title, content) pair being written. Used for a brand-new issue, where
+    there is no prior baseline to carry forward for either field.
     """
 
     content = _strip_written_comment(body)
-    digest = compute_written_digest(title, content)
-    comment = render_written_comment(digest)
+    comment = render_written_comment(
+        compute_title_digest(title), compute_body_digest(content)
+    )
     return f"{content}\n{comment}" if content else comment
 
 
-def extract_written_digest(body: str | None) -> str | None:
-    """Return the written-comment's digest, or None when the body has none."""
+def _is_hex16(value: str) -> bool:
+    return len(value) == 16 and all(char in _HEX16 for char in value)
+
+
+def extract_written_digests(body: str | None) -> tuple[str | None, str | None]:
+    """Return the written-comment's (title_digest, body_digest).
+
+    Both come back `None` when the body carries no comment, an unknown
+    version, or anything malformed: an unreadable baseline is treated exactly
+    like an absent one, so the next write installs a fresh, readable one
+    rather than planning against a comment it cannot trust.
+    """
 
     if not body:
-        return None
+        return None, None
     start = body.rfind(WRITTEN_PREFIX)
     if start < 0:
-        return None
+        return None, None
     start += len(WRITTEN_PREFIX)
     end = body.find(WRITTEN_SUFFIX, start)
     if end < 0:
-        return None
-    digest = body[start:end].strip()
-    return digest or None
-
-
-def remote_edited_since_write(title: str, body: str | None) -> bool:
-    """Whether the remote body/title diverged from the kit's last written baseline.
-
-    A missing baseline (an issue written before this feature, or never written
-    by the kit at all) is reported as not edited: there is nothing to compare
-    against, so the caller falls back to today's behavior and the next write
-    installs a baseline.
-    """
-
-    digest = extract_written_digest(body)
-    if digest is None:
-        return False
-    content = _strip_written_comment(body)
-    expected = compute_written_digest(title, content)
-    return digest != expected
+        return None, None
+    inner = body[start:end].strip()
+    parts = inner.split(";")
+    if not parts or parts[0] != WRITTEN_VERSION:
+        return None, None
+    fields: dict[str, str] = {}
+    for part in parts[1:]:
+        key, separator, value = part.partition("=")
+        if not separator:
+            return None, None
+        fields[key.strip()] = value.strip()
+    title_digest = fields.get("title")
+    body_digest = fields.get("body")
+    if not title_digest or not body_digest:
+        return None, None
+    if not (_is_hex16(title_digest) and _is_hex16(body_digest)):
+        return None, None
+    return title_digest, body_digest
 
 
 def render_issue_body(item: dict[str, Any]) -> str:
@@ -490,52 +512,114 @@ def _issue_title_body_plan(
     desired_body: str,
     *,
     manage_body: bool,
-) -> tuple[dict[str, Any], bool, list[str]]:
-    """Return the title/body change, whether it is held, and which fields differ.
+    overwrite: bool,
+) -> tuple[dict[str, Any], list[str], bool]:
+    """Return the title/body change, the fields still held, and whether any was held.
 
-    Managed bodies compare the remote's own written-comment digest against a
-    freshly computed one for the remote's *current* (title, content): a match
-    means the remote is exactly as the kit left it, so any difference from the
-    manifest is an ordinary pending update. A mismatch means a human changed
-    the title or body since the kit's last write, so the title/body change is
-    reported as held rather than planned, unless the caller is overwriting it.
+    Title and body each carry their own written-comment digest, so an edit to
+    one is detected independently of the other. A field is held when GitHub's
+    current digest for it no longer matches the digest the kit's last write
+    recorded *and* the field now differs from what the manifest wants; a field
+    that is unheld is planned as usual.
 
-    A preserved body (`manage_body=False`) is not held: the kit never manages
-    its content, only the identity marker, so there is nothing to protect a
-    human edit from.
+    A held field that is being kept (not overwritten) is *not* silently
+    rewritten into a fresh baseline: whenever the body is rewritten for the
+    other field's sake (for example, a title-only update still has to refresh
+    the comment), a kept field's own digest is carried forward unchanged from
+    whatever the remote's existing comment recorded. That keeps a still-held
+    field detectably held on the next plan rather than laundering the human's
+    edit into a new baseline the moment the *other* field is legitimately
+    rewritten.
+
+    A preserved body (`manage_body=False`) never holds its content - the kit
+    only ever touches the identity marker there, never arbitrary prose - but
+    its title is held on exactly the same terms as a managed body's.
+
+    `overwrite` disables holding for this item: a held field is planned with
+    the manifest's value regardless, which also lets its digest refresh.
     """
 
     remote_title = remote.get("title")
     remote_body = remote.get("body")
-
-    if not manage_body:
-        issue_changes: dict[str, Any] = {}
-        if remote_title != item["title"]:
-            issue_changes["title"] = item["title"]
-        guid_mismatch = extract_guid(remote_body) != item.get("guid")
-        if guid_mismatch or "title" in issue_changes:
-            # A preserved body still carries the kit's marker, so the GUID (and
-            # the written-comment baseline) are corrected in place without
-            # touching anything else in it.
-            fixed = with_marker(remote_body or "", item)
-            issue_changes["body"] = with_written_comment(item["title"], fixed)
-        return issue_changes, False, []
-
     remote_content = _strip_written_comment(remote_body)
+    old_title_digest, old_body_digest = extract_written_digests(remote_body)
+    current_title_digest = compute_title_digest(remote_title or "")
+    current_body_digest = compute_body_digest(remote_content)
+
     title_differs = remote_title != item["title"]
-    body_differs = remote_content != _canonical_text(desired_body)
-    is_held = remote_edited_since_write(remote_title or "", remote_body) and (
-        title_differs or body_differs
+    title_edited = (
+        old_title_digest is not None and old_title_digest != current_title_digest
     )
+    title_held = title_edited and title_differs
 
-    issue_changes = {}
-    if title_differs or body_differs:
-        if title_differs:
-            issue_changes["title"] = item["title"]
-        issue_changes["body"] = with_written_comment(item["title"], desired_body)
+    if manage_body:
+        candidate_content = _canonical_text(desired_body)
+        body_differs = remote_content != candidate_content
+        body_edited = (
+            old_body_digest is not None and old_body_digest != current_body_digest
+        )
+        body_held = body_edited and body_differs
+    else:
+        # A preserved body still carries the kit's marker, so the GUID is
+        # corrected in place without touching anything else in it - and only
+        # when it is actually wrong, so an untouched issue whose GUID already
+        # trivially matches (both absent) is not rewritten just to add a
+        # marker it never had. This is never held: the kit isn't protecting a
+        # human edit from its own arbitrary-content management, because it
+        # does not do any.
+        guid_mismatch = extract_guid(remote_body) != item.get("guid")
+        candidate_content = (
+            _canonical_text(with_marker(remote_content, item))
+            if guid_mismatch
+            else remote_content
+        )
+        body_held = False
 
-    fields = (["title"] if title_differs else []) + (["body"] if body_differs else [])
-    return issue_changes, is_held, fields
+    was_any_field_held = title_held or body_held
+    effective_title_held = title_held and not overwrite
+    effective_body_held = body_held and not overwrite
+
+    final_title = remote_title if effective_title_held else item["title"]
+    final_content = remote_content if effective_body_held else candidate_content
+
+    title_changing = final_title != remote_title
+    content_changing = final_content != remote_content
+
+    issue_changes: dict[str, Any] = {}
+    if title_changing:
+        issue_changes["title"] = final_title
+
+    # Only rewrite the body when the title or the content is actually
+    # changing. A missing or stale written-comment baseline is not, on its
+    # own, a reason to touch an issue that otherwise needs nothing: the kit
+    # installs (or refreshes) the comment opportunistically, alongside a
+    # write it was already making, rather than forcing one.
+    if title_changing or content_changing:
+        final_title_digest = (
+            compute_title_digest(final_title)
+            if title_changing
+            else (
+                old_title_digest if old_title_digest is not None else current_title_digest
+            )
+        )
+        final_body_digest = (
+            compute_body_digest(final_content)
+            if content_changing
+            else (
+                old_body_digest if old_body_digest is not None else current_body_digest
+            )
+        )
+        new_comment = render_written_comment(final_title_digest, final_body_digest)
+        new_full_body = (
+            f"{final_content}\n{new_comment}" if final_content else new_comment
+        )
+        if new_full_body != _canonical_text(remote_body or ""):
+            issue_changes["body"] = new_full_body
+
+    held_fields = (["title"] if effective_title_held else []) + (
+        ["body"] if effective_body_held else []
+    )
+    return issue_changes, held_fields, was_any_field_held
 
 
 def build_sync_plan(
@@ -637,20 +721,24 @@ def build_sync_plan(
                 )
             )
         else:
-            issue_changes, is_held, differing_fields = _issue_title_body_plan(
-                item, remote, desired_body, manage_body=manage_body
+            issue_changes, held_fields, was_any_field_held = _issue_title_body_plan(
+                item,
+                remote,
+                desired_body,
+                manage_body=manage_body,
+                overwrite=force_overwrite,
             )
-            if force_overwrite and not is_held:
+            if force_overwrite and not was_any_field_held:
                 raise ManifestError(
                     f"--overwrite-remote-edit item '{item_id}' is not held for a "
                     "remote edit"
                 )
-            if is_held and not force_overwrite:
+            if held_fields:
                 held_remote_edits.append(
                     {
                         "item_id": item_id,
                         "issue_number": remote.get("number"),
-                        "fields": differing_fields,
+                        "fields": held_fields,
                         "reason": "edited on GitHub since the kit last wrote it",
                         "hint": (
                             "Update the manifest item to accept the GitHub edit, "
@@ -659,7 +747,6 @@ def build_sync_plan(
                         ),
                     }
                 )
-                issue_changes = {}
             if remote.get("type") != item["type"]:
                 issue_changes["type"] = item["type"]
                 fallback_label = f"type:{item['type'].lower()}"
