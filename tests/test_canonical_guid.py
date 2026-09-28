@@ -24,6 +24,7 @@ from agentic_backlog_kit.sync import (
     extract_item_id,
     render_issue_body,
     render_marker,
+    with_written_comment,
 )
 
 from tests.helpers import is_relationship_query, item, manifest, relationship_data
@@ -196,7 +197,10 @@ class GuidSyncTests(unittest.TestCase):
         plan = build_sync_plan(_v2(local), {"issues": [remote]})
 
         update = next(action for action in plan.actions if action.kind == "issue.update")
-        self.assertEqual(render_issue_body(local), update.payload["body"])
+        self.assertEqual(
+            with_written_comment(local["title"], render_issue_body(local)),
+            update.payload["body"],
+        )
         self.assertIn(GUID_MARKER, update.payload["body"])
 
     def test_existing_issues_without_a_guid_are_not_rewritten(self) -> None:
@@ -216,7 +220,10 @@ class GuidSyncTests(unittest.TestCase):
 
         update = next(action for action in plan.actions if action.kind == "issue.update")
         self.assertEqual(
-            f"Written by a person.\n\n{GUID_MARKER}\n\n- keep this list",
+            with_written_comment(
+                local["title"],
+                f"Written by a person.\n\n{GUID_MARKER}\n\n- keep this list",
+            ),
             update.payload["body"],
         )
 
