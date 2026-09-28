@@ -122,11 +122,19 @@ def _resolve_status(state: str, workflow: dict[str, Any]) -> str:
 
 
 def _import_description(issue: dict[str, Any]) -> str:
-    """Keep what the issue already says, so adoption does not erase it."""
+    """Keep what the issue already says, so adoption does not erase it.
+
+    Both hidden comments the kit itself might have written - the identity
+    marker and, since R35, the written-baseline comment - are internal
+    bookkeeping and must not leak into a human-readable description.
+    """
 
     body = str(issue.get("body") or "")
     cleaned = "\n".join(
-        line for line in body.splitlines() if "agentic-backlog-kit:id=" not in line
+        line
+        for line in body.splitlines()
+        if "agentic-backlog-kit:id=" not in line
+        and "agentic-backlog-kit:written=" not in line
     ).strip()
     return cleaned or str(issue.get("title") or "").strip() or "Imported issue"
 

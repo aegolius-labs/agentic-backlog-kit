@@ -109,6 +109,22 @@ class InferenceTests(unittest.TestCase):
 
         self.assertEqual("Real content someone wrote.", plan.items[0]["description"])
 
+    def test_the_written_comment_baseline_does_not_leak_into_the_description(
+        self,
+    ) -> None:
+        # R35: a managed issue carries a second hidden comment recording the
+        # kit's own written baseline. If it ever ends up unmanaged and is
+        # re-adopted, that bookkeeping line must not become part of the
+        # imported description.
+        body = (
+            "Real content someone wrote.\n"
+            "<!-- agentic-backlog-kit:written=sha256:abcdef0123456789 -->"
+        )
+
+        plan = build_import_plan(manifest(), [_issue(7, body=body)])
+
+        self.assertEqual("Real content someone wrote.", plan.items[0]["description"])
+
     def test_falls_back_to_the_title_for_an_empty_body(self) -> None:
         plan = build_import_plan(manifest(), [_issue(7, title="Fix the thing")])
 
@@ -332,6 +348,21 @@ class OrphanRecoveryTests(unittest.TestCase):
         self.assertEqual("Stranded", recovered[0]["title"])
         self.assertEqual("Real content", recovered[0]["description"])
         self.assertIn("GH-63", {entry["id"] for entry in merged["items"]})
+
+    def test_recovery_strips_the_written_comment_baseline_from_the_description(
+        self,
+    ) -> None:
+        data = manifest()
+        body = (
+            "Real content.\n"
+            "<!-- agentic-backlog-kit:written=sha256:abcdef0123456789 -->"
+        )
+
+        _, recovered, _ = reconcile_orphans(
+            data, [self._marked("GH-63", 63, title="Stranded", body=body)]
+        )
+
+        self.assertEqual("Real content.", recovered[0]["description"])
 
     def test_recovery_writes_nothing_when_there_is_nothing_to_recover(self) -> None:
         data = manifest(item("T-1"))

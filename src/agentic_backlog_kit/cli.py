@@ -360,6 +360,17 @@ def _parser() -> argparse.ArgumentParser:
         metavar="ID=SPRINT",
         help="Explicitly move one item's iteration to an exact active title",
     )
+    sync_plan.add_argument(
+        "--overwrite-remote-edit",
+        action="append",
+        dest="overwrite_remote_edit",
+        metavar="ITEM_ID",
+        help=(
+            "Plan the manifest's title/body for an item whose GitHub edit is "
+            "being held, restoring the manifest's version; repeat per item. "
+            "Rejected if the item is unknown or not currently held."
+        ),
+    )
 
     sync_apply = commands.add_parser(
         "sync-apply", help="Apply one exact reviewed plan"
@@ -921,6 +932,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                 args.transition_sprint,
                 iteration.get("field", "Sprint"),
             ),
+            overwrite_remote_edits=args.overwrite_remote_edit,
         )
         payload = plan.as_dict()
         if args.output:

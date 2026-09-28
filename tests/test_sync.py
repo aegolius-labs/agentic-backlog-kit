@@ -2,9 +2,44 @@ from __future__ import annotations
 
 import unittest
 
-from agentic_backlog_kit.sync import ApplyAuthorizationError, apply_plan, build_sync_plan
+from agentic_backlog_kit.manifest import ManifestError
+from agentic_backlog_kit.sync import (
+    ApplyAuthorizationError,
+    apply_plan,
+    build_sync_plan,
+    extract_item_id,
+    extract_marker_fields,
+    extract_written_digest,
+    render_issue_body,
+    render_marker,
+    with_written_comment,
+)
 
 from tests.helpers import item, manifest
+
+
+def _remote(item_id: str, *, title: str, body: str, number: int = 1, **overrides) -> dict:
+    base = {
+        "abk_id": item_id,
+        "number": number,
+        "title": title,
+        "body": body,
+        "type": "Task",
+        "state": "open",
+        "in_project": True,
+        "parent_abk_id": None,
+        "depends_on_abk_ids": [],
+        "project_fields": {
+            "Status": "Ready",
+            "Impact": 3,
+            "Effort": 3,
+            "Business Value": 3,
+            "Enabler Value": 0,
+            "Priority": 15.0,
+        },
+    }
+    base.update(overrides)
+    return base
 
 
 class SyncPlanningTests(unittest.TestCase):
@@ -236,6 +271,198 @@ class SyncPlanningTests(unittest.TestCase):
         update = next(action for action in plan.actions if action.kind == "issue.update")
 
         self.assertEqual(["customer", "type:task"], update.payload["labels"])
+
+
+class RemoteEditHoldTests(unittest.TestCase):
+    """R35: hold a title/body update GitHub reports a human changed since the
+
+    kit's last write, rather than silently reverting it.
+    """
+
+    def _baseline(self, local_item: dict) -> str:
+        return with_written_comment(local_item["title"], render_issue_body(local_item))
+
+    def test_absent_baseline_plans_the_update_and_writes_one(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        remote = {
+            "issues": [_remote("T-1", title="Old title", body="")]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], plan.held_remote_edits)
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertEqual("Ship it", update.payload["title"])
+        self.assertEqual(
+            with_written_comment("Ship it", render_issue_body(local_item)),
+            update.payload["body"],
+        )
+        self.assertIsNotNone(extract_written_digest(update.payload["body"]))
+
+    def test_no_hold_when_baseline_matches_and_manifest_wants_a_further_change(
+        self,
+    ) -> None:
+        local_item = item("T-1", title="Ship it")
+        written_before = item("T-1", title="Ship it earlier")
+        baseline_body = self._baseline(written_before)
+        remote = {
+            "issues": [_remote("T-1", title="Ship it earlier", body=baseline_body)]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], plan.held_remote_edits)
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertEqual("Ship it", update.payload["title"])
+
+    def test_holds_a_title_edited_on_github_since_the_last_write(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        baseline_body = self._baseline(local_item)
+        remote = {
+            "issues": [
+                _remote("T-1", title="Ship it differently", body=baseline_body, number=7)
+            ]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+        self.assertEqual(
+            [
+                {
+                    "item_id": "T-1",
+                    "issue_number": 7,
+                    "fields": ["title"],
+                    "reason": "edited on GitHub since the kit last wrote it",
+                    "hint": (
+                        "Update the manifest item to accept the GitHub edit, or "
+                        "pass --overwrite-remote-edit T-1 to restore the "
+                        "manifest's version"
+                    ),
+                }
+            ],
+            plan.held_remote_edits,
+        )
+
+    def test_holds_a_body_edited_on_github_since_the_last_write(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        baseline_body = self._baseline(local_item)
+        edited_body = baseline_body.replace(
+            "## Outcome", "## Outcome\n\nA human added this line.\n"
+        )
+        remote = {"issues": [_remote("T-1", title="Ship it", body=edited_body)]}
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+        self.assertEqual(1, len(plan.held_remote_edits))
+        self.assertEqual(["body"], plan.held_remote_edits[0]["fields"])
+
+    def test_no_hold_when_the_remote_already_matches_what_the_manifest_wants(
+        self,
+    ) -> None:
+        local_item = item("T-1", title="Ship it")
+        correct_body = self._baseline(local_item)
+        real_digest = extract_written_digest(correct_body)
+        bogus_digest = ("0" if real_digest[0] != "0" else "1") + real_digest[1:]
+        # A stale/bogus baseline digest: on its own it looks like the remote
+        # was edited since the kit's last write, but the content already is
+        # exactly what the manifest wants, so there is nothing to hold or plan.
+        tampered_body = correct_body.replace(real_digest, bogus_digest)
+        remote = {"issues": [_remote("T-1", title="Ship it", body=tampered_body)]}
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], plan.held_remote_edits)
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+
+    def test_crlf_normalization_does_not_register_as_an_edit(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        baseline_body = self._baseline(local_item)
+        remote = {
+            "issues": [
+                _remote("T-1", title="Ship it", body=baseline_body.replace("\n", "\r\n"))
+            ]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        self.assertEqual([], plan.held_remote_edits)
+        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+
+    def test_title_only_change_still_rewrites_the_body_to_refresh_the_digest(
+        self,
+    ) -> None:
+        local_item = item("T-1", title="Renamed")
+        written_before = item("T-1", title="Original name")
+        baseline_body = self._baseline(written_before)
+        remote = {
+            "issues": [_remote("T-1", title="Original name", body=baseline_body)]
+        }
+
+        plan = build_sync_plan(manifest(local_item), remote)
+
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertEqual("Renamed", update.payload["title"])
+        self.assertIn("body", update.payload)
+        self.assertNotEqual(
+            extract_written_digest(baseline_body),
+            extract_written_digest(update.payload["body"]),
+        )
+
+    def test_override_restores_the_manifests_version_of_a_held_item(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        baseline_body = self._baseline(local_item)
+        remote = {
+            "issues": [_remote("T-1", title="Ship it differently", body=baseline_body)]
+        }
+
+        plan = build_sync_plan(
+            manifest(local_item), remote, overwrite_remote_edits=["T-1"]
+        )
+
+        self.assertEqual([], plan.held_remote_edits)
+        self.assertEqual(["T-1"], plan.overwrite_remote_edits)
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertEqual("Ship it", update.payload["title"])
+
+    def test_override_of_a_non_held_item_is_rejected(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        remote = {"issues": [_remote("T-1", title="Ship it", body="")]}
+
+        with self.assertRaisesRegex(ManifestError, "not held"):
+            build_sync_plan(manifest(local_item), remote, overwrite_remote_edits=["T-1"])
+
+    def test_override_of_an_unknown_item_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ManifestError, "unknown"):
+            build_sync_plan(
+                manifest(item("T-1")),
+                {"issues": []},
+                overwrite_remote_edits=["NOT-AN-ITEM"],
+            )
+
+    def test_held_edits_are_folded_into_the_plan_digest(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        baseline_body = self._baseline(local_item)
+        held_remote = {
+            "issues": [_remote("T-1", title="Ship it differently", body=baseline_body)]
+        }
+        clean_remote = {"issues": [_remote("T-1", title="Ship it", body=baseline_body)]}
+
+        held_plan = build_sync_plan(manifest(local_item), held_remote)
+        clean_plan = build_sync_plan(manifest(local_item), clean_remote)
+
+        self.assertNotEqual(held_plan.digest, clean_plan.digest)
+
+    def test_extract_functions_ignore_the_written_comment(self) -> None:
+        local_item = item("T-1", title="Ship it")
+        body = with_written_comment(local_item["title"], render_issue_body(local_item))
+
+        self.assertEqual("T-1", extract_item_id(body))
+        fields = extract_marker_fields(body)
+        self.assertEqual({"id": "T-1", "schema": "1"}, fields)
+        self.assertNotIn("written", fields)
+        self.assertEqual(render_marker(local_item), body.splitlines()[0])
 
 
 if __name__ == "__main__":

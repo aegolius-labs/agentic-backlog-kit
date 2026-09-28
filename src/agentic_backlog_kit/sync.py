@@ -40,6 +40,8 @@ class SyncPlan:
     snapshot_fingerprint: str
     manage_body: bool = True
     transitions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    held_remote_edits: list[dict[str, Any]] = field(default_factory=list)
+    overwrite_remote_edits: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +50,8 @@ class SyncPlan:
             "snapshot_fingerprint": self.snapshot_fingerprint,
             "manage_body": self.manage_body,
             "transitions": self.transitions,
+            "held_remote_edits": self.held_remote_edits,
+            "overwrite_remote_edits": self.overwrite_remote_edits,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
         }
@@ -117,6 +121,105 @@ def with_marker(body: str, item: dict[str, Any]) -> str:
     if span is None:
         return f"{render_marker(item)}\n\n{body}" if body.strip() else render_marker(item)
     return body[: span[0]] + render_marker(item) + body[span[1] :]
+
+
+WRITTEN_PREFIX = "<!-- agentic-backlog-kit:written=sha256:"
+WRITTEN_SUFFIX = " -->"
+
+
+def _canonical_text(text: str) -> str:
+    """Normalize line endings and trailing whitespace for a stable digest.
+
+    GitHub may normalize CRLF to LF (or the reverse, depending on how a body
+    was written), so the digest has to be computed over a form that does not
+    change under that normalization alone.
+    """
+
+    return text.replace("\r\n", "\n").replace("\r", "\n").rstrip()
+
+
+def _strip_written_comment(body: str | None) -> str:
+    """Return the body's content with the trailing written-comment removed.
+
+    The comment is always the last line the kit writes, so anything after it
+    is preserved untouched (there should be nothing) while the comment itself,
+    and the newline that separates it from the content, is dropped.
+    """
+
+    text = _canonical_text(body or "")
+    start = text.rfind(WRITTEN_PREFIX)
+    if start < 0:
+        return text
+    end = text.find(WRITTEN_SUFFIX, start)
+    if end < 0:
+        return text
+    content = text[:start]
+    trailing = text[end + len(WRITTEN_SUFFIX) :].strip()
+    if content.endswith("\n"):
+        content = content[:-1]
+    if trailing:
+        # Unexpected trailing content after the comment; keep it rather than
+        # silently discard it.
+        content = f"{content}\n{trailing}" if content else trailing
+    return content
+
+
+def compute_written_digest(title: str, content: str) -> str:
+    """Return the first 16 hex characters of sha256(title + content), canonicalized."""
+
+    canonical = _canonical_text(title) + "\n" + _canonical_text(content)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def render_written_comment(digest: str) -> str:
+    return f"{WRITTEN_PREFIX}{digest}{WRITTEN_SUFFIX}"
+
+
+def with_written_comment(title: str, body: str) -> str:
+    """Return `body` with a fresh written-comment baseline appended.
+
+    The comment records a digest of exactly the (title, content) pair being
+    written, so the next planning pass can tell whether GitHub still holds
+    what the kit last wrote or whether a human changed it since.
+    """
+
+    content = _strip_written_comment(body)
+    digest = compute_written_digest(title, content)
+    comment = render_written_comment(digest)
+    return f"{content}\n{comment}" if content else comment
+
+
+def extract_written_digest(body: str | None) -> str | None:
+    """Return the written-comment's digest, or None when the body has none."""
+
+    if not body:
+        return None
+    start = body.rfind(WRITTEN_PREFIX)
+    if start < 0:
+        return None
+    start += len(WRITTEN_PREFIX)
+    end = body.find(WRITTEN_SUFFIX, start)
+    if end < 0:
+        return None
+    digest = body[start:end].strip()
+    return digest or None
+
+
+def remote_edited_since_write(title: str, body: str | None) -> bool:
+    """Whether the remote body/title diverged from the kit's last written baseline.
+
+    A missing baseline (an issue written before this feature, or never written
+    by the kit at all) is reported as not edited: there is nothing to compare
+    against, so the caller falls back to today's behavior and the next write
+    installs a baseline.
+    """
+
+    digest = extract_written_digest(body)
+    if digest is None:
+        return False
+    content = _strip_written_comment(body)
+    expected = compute_written_digest(title, content)
+    return digest != expected
 
 
 def render_issue_body(item: dict[str, Any]) -> str:
@@ -346,6 +449,8 @@ def _plan_digest(
     snapshot_fingerprint: str,
     manage_body: bool,
     transitions: dict[str, dict[str, Any]] | None = None,
+    held_remote_edits: list[dict[str, Any]] | None = None,
+    overwrite_remote_edits: list[str] | None = None,
 ) -> str:
     payload = {
         "actions": [action.as_dict() for action in actions],
@@ -353,9 +458,84 @@ def _plan_digest(
         "snapshot_fingerprint": snapshot_fingerprint,
         "manage_body": manage_body,
         "transitions": transitions or {},
+        "held_remote_edits": held_remote_edits or [],
+        "overwrite_remote_edits": overwrite_remote_edits or [],
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _normalize_overwrite_remote_edits(
+    overwrite_remote_edits: Iterable[str] | None,
+    local_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    """Reject unknown items up front; whether each is actually held is checked
+
+    per item during planning, since that depends on the remote snapshot.
+    """
+
+    ids = sorted({str(item_id) for item_id in (overwrite_remote_edits or ())})
+    unknown = [item_id for item_id in ids if item_id not in local_by_id]
+    if unknown:
+        raise ManifestError(
+            "--overwrite-remote-edit references unknown item(s): "
+            + ", ".join(unknown)
+        )
+    return ids
+
+
+def _issue_title_body_plan(
+    item: dict[str, Any],
+    remote: dict[str, Any],
+    desired_body: str,
+    *,
+    manage_body: bool,
+) -> tuple[dict[str, Any], bool, list[str]]:
+    """Return the title/body change, whether it is held, and which fields differ.
+
+    Managed bodies compare the remote's own written-comment digest against a
+    freshly computed one for the remote's *current* (title, content): a match
+    means the remote is exactly as the kit left it, so any difference from the
+    manifest is an ordinary pending update. A mismatch means a human changed
+    the title or body since the kit's last write, so the title/body change is
+    reported as held rather than planned, unless the caller is overwriting it.
+
+    A preserved body (`manage_body=False`) is not held: the kit never manages
+    its content, only the identity marker, so there is nothing to protect a
+    human edit from.
+    """
+
+    remote_title = remote.get("title")
+    remote_body = remote.get("body")
+
+    if not manage_body:
+        issue_changes: dict[str, Any] = {}
+        if remote_title != item["title"]:
+            issue_changes["title"] = item["title"]
+        guid_mismatch = extract_guid(remote_body) != item.get("guid")
+        if guid_mismatch or "title" in issue_changes:
+            # A preserved body still carries the kit's marker, so the GUID (and
+            # the written-comment baseline) are corrected in place without
+            # touching anything else in it.
+            fixed = with_marker(remote_body or "", item)
+            issue_changes["body"] = with_written_comment(item["title"], fixed)
+        return issue_changes, False, []
+
+    remote_content = _strip_written_comment(remote_body)
+    title_differs = remote_title != item["title"]
+    body_differs = remote_content != _canonical_text(desired_body)
+    is_held = remote_edited_since_write(remote_title or "", remote_body) and (
+        title_differs or body_differs
+    )
+
+    issue_changes = {}
+    if title_differs or body_differs:
+        if title_differs:
+            issue_changes["title"] = item["title"]
+        issue_changes["body"] = with_written_comment(item["title"], desired_body)
+
+    fields = (["title"] if title_differs else []) + (["body"] if body_differs else [])
+    return issue_changes, is_held, fields
 
 
 def build_sync_plan(
@@ -364,6 +544,7 @@ def build_sync_plan(
     *,
     manage_body: bool = True,
     transitions: dict[str, dict[str, Any]] | None = None,
+    overwrite_remote_edits: Iterable[str] | None = None,
 ) -> SyncPlan:
     """Build an idempotent local-to-GitHub plan without performing mutations.
 
@@ -372,6 +553,14 @@ def build_sync_plan(
     GitHub observes that.  An item still receives the manifest's operational
     defaults the first time it is projected, and an explicit reviewed
     transition is the one way local intent may move them afterwards.
+
+    A managed title or body is held back rather than planned when GitHub
+    reports it changed since the kit's own last write: an agent confirming an
+    ordinary plan must not be able to silently revert a human's edit.
+    `overwrite_remote_edits` names items whose held edit the caller has
+    reviewed and wants to overwrite with the manifest's version anyway; each
+    must actually be held, or the request is rejected before anything is
+    planned.
     """
 
     data = validate_manifest(manifest)
@@ -382,6 +571,10 @@ def build_sync_plan(
     requested_transitions = normalize_transitions(
         transitions, data, remote_by_id, sprint_field
     )
+    normalized_overwrites = _normalize_overwrite_remote_edits(
+        overwrite_remote_edits, local_by_id
+    )
+    overwrite_ids = set(normalized_overwrites)
 
     # Priority is a planning field derived from operational state, so it is
     # computed from fresh GitHub state with this plan's own transitions already
@@ -405,6 +598,7 @@ def build_sync_plan(
     project_actions: list[SyncAction] = []
     transition_actions: list[SyncAction] = []
     relationship_actions: list[SyncAction] = []
+    held_remote_edits: list[dict[str, Any]] = []
 
     for item_id in sorted(local_by_id):
         item = local_by_id[item_id]
@@ -413,15 +607,21 @@ def build_sync_plan(
         desired_fields = _desired_fields(
             item, score_by_id[item_id], sprint_field=sprint_field
         )
+        force_overwrite = item_id in overwrite_ids
 
         if remote is None:
+            if force_overwrite:
+                raise ManifestError(
+                    f"--overwrite-remote-edit item '{item_id}' is not held for a "
+                    "remote edit; it does not exist on GitHub yet"
+                )
             creates.append(
                 SyncAction(
                     "issue.create",
                     item_id,
                     {
                         "title": item["title"],
-                        "body": desired_body,
+                        "body": with_written_comment(item["title"], desired_body),
                         "type": item["type"],
                         "fallback_label": f"type:{item['type'].lower()}",
                     },
@@ -437,15 +637,29 @@ def build_sync_plan(
                 )
             )
         else:
-            issue_changes: dict[str, Any] = {}
-            if remote.get("title") != item["title"]:
-                issue_changes["title"] = item["title"]
-            if manage_body and remote.get("body", "") != desired_body:
-                issue_changes["body"] = desired_body
-            elif not manage_body and extract_guid(remote.get("body")) != item.get("guid"):
-                # A preserved body still carries the kit's marker, so the GUID is
-                # corrected in place without touching anything else in it.
-                issue_changes["body"] = with_marker(remote.get("body") or "", item)
+            issue_changes, is_held, differing_fields = _issue_title_body_plan(
+                item, remote, desired_body, manage_body=manage_body
+            )
+            if force_overwrite and not is_held:
+                raise ManifestError(
+                    f"--overwrite-remote-edit item '{item_id}' is not held for a "
+                    "remote edit"
+                )
+            if is_held and not force_overwrite:
+                held_remote_edits.append(
+                    {
+                        "item_id": item_id,
+                        "issue_number": remote.get("number"),
+                        "fields": differing_fields,
+                        "reason": "edited on GitHub since the kit last wrote it",
+                        "hint": (
+                            "Update the manifest item to accept the GitHub edit, "
+                            f"or pass --overwrite-remote-edit {item_id} to restore "
+                            "the manifest's version"
+                        ),
+                    }
+                )
+                issue_changes = {}
             if remote.get("type") != item["type"]:
                 issue_changes["type"] = item["type"]
                 fallback_label = f"type:{item['type'].lower()}"
@@ -546,6 +760,7 @@ def build_sync_plan(
         + transition_actions
         + relationship_actions
     )
+    held_remote_edits.sort(key=lambda entry: entry["item_id"])
     manifest_fingerprint = state_fingerprint(data)
     snapshot_fingerprint = state_fingerprint(remote_snapshot)
     return SyncPlan(
@@ -556,11 +771,15 @@ def build_sync_plan(
             snapshot_fingerprint,
             manage_body,
             requested_transitions,
+            held_remote_edits,
+            normalized_overwrites,
         ),
         manifest_fingerprint=manifest_fingerprint,
         snapshot_fingerprint=snapshot_fingerprint,
         manage_body=manage_body,
         transitions=requested_transitions,
+        held_remote_edits=held_remote_edits,
+        overwrite_remote_edits=normalized_overwrites,
     )
 
 
@@ -585,6 +804,8 @@ def apply_plan(
         plan.snapshot_fingerprint,
         plan.manage_body,
         plan.transitions,
+        plan.held_remote_edits,
+        plan.overwrite_remote_edits,
     ) != plan.digest:
         raise ApplyAuthorizationError("Sync plan changed after validation")
     if manifest is None or remote_snapshot is None:
@@ -596,6 +817,7 @@ def apply_plan(
         remote_snapshot,
         manage_body=plan.manage_body,
         transitions=plan.transitions,
+        overwrite_remote_edits=plan.overwrite_remote_edits,
     )
     if fresh_plan.digest != plan.digest:
         raise ApplyAuthorizationError(
@@ -689,6 +911,16 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
         for key, value in transitions.items()
     ):
         raise ManifestError("Sync plan transitions must map item ids to field objects")
+    held_remote_edits = data.get("held_remote_edits", [])
+    if not isinstance(held_remote_edits, list) or any(
+        not isinstance(entry, dict) for entry in held_remote_edits
+    ):
+        raise ManifestError("Sync plan held_remote_edits must be a list of objects")
+    overwrite_remote_edits = data.get("overwrite_remote_edits", [])
+    if not isinstance(overwrite_remote_edits, list) or any(
+        not isinstance(entry, str) for entry in overwrite_remote_edits
+    ):
+        raise ManifestError("Sync plan overwrite_remote_edits must be a list of item ids")
     if (
         not isinstance(digest, str)
         or not isinstance(manifest_fingerprint, str)
@@ -700,6 +932,8 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
             snapshot_fingerprint,
             manage_body,
             transitions,
+            held_remote_edits,
+            overwrite_remote_edits,
         )
         != digest
     ):
@@ -711,4 +945,6 @@ def sync_plan_from_dict(data: dict[str, Any]) -> SyncPlan:
         snapshot_fingerprint=snapshot_fingerprint,
         manage_body=manage_body,
         transitions=transitions,
+        held_remote_edits=held_remote_edits,
+        overwrite_remote_edits=overwrite_remote_edits,
     )
