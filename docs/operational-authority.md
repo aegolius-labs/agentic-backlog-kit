@@ -78,29 +78,68 @@ nothing.
 ## Planning against fresh state
 
 Ranking and sprint selection ask what to do next, which depends on what is
-happening now. Pass a snapshot to answer that from GitHub:
+happening now. Owner decision **R35** (2026-09-28) made that the default:
+`next`, `prioritize`, `sprint-plan`, and `gantt` read fresh operational state
+automatically, without requiring an operator to remember `abk snapshot` first.
+The manifest itself is never written with observations - only the resolution
+of what planning *reads* changed.
 
 ```bash
-abk snapshot --output .agentic-backlog/snapshot.json
-abk next --operational-snapshot .agentic-backlog/snapshot.json
-abk prioritize --operational-snapshot .agentic-backlog/snapshot.json
-abk sprint-plan --operational-snapshot .agentic-backlog/snapshot.json
+abk next
+abk prioritize
+abk sprint-plan
 ```
 
-Every planning command reports which state it used:
+Each of these, with no extra flags, resolves operational state in this order:
+
+1. **`--operational-snapshot PATH`**, if given, is used exactly as that file
+   says - unchanged from before R35.
+2. **`--offline`**, if given, uses local intent only. No snapshot is read or
+   written. This is the previous default, now explicit.
+3. **Otherwise (the new default): auto.** A small cache at
+   `.agentic-backlog/cache/observed-snapshot.json` (gitignored) is reused when
+   it is younger than `--max-age SECONDS` (default 300) and targets the same
+   owner/repository/project the manifest declares. Otherwise the command
+   fetches a fresh snapshot the same way `abk snapshot` does, uses it, and
+   refreshes the cache. `--backend` selects the transport for that fetch, same
+   as elsewhere in the kit.
+
+Every planning command reports which state it used, plus how it was obtained:
 
 ```json
-{ "operational_state": "github" }
-{ "operational_state": "local-intent" }
+{ "operational_state": "github", "freshness": { "source": "cache", "observed_at": "2026-09-28T14:03:00Z", "age_seconds": 42 } }
+{ "operational_state": "github", "freshness": { "source": "fetched", "observed_at": "2026-09-28T14:03:00Z", "age_seconds": 0 } }
+{ "operational_state": "github", "freshness": { "source": "explicit" } }
+{ "operational_state": "local-intent", "freshness": { "source": "offline" } }
 ```
 
-Add `--report-operational-drift` to see exactly what differed.
+`operational_state` keeps its old meaning and its old two values, so anything
+that already reads it is unaffected. `freshness.source` says how that state was
+obtained: `cache` (reused), `fetched` (just read), `explicit` (an exact
+snapshot file), or `offline`.
+
+Add `--report-operational-drift` to see exactly what differed, same as before.
+
+### A failed auto-fetch fails closed
+
+If the auto-refresh cannot reach GitHub - no `gh` session, no `GH_TOKEN`, a
+transport error - planning does not silently fall back to local intent. It
+stops with a clear error and a hint to pass `--offline` for a local-intent
+preview instead. Stale or wrong answers are worse than an explicit stop; the
+kit would rather ask than guess.
+
+### Every write invalidates the cache
+
+`sync-apply`, `import-apply`, `scaffold-apply`, `iteration-apply`, and
+`init-apply` delete the cache after a successful apply, so the very next
+planning command refetches rather than answering from the state that write
+just changed. `abk snapshot` also refreshes the cache as a side effect, since
+it reads the manifest's own target anyway.
 
 ### Offline preview is a preview
 
-Without `--operational-snapshot`, planning uses the manifest. That is supported
-and it is the default, because planning must work without network access. It is
-a preview, not an answer:
+`--offline` is still supported, and it is what planning must fall back to when
+there is no network access. It is a preview, not an answer:
 
 - Work finished on the board still looks open, so `next` can hand an agent
   something already done.
@@ -110,6 +149,25 @@ a preview, not an answer:
 
 The `operational_state` field says which of the two you are reading. Treat
 `local-intent` as provisional whenever the board has other contributors.
+
+### The manifest can fall behind the board
+
+When operational state comes from a snapshot - cached, fetched, or explicit -
+planning also reports `manifest_behind` whenever the snapshot carries a kit
+marker (`abk_id`) for an issue the manifest does not know about:
+
+```json
+{
+  "manifest_behind": {
+    "unknown_managed_issues": [{ "item_id": "T-42", "number": 118 }],
+    "hint": "Another machine or user may have added items GitHub already tracks. Run `git pull` to pick up a newer manifest, or `abk import-reconcile` to recover them here."
+  }
+}
+```
+
+This is the signature of another machine, session, or user having added
+managed items this manifest has not yet absorbed. The key is omitted entirely
+when nothing is unknown.
 
 ### A remote status the manifest does not define
 
@@ -159,5 +217,8 @@ carried over. See [sprint commitments](sprint-commitments.md).
 - Composition reads fields, not people: who is assigned to an item is not part
   of operational state yet.
 - There is no way to write observed operational state back into the manifest.
-  Offline planning therefore stays as stale as the manifest is, and the only
-  remedy is to pass a snapshot.
+  `--offline` planning therefore stays as stale as the manifest is; the auto
+  default and `--operational-snapshot` are the remedy. `abk observe` (see
+  [Observed-state evidence](observed-state.md)) is the one sanctioned channel
+  for handing observed state to another system, and even that is evidence,
+  never intent - it never writes to this kit's own manifest either.

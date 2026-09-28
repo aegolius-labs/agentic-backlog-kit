@@ -22,6 +22,15 @@ from .capabilities import (
     require_capabilities,
 )
 from .execution import failure_hint
+from .freshness import (
+    DEFAULT_CACHE_PATH,
+    DEFAULT_MAX_AGE_SECONDS,
+    FreshnessError,
+    invalidate_cache,
+    manifest_behind,
+    resolve_snapshot,
+    write_cache,
+)
 from .importing import (
     ImportExecutor,
     apply_import_plan,
@@ -212,7 +221,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     _add_operational_arguments(sprint)
     sprint.add_argument("--as-of", help="ISO date used to resolve @current and @next")
-    sprint.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
     sprint.add_argument(
         "--skipped-limit",
         type=int,
@@ -432,13 +440,37 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
-    """Let a planning command read Status and Sprint from fresh GitHub state."""
+    """Let a planning command read Status and Sprint from GitHub's current state.
+
+    Fresh by default, offline explicit (owner decision D1, R35): without
+    `--offline` or `--operational-snapshot`, planning auto-refreshes a small
+    on-disk cache of observed state rather than falling back to local intent.
+    """
 
     parser.add_argument(
         "--operational-snapshot",
         help=(
-            "Remote sync snapshot supplying fresh Status and Sprint. Without it, "
-            "planning uses local intent, which may be stale."
+            "Exact remote sync snapshot supplying fresh Status and Sprint, used "
+            "as given instead of the auto-refreshed cache."
+        ),
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help=(
+            "Use local intent only; never read or refresh the observed-state "
+            "cache. A preview, not an answer: work finished on the board still "
+            "looks open. Conflicts with --operational-snapshot."
+        ),
+    )
+    parser.add_argument(
+        "--max-age",
+        type=int,
+        default=DEFAULT_MAX_AGE_SECONDS,
+        metavar="SECONDS",
+        help=(
+            "Treat the observed-state cache as fresh for this many seconds "
+            f"before refetching (default {DEFAULT_MAX_AGE_SECONDS})"
         ),
     )
     parser.add_argument(
@@ -446,24 +478,36 @@ def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Include the observed local/remote operational differences",
     )
+    if not any("--backend" in action.option_strings for action in parser._actions):
+        parser.add_argument(
+            "--backend", choices=("auto", "gh", "api"), default="auto"
+        )
 
 
 def _operational_manifest(
     manifest: dict[str, Any], args: argparse.Namespace
-) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
-    """Return the manifest planning should use, plus any observed differences.
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]] | None, dict[str, Any] | None]:
+    """Return the manifest planning should use, its freshness, and any drift.
 
-    Offline preview is supported and is the default, but it is a preview: with
-    no snapshot the answer reflects local intent rather than what GitHub is
-    currently reporting.
+    Resolution order (D1, R35): an explicit `--operational-snapshot` is used
+    exactly as given; `--offline` uses local intent only; otherwise the
+    auto-refreshed cache (or a fresh fetch) supplies observed state. A failed
+    auto-fetch raises `FreshnessError` rather than silently answering from
+    stale local intent.
     """
 
-    path = getattr(args, "operational_snapshot", None)
-    if not path:
-        return manifest, None
-    snapshot = json.loads(Path(path).read_text(encoding="utf-8"))
-    composed, differences = compose_operational_state(manifest, snapshot)
-    return composed, differences
+    resolution = resolve_snapshot(
+        manifest,
+        snapshot_path=getattr(args, "operational_snapshot", None),
+        offline=getattr(args, "offline", False),
+        max_age_seconds=getattr(args, "max_age", DEFAULT_MAX_AGE_SECONDS),
+        fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+    )
+    if resolution.snapshot is None:
+        return manifest, resolution.freshness, None, None
+    composed, differences = compose_operational_state(manifest, resolution.snapshot)
+    behind = manifest_behind(manifest, resolution.snapshot)
+    return composed, resolution.freshness, differences, behind
 
 
 def _parse_transitions(
@@ -495,6 +539,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         GitHubApiError,
         ApplyAuthorizationError,
         CapabilityError,
+        FreshnessError,
     ) as error:
         # A rejected write should read as a decision, not a stack trace. The
         # receipt already records the exact failing action; this is the line the
@@ -601,6 +646,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             discovery_snapshot=discovery,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
+        invalidate_cache()
         manifest = default_manifest(
             plan.owner, plan.repository, result.project["number"]
         )
@@ -646,7 +692,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         )
         return 0
     if args.command == "prioritize":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         done_statuses = set(planning["workflow"]["done_statuses"])
         ranked = [
             entry
@@ -658,12 +704,15 @@ def _dispatch(args: argparse.Namespace) -> int:
         payload["operational_state"] = (
             "github" if differences is not None else "local-intent"
         )
+        payload["freshness"] = freshness
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
         return 0
     if args.command == "next":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         item, passed_over = explain_next(planning, limit=max(args.explain, 0))
         payload = {
             "item": asdict(item) if item else None,
@@ -671,13 +720,16 @@ def _dispatch(args: argparse.Namespace) -> int:
             "operational_state": (
                 "github" if differences is not None else "local-intent"
             ),
+            "freshness": freshness,
         }
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
         return 0
     if args.command == "gantt":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         schedule = build_schedule(
             planning,
             start=args.start,
@@ -694,6 +746,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             payload["operational_state"] = (
                 "github" if differences is not None else "local-intent"
             )
+            payload["freshness"] = freshness
+            if behind is not None:
+                payload["manifest_behind"] = behind
             if args.report_operational_drift and differences is not None:
                 payload["operational_drift"] = differences
             if args.output:
@@ -738,7 +793,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                     repository=github["repository"],
                     project_number=github["project_number"],
                 ).read()
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         plan = plan_sprint(
             planning,
             capacity=args.capacity,
@@ -751,6 +806,9 @@ def _dispatch(args: argparse.Namespace) -> int:
         payload["operational_state"] = (
             "github" if differences is not None else "local-intent"
         )
+        payload["freshness"] = freshness
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
@@ -793,6 +851,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "snapshot":
         snapshot = _read_snapshot(None, manifest, args.backend)
+        # A manual snapshot reads the manifest's own target, so it doubles as
+        # a refresh of the auto-fresh planning cache: the next planning
+        # command need not refetch what an operator just pulled by hand.
+        write_cache(DEFAULT_CACHE_PATH, manifest, snapshot)
         if args.output:
             _write_json(Path(args.output), snapshot)
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})
@@ -895,6 +957,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             unmanaged_issues=unmanaged,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
+        invalidate_cache()
         merged = merge_imported_items(fresh_manifest, plan.items)
         save_manifest(
             Path(args.manifest),
@@ -963,6 +1026,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             remote_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
+        invalidate_cache()
         payload = asdict(receipt)
         _print_json(payload)
         return 0
@@ -1059,6 +1123,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
+        invalidate_cache()
         verified = verify_iteration_apply(plan, fresh_manifest, reader.read())
         _print_json(
             {
@@ -1098,6 +1163,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
+        invalidate_cache()
         _print_json(asdict(receipt))
         return 0
     raise AssertionError(f"Unhandled command: {args.command}")

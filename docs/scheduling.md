@@ -63,14 +63,15 @@ projection excluded would describe a timeline the chart does not draw.
 
 ## Fresh state versus committed state
 
-`gantt` accepts `--operational-snapshot`, which ranks and states the chart
-against what GitHub now says rather than local intent. Use it whenever the chart
-is for a person.
+`gantt` reads fresh operational state by default, auto-refreshing a short-lived
+local cache of what GitHub now says rather than local intent. That default is
+right whenever the chart is for a person.
 
-The committed `roadmap-gantt.md` deliberately does **not** use one. It is the
-projection of the tracked manifest, so it can be regenerated identically in CI
-with no network and no credentials, which is what lets a test prove it is not
-stale. A chart of live GitHub state could not be verified that way.
+The committed `roadmap-gantt.md` deliberately opts out with `--offline`. It is
+the projection of the tracked manifest alone, so it can be regenerated
+identically in CI with no network and no credentials, which is what lets a
+test prove it is not stale. A chart of live GitHub state could not be verified
+that way.
 
 ## Rendering
 
