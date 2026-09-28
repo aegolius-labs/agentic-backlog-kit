@@ -152,6 +152,83 @@ that field records, so `sprint-plan` retains work already committed to the
 target sprint and withholds work committed elsewhere unless it is explicitly
 carried over. See [sprint commitments](sprint-commitments.md).
 
+## Edits made on GitHub
+
+Title and body are the manifest's to own (see the table above), but that
+authority only ever pointed one direction as far as a machine could tell: if a
+teammate edited a managed issue's title or body directly on GitHub, the next
+`sync-plan` proposed reverting it, and confirming that plan silently undid the
+human's edit. R35 (2026-09-28) closes that gap by giving the kit a way to tell
+"the manifest changed" apart from "a human edited GitHub".
+
+**The baseline comment.** Whenever the kit writes an issue's title and/or
+body - on `issue.create`, and on `issue.update` whether the body is fully
+managed or only its identity marker is - it appends a second hidden comment
+after everything else in the body:
+
+```
+<!-- agentic-backlog-kit:written=sha256:<16 hex chars> -->
+```
+
+The digest covers the exact title and body being written (with this comment
+itself excluded), after normalizing line endings and trailing whitespace so a
+GitHub-side CRLF/LF change alone never looks like an edit. This is separate
+bookkeeping from the identity marker (`agentic-backlog-kit:id=...`) - the two
+never overlap, and the identity marker byte layout does not change.
+
+**Detection.** The next `sync-plan` recomputes the digest over the remote
+issue's *current* title and body and compares it with the digest the remote
+body still carries:
+
+- **Matches** - the remote is exactly as the kit left it. Any difference from
+  the manifest is planned as an ordinary `issue.update`, same as before.
+- **Does not match, and the remote now differs from what the manifest
+  wants** - a human changed the title or body since the kit's last write. The
+  title/body change is **held**: it is left out of the plan and reported
+  instead, under `held_remote_edits`:
+
+  ```json
+  {
+    "item_id": "R35",
+    "issue_number": 214,
+    "fields": ["title"],
+    "reason": "edited on GitHub since the kit last wrote it",
+    "hint": "Update the manifest item to accept the GitHub edit, or pass --overwrite-remote-edit R35 to restore the manifest's version"
+  }
+  ```
+
+  Type, label, and Project field actions for the same item are unaffected.
+- **Does not match, but the remote already equals what the manifest
+  wants** - nothing to do; no hold, no action.
+- **No baseline comment at all** - every issue written before this feature
+  falls here. The kit behaves exactly as it did previously: the update is
+  planned, and that write installs the first baseline.
+
+Held edits are folded into the plan digest, so a plan reviewed with one held
+item cannot later be silently re-confirmed against a plan without it.
+
+**Overriding a hold.** Once you have looked at the GitHub edit and decided the
+manifest's version should win anyway:
+
+```bash
+abk sync-plan --overwrite-remote-edit R35
+```
+
+repeatable per item. It is rejected before anything is planned if the named
+item does not exist or is not currently held. Applying the resulting plan
+writes a fresh baseline.
+
+**Adopting the human edit instead** is not a command - the manifest is edited
+by a person - but it is the usual path: update the manifest item's title or
+description to match what is now on GitHub, and the next plan finds nothing
+to hold.
+
+**Migration note.** An issue the kit wrote before 2026-09-28 has no baseline
+comment yet. Nothing breaks: the first `sync-plan` after upgrading plans that
+issue's update exactly as it would have before, and the write that applies it
+installs the issue's first baseline. From then on, an edit made directly on
+GitHub is detected and held.
+
 ## Known limits
 
 - Composition reads `Status` and the iteration field only. Assignees, labels

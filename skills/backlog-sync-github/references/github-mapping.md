@@ -4,6 +4,8 @@ Only issues containing `<!-- agentic-backlog-kit:id=ITEM_ID;schema=1 -->` are ma
 
 An item with a `guid` carries it in the same marker: `<!-- agentic-backlog-kit:id=ITEM_ID;schema=1;guid=GUID -->`. Items without one keep the plain marker, so existing issues are never rewritten for it. With `--preserve-body`, only the marker is corrected when its GUID differs; the rest of the body is left alone. A kit older than schema 2 that rewrites a body drops the key, and the next plan from a current kit restores it.
 
+Every body the kit writes also carries a second, separate hidden comment at the end: `<!-- agentic-backlog-kit:written=sha256:HEX -->`, a digest of the exact title and body it just wrote. `sync-plan` compares it against the remote's current title/body and, when they no longer match, holds that item's title/body update instead of planning it - see [operational-authority.md](../../../docs/operational-authority.md#edits-made-on-github). An issue written before this existed has no such comment; its next write installs one.
+
 Mapping:
 
 - Item type: native organization issue type when available, otherwise `type:*` label.
