@@ -1009,6 +1009,26 @@
       "enabler_value": 2
     },
     {
+      "id": "R35",
+      "type": "Feature",
+      "parent": "EPIC-PROD",
+      "maturity": "refined",
+      "status": "In Review",
+      "title": "R35 - Keep every session, machine and user on current state",
+      "description": "Planning read stale local intent unless an operator remembered to pass a snapshot, snapshots were never refreshed on their own, a teammate's GitHub edit to a managed title or body was proposed for reversion by the next sync, and nothing gave aio-agentic-sdlc a defined format for GitHub observations to return as evidence. Owner decided on 2026-09-28: fresh by default with offline explicit, detect and hold human edits, and define the evidence export here. D1 stands: the manifest is never written with observations.",
+      "acceptance_criteria": [
+        "Planning commands read fresh GitHub state by default and fail closed when they cannot",
+        "A title or body edited on GitHub since the kit last wrote it is held, never silently reverted",
+        "Observed state is exported in a versioned evidence contract pinned by a fixture"
+      ],
+      "impact": 5,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 5,
+      "depends_on": [],
+      "sprint": null
+    },
+    {
       "type": "Story",
       "depends_on": [],
       "sprint": null,
@@ -1695,6 +1715,70 @@
       "effort": 2,
       "business_value": 3,
       "enabler_value": 3
+    },
+    {
+      "depends_on": [],
+      "sprint": null,
+      "status": "In Review",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R35",
+      "id": "S-R35-1",
+      "title": "Make planning fresh by default and offline explicit",
+      "description": "next, prioritize, sprint-plan and gantt resolve operational state from an explicit snapshot, --offline, or by default a short-lived cache beside the manifest that is refetched when stale or aimed at another target. A failed fetch fails closed. Every apply drops the cache before its first write, and planning reports marked issues the manifest does not know about.",
+      "acceptance_criteria": [
+        "Without flags a planning command uses GitHub state no older than --max-age",
+        "A failed fetch errors with a hint to pass --offline instead of answering from local intent",
+        "Any apply, including a partially failed one, leaves no cache describing pre-write state",
+        "Marked issues missing from the manifest are reported as manifest_behind"
+      ],
+      "impact": 5,
+      "effort": 2,
+      "business_value": 4,
+      "enabler_value": 4
+    },
+    {
+      "depends_on": [],
+      "sprint": null,
+      "status": "In Review",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R35",
+      "id": "S-R35-2",
+      "title": "Hold title and body edits made on GitHub since the kit last wrote them",
+      "description": "Each kit write records per-field title and body digests in a second hidden comment, separate from the identity marker pinned by Seam A. A field edited on GitHub since then and different from the manifest is held and reported, never planned, until a person updates the manifest or passes --overwrite-remote-edit.",
+      "acceptance_criteria": [
+        "A held field produces no issue.update for that field and appears in held_remote_edits",
+        "A held field stays held after the other field is legitimately rewritten",
+        "The identity marker is byte-for-byte unchanged",
+        "--overwrite-remote-edit is recorded in the plan digest and rejected for an item that is not held"
+      ],
+      "impact": 4,
+      "effort": 3,
+      "business_value": 4,
+      "enabler_value": 3
+    },
+    {
+      "depends_on": [
+        "S-R35-1"
+      ],
+      "sprint": null,
+      "status": "In Review",
+      "maturity": "ready",
+      "type": "Story",
+      "parent": "R35",
+      "id": "S-R35-3",
+      "title": "Export observed GitHub state as a versioned evidence contract",
+      "description": "abk observe emits the abk-observed-state contract: per managed issue its item id, canonical GUID, issue number, open or closed state, and observed Status and Sprint, with a digest. It is evidence for aio-agentic-sdlc layers 2 and 3, never intent. A schema and a Seam A fixture pin it.",
+      "acceptance_criteria": [
+        "abk observe produces a document matching schemas/observed-state.schema.json",
+        "The Seam A fixture regenerates byte-for-byte from a synthetic snapshot",
+        "The contract documents additive versioning and that consumers must not treat it as intent"
+      ],
+      "impact": 4,
+      "effort": 2,
+      "business_value": 3,
+      "enabler_value": 5
     }
   ]
 }
