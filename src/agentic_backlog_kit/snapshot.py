@@ -557,6 +557,12 @@ class GitHubSnapshotReader:
                 "project_number": self.project_number,
             },
             "issues": snapshot_issues,
+            # Free to report: the same listing already fetched every issue to
+            # find the managed ones, so this costs no additional request. It
+            # lets the observed-state evidence export (`abk observe`) report
+            # how much of the repository this kit does not yet track, without
+            # a second, opt-in relationship-style read.
+            "unmanaged_issue_count": len(all_issues) - len(managed),
         }
 
 

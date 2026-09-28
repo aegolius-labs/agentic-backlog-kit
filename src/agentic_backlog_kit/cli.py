@@ -21,6 +21,7 @@ from .capabilities import (
     inspect_route,
     require_capabilities,
 )
+from .evidence import observed_state
 from .execution import failure_hint
 from .freshness import (
     DEFAULT_CACHE_PATH,
@@ -29,6 +30,7 @@ from .freshness import (
     invalidate_cache,
     manifest_behind,
     resolve_snapshot,
+    utc_now_iso,
     write_cache,
 )
 from .importing import (
@@ -285,6 +287,28 @@ def _parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--manifest", default=DEFAULT_MANIFEST)
     snapshot.add_argument("--output")
     snapshot.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+
+    observe = commands.add_parser(
+        "observe",
+        help="Export observed GitHub state as evidence for a downstream system",
+    )
+    observe.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    observe.add_argument("--output")
+    observe.add_argument(
+        "--offline-snapshot",
+        help="Use this exact snapshot file instead of the auto-refreshed cache",
+    )
+    observe.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+    observe.add_argument(
+        "--max-age",
+        type=int,
+        default=DEFAULT_MAX_AGE_SECONDS,
+        metavar="SECONDS",
+        help=(
+            "Treat the observed-state cache as fresh for this many seconds "
+            f"before refetching (default {DEFAULT_MAX_AGE_SECONDS})"
+        ),
+    )
 
     import_plan = commands.add_parser(
         "import-plan", help="Preview adopting issues the repository already has"
@@ -860,6 +884,37 @@ def _dispatch(args: argparse.Namespace) -> int:
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})
         else:
             _print_json(snapshot)
+        return 0
+    if args.command == "observe":
+        resolution = resolve_snapshot(
+            manifest,
+            snapshot_path=args.offline_snapshot,
+            offline=False,
+            max_age_seconds=args.max_age,
+            fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+        )
+        source = resolution.freshness["source"]
+        if source == "explicit":
+            route = "offline-snapshot"
+            observed_at = resolution.freshness.get("observed_at") or utc_now_iso()
+        elif source == "cache":
+            route = "cache"
+            observed_at = resolution.freshness["observed_at"]
+        else:
+            route = args.backend
+            observed_at = resolution.freshness["observed_at"]
+        document = observed_state(manifest, resolution.snapshot, observed_at, route)
+        if args.output:
+            _write_json(Path(args.output), document)
+            _print_json(
+                {
+                    "output": args.output,
+                    "items": len(document["items"]),
+                    "digest": document["digest"],
+                }
+            )
+        else:
+            _print_json(document)
         return 0
     if args.command in {"import-plan", "import-apply", "import-reconcile"}:
         github = manifest["github"]
