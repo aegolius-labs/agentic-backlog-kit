@@ -782,8 +782,10 @@ def _dispatch(args: argparse.Namespace) -> int:
             lanes=args.lanes,
             include_completed=args.include_completed,
         )
+        # The chart names the command that reproduces it, so an offline
+        # projection says so: rerun without the flag it would read GitHub.
         command = (
-            f"abk gantt --lanes {args.lanes} "
+            f"abk gantt {'--offline ' if args.offline else ''}--lanes {args.lanes} "
             f"--days-per-effort {args.days_per_effort}"
         )
         if args.format == "json":

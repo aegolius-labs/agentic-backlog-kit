@@ -30,13 +30,14 @@ the largest thing left, so `next` will hand you one and the schedule projection
 draws it. Both apply the same rule, because a roadmap of whole features would
 otherwise report nothing to do and project an empty timeline.
 
-Always pass a fresh operational snapshot. Without one the answer is computed
-from local intent, which lags whatever GitHub now says; the result labels itself
-`"operational_state": "local-intent"` when that happens, so check that field
-before trusting the answer.
+Planning reads fresh GitHub state by default and reports how it got it in
+`freshness`. Only `--offline` answers from local intent, which lags whatever
+GitHub now says; the result then labels itself
+`"operational_state": "local-intent"`, so check that field before trusting the
+answer. `manifest_behind` in the output means GitHub tracks items this
+manifest does not: pull before planning.
 
 ```bash
-abk snapshot --output .agentic-backlog/cache/remote.json
 abk gantt --lanes 1 --days-per-effort 2
 ```
 
