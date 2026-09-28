@@ -508,6 +508,13 @@ def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
         )
 
 
+def _cache_path(args: argparse.Namespace) -> Path:
+    """Keep the observed-state cache beside the manifest it describes."""
+
+    manifest_path = Path(getattr(args, "manifest", None) or DEFAULT_MANIFEST)
+    return manifest_path.parent / "cache" / DEFAULT_CACHE_PATH.name
+
+
 def _operational_manifest(
     manifest: dict[str, Any], args: argparse.Namespace
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]] | None, dict[str, Any] | None]:
@@ -526,6 +533,7 @@ def _operational_manifest(
         offline=getattr(args, "offline", False),
         max_age_seconds=getattr(args, "max_age", DEFAULT_MAX_AGE_SECONDS),
         fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+        cache_path=_cache_path(args),
     )
     if resolution.snapshot is None:
         return manifest, resolution.freshness, None, None
@@ -662,6 +670,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             repository=plan.repository,
             project_number=plan.project["number"] if plan.project else 1,
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_bootstrap_plan(
             plan,
@@ -670,7 +681,6 @@ def _dispatch(args: argparse.Namespace) -> int:
             discovery_snapshot=discovery,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        invalidate_cache()
         manifest = default_manifest(
             plan.owner, plan.repository, result.project["number"]
         )
@@ -878,7 +888,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         # A manual snapshot reads the manifest's own target, so it doubles as
         # a refresh of the auto-fresh planning cache: the next planning
         # command need not refetch what an operator just pulled by hand.
-        write_cache(DEFAULT_CACHE_PATH, manifest, snapshot)
+        write_cache(_cache_path(args), manifest, snapshot)
         if args.output:
             _write_json(Path(args.output), snapshot)
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})
@@ -892,6 +902,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             offline=False,
             max_age_seconds=args.max_age,
             fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+            cache_path=_cache_path(args),
         )
         source = resolution.freshness["source"]
         if source == "explicit":
@@ -1003,6 +1014,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         applied = apply_import_plan(
             plan,
@@ -1012,7 +1026,6 @@ def _dispatch(args: argparse.Namespace) -> int:
             unmanaged_issues=unmanaged,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        invalidate_cache()
         merged = merge_imported_items(fresh_manifest, plan.items)
         save_manifest(
             Path(args.manifest),
@@ -1072,6 +1085,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_plan(
             plan,
@@ -1081,7 +1097,6 @@ def _dispatch(args: argparse.Namespace) -> int:
             remote_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        invalidate_cache()
         payload = asdict(receipt)
         _print_json(payload)
         return 0
@@ -1169,6 +1184,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_iteration_plan(
             plan,
@@ -1178,7 +1196,6 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        invalidate_cache()
         verified = verify_iteration_apply(plan, fresh_manifest, reader.read())
         _print_json(
             {
@@ -1209,6 +1226,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_scaffold_plan(
             plan,
@@ -1218,7 +1238,6 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        invalidate_cache()
         _print_json(asdict(receipt))
         return 0
     raise AssertionError(f"Unhandled command: {args.command}")

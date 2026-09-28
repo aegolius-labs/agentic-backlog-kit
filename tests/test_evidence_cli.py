@@ -73,7 +73,7 @@ class ObserveCliTests(unittest.TestCase):
             self.assertEqual("abk-observed-state", document["contract"])
             self.assertEqual("gh", document["source"]["route"])
             self.assertEqual("T-1", document["items"][0]["item_id"])
-            self.assertTrue((root / DEFAULT_CACHE_PATH).exists())
+            self.assertTrue((root / "cache" / DEFAULT_CACHE_PATH.name).exists())
 
     def test_cache_hit_labels_the_route_as_cache(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -142,7 +142,7 @@ class ObserveCliTests(unittest.TestCase):
             self.assertEqual(0, result)
             self.assertEqual("offline-snapshot", document["source"]["route"])
             self.assertIn("observed_at", document)
-            self.assertFalse((root / DEFAULT_CACHE_PATH).exists())
+            self.assertFalse((root / "cache" / DEFAULT_CACHE_PATH.name).exists())
 
     def test_output_path_writes_the_document_and_prints_a_summary(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

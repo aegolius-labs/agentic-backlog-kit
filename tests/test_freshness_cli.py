@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 from agentic_backlog_kit.cli import main
@@ -71,7 +72,7 @@ class PrioritizeFreshnessCliTests(unittest.TestCase):
             self.assertEqual("fetched", payload["freshness"]["source"])
             self.assertIn("observed_at", payload["freshness"])
             self.assertIn("age_seconds", payload["freshness"])
-            cache = read_cache(root / DEFAULT_CACHE_PATH)
+            cache = read_cache(root / "cache" / DEFAULT_CACHE_PATH.name)
             self.assertIsNotNone(cache)
             self.assertEqual(snapshot, cache["snapshot"])
 
@@ -158,7 +159,7 @@ class PrioritizeFreshnessCliTests(unittest.TestCase):
             self.assertEqual(0, result)
             self.assertEqual("local-intent", payload["operational_state"])
             self.assertEqual({"source": "offline"}, payload["freshness"])
-            self.assertIsNone(read_cache(root / DEFAULT_CACHE_PATH))
+            self.assertIsNone(read_cache(root / "cache" / DEFAULT_CACHE_PATH.name))
 
     def test_offline_and_explicit_snapshot_are_rejected_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -210,7 +211,7 @@ class PrioritizeFreshnessCliTests(unittest.TestCase):
             failure = json.loads(err.getvalue())
             self.assertEqual("FreshnessError", failure["error"])
             self.assertIn("--offline", failure["message"])
-            self.assertIsNone(read_cache(root / DEFAULT_CACHE_PATH))
+            self.assertIsNone(read_cache(root / "cache" / DEFAULT_CACHE_PATH.name))
 
     def test_explicit_snapshot_reports_manifest_behind_for_an_unknown_managed_issue(
         self,
@@ -324,10 +325,11 @@ class PrioritizeFreshnessCliTests(unittest.TestCase):
 
 
 class ApplyInvalidatesCacheTests(unittest.TestCase):
-    def test_sync_apply_deletes_the_cache_after_a_successful_apply(self) -> None:
+    def _apply_with_executor(self, executor: Any) -> tuple[int | None, Path]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            manifest_path = root / "manifest.json"
+            manifest_path = root / "state" / "manifest.json"
+            manifest_path.parent.mkdir()
             plan_path = root / "plan.json"
             receipt_path = root / "receipt.json"
             data = manifest(item("T-1"))
@@ -339,38 +341,39 @@ class ApplyInvalidatesCacheTests(unittest.TestCase):
             reader = Mock()
             reader.return_value.read.return_value = snapshot
 
-            with _chdir(root):
-                cache_path = root / DEFAULT_CACHE_PATH
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                cache_path.write_text(
-                    json.dumps(
-                        {
-                            "cache_version": 1,
-                            "observed_at": "2026-01-01T00:00:00Z",
-                            "target": {
-                                "owner": "aegolius-labs",
-                                "repository": "example",
-                                "project_number": 1,
-                            },
-                            "snapshot": snapshot,
-                        }
-                    ),
-                    encoding="utf-8",
-                )
-                self.assertTrue(cache_path.exists())
+            # The cache lives beside the manifest, not in the working directory.
+            cache_path = manifest_path.parent / "cache" / DEFAULT_CACHE_PATH.name
+            cache_path.parent.mkdir(parents=True)
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "cache_version": 1,
+                        "observed_at": "2026-01-01T00:00:00Z",
+                        "target": {
+                            "owner": "aegolius-labs",
+                            "repository": "example",
+                            "project_number": 1,
+                        },
+                        "snapshot": snapshot,
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-                with (
-                    patch(
-                        "agentic_backlog_kit.cli._transport", return_value=object()
-                    ),
-                    patch("agentic_backlog_kit.cli.GitHubSnapshotReader", reader),
-                    patch("agentic_backlog_kit.cli.GitHubService"),
-                    patch(
-                        "agentic_backlog_kit.cli.GitHubPlanExecutor",
-                        return_value=lambda action: None,
-                    ),
-                    redirect_stdout(io.StringIO()),
-                ):
+            result: int | None = None
+            with (
+                _chdir(root),
+                patch("agentic_backlog_kit.cli._transport", return_value=object()),
+                patch("agentic_backlog_kit.cli.GitHubSnapshotReader", reader),
+                patch("agentic_backlog_kit.cli.GitHubService"),
+                patch(
+                    "agentic_backlog_kit.cli.GitHubPlanExecutor",
+                    return_value=executor,
+                ),
+                redirect_stdout(io.StringIO()),
+                redirect_stderr(io.StringIO()),
+            ):
+                try:
                     result = main(
                         [
                             "sync-apply",
@@ -384,9 +387,26 @@ class ApplyInvalidatesCacheTests(unittest.TestCase):
                             str(receipt_path),
                         ]
                     )
+                except RuntimeError:
+                    result = None
+            return result, cache_path.exists()
 
-                self.assertEqual(0, result)
-                self.assertFalse(cache_path.exists())
+    def test_sync_apply_deletes_the_cache_after_a_successful_apply(self) -> None:
+        result, cache_exists = self._apply_with_executor(lambda action: None)
+
+        self.assertEqual(0, result)
+        self.assertFalse(cache_exists)
+
+    def test_a_failed_apply_still_drops_the_cache_it_may_have_invalidated(
+        self,
+    ) -> None:
+        def fail(action: Any) -> None:
+            raise RuntimeError("GitHub refused the write")
+
+        result, cache_exists = self._apply_with_executor(fail)
+
+        self.assertNotEqual(0, result)
+        self.assertFalse(cache_exists)
 
 
 if __name__ == "__main__":
