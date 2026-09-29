@@ -30,8 +30,8 @@ from .freshness import (
     invalidate_cache,
     manifest_behind,
     resolve_snapshot,
+    try_write_cache,
     utc_now_iso,
-    write_cache,
 )
 from .importing import (
     ImportExecutor,
@@ -901,7 +901,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         # A manual snapshot reads the manifest's own target, so it doubles as
         # a refresh of the auto-fresh planning cache: the next planning
         # command need not refetch what an operator just pulled by hand.
-        write_cache(_cache_path(args), manifest, snapshot)
+        try_write_cache(_cache_path(args), manifest, snapshot)
         if args.output:
             _write_json(Path(args.output), snapshot)
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})

@@ -27,6 +27,8 @@ because snapshot content feeds plan fingerprints elsewhere in the kit.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -124,12 +126,41 @@ def write_cache(
         "snapshot": snapshot,
     }
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = cache_path.with_suffix(cache_path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(cache, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    # A unique temporary name, so two sessions refreshing at once never write
+    # through the same file; the last replace wins, and either copy is valid.
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{cache_path.name}.", suffix=".tmp", dir=cache_path.parent
     )
-    temporary.replace(cache_path)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(cache, indent=2, ensure_ascii=False) + "\n")
+        os.replace(temporary, cache_path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
     return cache
+
+
+def try_write_cache(
+    cache_path: Path,
+    manifest: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    observed_at: str | None = None,
+) -> str | None:
+    """Write the cache, returning why it could not be written instead of raising.
+
+    The cache only saves the next command a fetch. Failing to store it - a
+    read-only checkout, or Windows refusing a replace while another session
+    holds the file open - must never fail a command whose fresh read succeeded.
+    """
+
+    try:
+        write_cache(cache_path, manifest, snapshot, observed_at=observed_at)
+    except OSError as error:
+        return f"{type(error).__name__}: {error}"
+    return None
 
 
 def invalidate_cache(cache_path: Path = DEFAULT_CACHE_PATH) -> None:
@@ -220,6 +251,7 @@ def resolve_snapshot(
         return SnapshotResolution(None, {"source": "offline"})
 
     current = now or datetime.now(timezone.utc)
+    cache_error: str | None = None
     cache = read_cache(cache_path)
     if cache_is_fresh(cache, manifest, max_age_seconds, now=current):
         observed_at = cache["observed_at"]
@@ -242,7 +274,9 @@ def resolve_snapshot(
                 f"{error} Pass --offline for a local-intent preview instead."
             ) from error
         observed_at = utc_now_iso(now=current)
-        write_cache(cache_path, manifest, snapshot, observed_at=observed_at)
+        cache_error = try_write_cache(
+            cache_path, manifest, snapshot, observed_at=observed_at
+        )
         source = "fetched"
 
     age_seconds = max(0, int((current - _parse_iso(observed_at)).total_seconds()))
@@ -251,4 +285,6 @@ def resolve_snapshot(
         "observed_at": observed_at,
         "age_seconds": age_seconds,
     }
+    if source == "fetched" and cache_error is not None:
+        freshness["cache_not_written"] = cache_error
     return SnapshotResolution(snapshot, freshness)

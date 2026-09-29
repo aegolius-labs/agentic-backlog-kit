@@ -23,7 +23,9 @@ from agentic_backlog_kit.sync import (
     extract_guid,
     extract_item_id,
     render_issue_body,
+    compute_title_digest,
     render_marker,
+    render_written_comment,
     with_written_comment,
 )
 
@@ -205,7 +207,9 @@ class GuidSyncTests(unittest.TestCase):
 
     def test_existing_issues_without_a_guid_are_not_rewritten(self) -> None:
         local = item("T-1")
-        remote = _remote("T-1", render_issue_body(local))
+        remote = _remote(
+            "T-1", with_written_comment(local["title"], render_issue_body(local))
+        )
 
         plan = build_sync_plan(_v2(local), {"issues": [remote]})
 
@@ -219,17 +223,21 @@ class GuidSyncTests(unittest.TestCase):
         plan = build_sync_plan(_v2(local), {"issues": [remote]}, manage_body=False)
 
         update = next(action for action in plan.actions if action.kind == "issue.update")
+        # A preserved body is a person's prose, so the baseline vouches for the
+        # title only and never records a digest for the body.
         self.assertEqual(
-            with_written_comment(
-                local["title"],
-                f"Written by a person.\n\n{GUID_MARKER}\n\n- keep this list",
-            ),
+            f"Written by a person.\n\n{GUID_MARKER}\n\n- keep this list\n"
+            + render_written_comment(compute_title_digest(local["title"]), None),
             update.payload["body"],
         )
 
     def test_a_preserved_body_with_the_right_guid_is_left_alone(self) -> None:
         local = _with_guid("T-1")
-        remote = _remote("T-1", f"Anything at all.\n\n{GUID_MARKER}")
+        remote = _remote(
+            "T-1",
+            f"Anything at all.\n\n{GUID_MARKER}\n"
+            + render_written_comment(compute_title_digest(local["title"]), None),
+        )
 
         plan = build_sync_plan(_v2(local), {"issues": [remote]}, manage_body=False)
 
@@ -247,7 +255,9 @@ class GuidSyncTests(unittest.TestCase):
 
     def test_the_second_plan_after_writing_the_guid_is_empty(self) -> None:
         local = _with_guid("T-1")
-        remote = _remote("T-1", render_issue_body(local))
+        remote = _remote(
+            "T-1", with_written_comment(local["title"], render_issue_body(local))
+        )
 
         plan = build_sync_plan(_v2(local), {"issues": [remote]})
 

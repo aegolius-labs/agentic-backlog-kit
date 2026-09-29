@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from agentic_backlog_kit.freshness import (
     DEFAULT_MAX_AGE_SECONDS,
@@ -85,6 +86,41 @@ class CacheWrapperTests(unittest.TestCase):
             invalidate_cache(cache_path)
 
             self.assertFalse(cache_path.exists())
+
+
+class CacheWriteSafetyTests(unittest.TestCase):
+    def test_a_write_leaves_no_temporary_file_behind(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            cache_path = Path(directory) / "observed-snapshot.json"
+            write_cache(cache_path, manifest(item("T-1")), _snapshot())
+            write_cache(cache_path, manifest(item("T-1")), _snapshot())
+
+            self.assertEqual(
+                ["observed-snapshot.json"],
+                sorted(entry.name for entry in Path(directory).iterdir()),
+            )
+
+    def test_a_cache_that_cannot_be_written_does_not_fail_a_fresh_read(self) -> None:
+        snapshot = _snapshot(_issue("T-1", 1))
+        with tempfile.TemporaryDirectory() as directory:
+            cache_path = Path(directory) / "observed-snapshot.json"
+            with patch(
+                "agentic_backlog_kit.freshness.os.replace",
+                side_effect=PermissionError("[WinError 5] Access is denied"),
+            ):
+                resolution = resolve_snapshot(
+                    manifest(item("T-1")),
+                    snapshot_path=None,
+                    offline=False,
+                    max_age_seconds=DEFAULT_MAX_AGE_SECONDS,
+                    fetch_snapshot=lambda: snapshot,
+                    cache_path=cache_path,
+                )
+
+            self.assertEqual(snapshot, resolution.snapshot)
+            self.assertEqual("fetched", resolution.freshness["source"])
+            self.assertIn("PermissionError", resolution.freshness["cache_not_written"])
+            self.assertEqual([], list(Path(directory).iterdir()))
 
 
 class CacheFreshnessTests(unittest.TestCase):

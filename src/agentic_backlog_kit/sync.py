@@ -181,11 +181,23 @@ def compute_body_digest(content: str) -> str:
     return hashlib.sha256(_canonical_text(content).encode("utf-8")).hexdigest()[:16]
 
 
-def render_written_comment(title_digest: str, body_digest: str) -> str:
-    return (
-        f"{WRITTEN_PREFIX}{WRITTEN_VERSION};title={title_digest};body={body_digest}"
-        f"{WRITTEN_SUFFIX}"
-    )
+def render_written_comment(
+    title_digest: str | None, body_digest: str | None
+) -> str:
+    """Render the baseline, recording only the fields the kit can vouch for.
+
+    A field is omitted rather than guessed when no trustworthy digest exists
+    for it - a preserved body the kit never wrote, for one - so a later reader
+    sees that field as having no baseline instead of trusting prose nobody
+    reviewed.
+    """
+
+    fields = [WRITTEN_VERSION]
+    if title_digest is not None:
+        fields.append(f"title={title_digest}")
+    if body_digest is not None:
+        fields.append(f"body={body_digest}")
+    return f"{WRITTEN_PREFIX}{';'.join(fields)}{WRITTEN_SUFFIX}"
 
 
 def with_written_comment(title: str, body: str) -> str:
@@ -210,10 +222,11 @@ def _is_hex16(value: str) -> bool:
 def extract_written_digests(body: str | None) -> tuple[str | None, str | None]:
     """Return the written-comment's (title_digest, body_digest).
 
-    Both come back `None` when the body carries no comment, an unknown
-    version, or anything malformed: an unreadable baseline is treated exactly
-    like an absent one, so the next write installs a fresh, readable one
-    rather than planning against a comment it cannot trust.
+    Each is `None` when the comment does not record it. Both come back `None`
+    when the body carries no comment, an unknown version, or anything
+    malformed: an unreadable baseline is treated exactly like an absent one,
+    so the next plan installs a fresh, readable one rather than planning
+    against a comment it cannot trust.
     """
 
     if not body:
@@ -225,23 +238,21 @@ def extract_written_digests(body: str | None) -> tuple[str | None, str | None]:
     end = body.find(WRITTEN_SUFFIX, start)
     if end < 0:
         return None, None
-    inner = body[start:end].strip()
-    parts = inner.split(";")
+    parts = body[start:end].strip().split(";")
     if not parts or parts[0] != WRITTEN_VERSION:
         return None, None
     fields: dict[str, str] = {}
     for part in parts[1:]:
         key, separator, value = part.partition("=")
-        if not separator:
+        key, value = key.strip(), value.strip()
+        if not separator or key not in {"title", "body"} or key in fields:
             return None, None
-        fields[key.strip()] = value.strip()
-    title_digest = fields.get("title")
-    body_digest = fields.get("body")
-    if not title_digest or not body_digest:
+        if not _is_hex16(value):
+            return None, None
+        fields[key] = value
+    if not fields:
         return None, None
-    if not (_is_hex16(title_digest) and _is_hex16(body_digest)):
-        return None, None
-    return title_digest, body_digest
+    return fields.get("title"), fields.get("body")
 
 
 def render_issue_body(item: dict[str, Any]) -> str:
@@ -539,34 +550,35 @@ def _issue_title_body_plan(
     the manifest's value regardless, which also lets its digest refresh.
     """
 
-    remote_title = remote.get("title")
+    remote_title = remote.get("title") or ""
     remote_body = remote.get("body")
     remote_content = _strip_written_comment(remote_body)
     old_title_digest, old_body_digest = extract_written_digests(remote_body)
-    current_title_digest = compute_title_digest(remote_title or "")
+    current_title_digest = compute_title_digest(remote_title)
     current_body_digest = compute_body_digest(remote_content)
 
     title_differs = remote_title != item["title"]
-    title_edited = (
-        old_title_digest is not None and old_title_digest != current_title_digest
+    title_held = (
+        old_title_digest is not None
+        and old_title_digest != current_title_digest
+        and title_differs
     )
-    title_held = title_edited and title_differs
 
     if manage_body:
         candidate_content = _canonical_text(desired_body)
         body_differs = remote_content != candidate_content
-        body_edited = (
-            old_body_digest is not None and old_body_digest != current_body_digest
+        # A comment that vouches for the title but not the body was written
+        # while the body was preserved: that prose is a person's, never the
+        # kit's, so switching to a managed body must not overwrite it unasked.
+        body_unvouched = old_title_digest is not None and old_body_digest is None
+        body_held = body_differs and (
+            body_unvouched
+            or (old_body_digest is not None and old_body_digest != current_body_digest)
         )
-        body_held = body_edited and body_differs
     else:
         # A preserved body still carries the kit's marker, so the GUID is
-        # corrected in place without touching anything else in it - and only
-        # when it is actually wrong, so an untouched issue whose GUID already
-        # trivially matches (both absent) is not rewritten just to add a
-        # marker it never had. This is never held: the kit isn't protecting a
-        # human edit from its own arbitrary-content management, because it
-        # does not do any.
+        # corrected in place without touching anything else in it. Its prose is
+        # never held, because the kit does not manage it.
         guid_mismatch = extract_guid(remote_body) != item.get("guid")
         candidate_content = (
             _canonical_text(with_marker(remote_content, item))
@@ -576,49 +588,49 @@ def _issue_title_body_plan(
         body_held = False
 
     was_any_field_held = title_held or body_held
-    effective_title_held = title_held and not overwrite
-    effective_body_held = body_held and not overwrite
+    keep_title = title_held and not overwrite
+    keep_body = body_held and not overwrite
 
-    final_title = remote_title if effective_title_held else item["title"]
-    final_content = remote_content if effective_body_held else candidate_content
+    final_title = remote_title if keep_title else item["title"]
+    final_content = remote_content if keep_body else candidate_content
+
+    # The digest each field is left with. A kept (held) field carries its
+    # recorded digest forward, so it stays held after the other field is
+    # rewritten. Any other field now holds exactly what the manifest wants, so
+    # its current value is the trusted baseline: that covers a fresh write, an
+    # issue created before baselines existed, and a GitHub edit the manifest
+    # has since accepted - which would otherwise keep a stale digest and hold
+    # the owner's next legitimate change as if a person had made it.
+    title_digest = (
+        old_title_digest if keep_title else compute_title_digest(final_title)
+    )
+    if not manage_body:
+        # A preserved body's prose was never reviewed against any manifest,
+        # so it is never promoted to a trusted baseline. Otherwise a later
+        # switch to a managed body would overwrite that prose with no hold.
+        body_digest = old_body_digest
+    elif keep_body:
+        body_digest = old_body_digest
+    else:
+        body_digest = compute_body_digest(final_content)
 
     title_changing = final_title != remote_title
     content_changing = final_content != remote_content
+    baseline_changing = (title_digest, body_digest) != (
+        old_title_digest,
+        old_body_digest,
+    )
 
     issue_changes: dict[str, Any] = {}
     if title_changing:
         issue_changes["title"] = final_title
+    if title_changing or content_changing or baseline_changing:
+        comment = render_written_comment(title_digest, body_digest)
+        new_body = f"{final_content}\n{comment}" if final_content else comment
+        if new_body != _canonical_text(remote_body or ""):
+            issue_changes["body"] = new_body
 
-    # Only rewrite the body when the title or the content is actually
-    # changing. A missing or stale written-comment baseline is not, on its
-    # own, a reason to touch an issue that otherwise needs nothing: the kit
-    # installs (or refreshes) the comment opportunistically, alongside a
-    # write it was already making, rather than forcing one.
-    if title_changing or content_changing:
-        final_title_digest = (
-            compute_title_digest(final_title)
-            if title_changing
-            else (
-                old_title_digest if old_title_digest is not None else current_title_digest
-            )
-        )
-        final_body_digest = (
-            compute_body_digest(final_content)
-            if content_changing
-            else (
-                old_body_digest if old_body_digest is not None else current_body_digest
-            )
-        )
-        new_comment = render_written_comment(final_title_digest, final_body_digest)
-        new_full_body = (
-            f"{final_content}\n{new_comment}" if final_content else new_comment
-        )
-        if new_full_body != _canonical_text(remote_body or ""):
-            issue_changes["body"] = new_full_body
-
-    held_fields = (["title"] if effective_title_held else []) + (
-        ["body"] if effective_body_held else []
-    )
+    held_fields = (["title"] if keep_title else []) + (["body"] if keep_body else [])
     return issue_changes, held_fields, was_any_field_held
 
 

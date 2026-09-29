@@ -94,7 +94,9 @@ class SyncPlanningTests(unittest.TestCase):
                     "abk_id": "T-1",
                     "number": 42,
                     "title": "Ship it",
-                    "body": "",
+                    "body": render_written_comment(
+                        compute_title_digest("Ship it"), None
+                    ),
                     "type": "Task",
                     "state": "open",
                     "in_project": True,
@@ -228,8 +230,16 @@ class SyncPlanningTests(unittest.TestCase):
             ]
         }
         reviewed = build_sync_plan(data, before, manage_body=False)
+        # The first action wrote the title and, with it, the baseline comment.
+        first = next(a for a in reviewed.actions if a.kind == "issue.update")
         after_first_action = {
-            "issues": [{**before["issues"][0], "title": "New title"}]
+            "issues": [
+                {
+                    **before["issues"][0],
+                    "title": first.payload["title"],
+                    "body": first.payload["body"],
+                }
+            ]
         }
 
         with self.assertRaisesRegex(ApplyAuthorizationError, "drift"):
@@ -392,8 +402,97 @@ class RemoteEditHoldTests(unittest.TestCase):
 
         plan = build_sync_plan(manifest(local_item), remote)
 
+        # Nothing is held, and the only write refreshes the stale baseline:
+        # the content GitHub holds is already what the manifest wants.
         self.assertEqual([], plan.held_remote_edits)
-        self.assertEqual([], [a for a in plan.actions if a.kind == "issue.update"])
+        updates = [a for a in plan.actions if a.kind == "issue.update"]
+        self.assertEqual(1, len(updates))
+        self.assertNotIn("title", updates[0].payload)
+        self.assertEqual(self._baseline(local_item), updates[0].payload["body"])
+
+    @staticmethod
+    def _applied(remote_issue: dict, plan) -> dict:
+        """Replay a plan's title/body writes onto one remote issue."""
+
+        applied = dict(remote_issue)
+        for action in plan.actions:
+            if action.kind == "issue.update":
+                for key in ("title", "body"):
+                    if key in action.payload:
+                        applied[key] = action.payload[key]
+        return applied
+
+    def test_an_accepted_github_edit_does_not_hold_the_next_manifest_change(
+        self,
+    ) -> None:
+        # A person retitles the issue on GitHub, and the manifest owner accepts
+        # it by updating the manifest to match.
+        written = item("T-1", title="Ship it")
+        edited_remote = _remote(
+            "T-1", title="Ship it now", body=self._baseline(written)
+        )
+        accepted = item("T-1", title="Ship it now")
+
+        refresh = build_sync_plan(manifest(accepted), {"issues": [edited_remote]})
+
+        self.assertEqual([], refresh.held_remote_edits)
+        refreshed = self._applied(edited_remote, refresh)
+        self.assertEqual("Ship it now", refreshed["title"])
+
+        # The owner's own next change is an ordinary update, not a held edit.
+        changed = item("T-1", title="Ship it today")
+        plan = build_sync_plan(manifest(changed), {"issues": [refreshed]})
+
+        self.assertEqual([], plan.held_remote_edits)
+        update = next(a for a in plan.actions if a.kind == "issue.update")
+        self.assertEqual("Ship it today", update.payload["title"])
+
+    def test_an_issue_written_before_baselines_gets_one_without_other_changes(
+        self,
+    ) -> None:
+        local_item = item("T-1", title="Ship it")
+        legacy = _remote("T-1", title="Ship it", body=render_issue_body(local_item))
+
+        plan = build_sync_plan(manifest(local_item), {"issues": [legacy]})
+
+        updates = [a for a in plan.actions if a.kind == "issue.update"]
+        self.assertEqual(1, len(updates))
+        self.assertNotIn("title", updates[0].payload)
+        self.assertEqual(self._baseline(local_item), updates[0].payload["body"])
+
+        settled = build_sync_plan(
+            manifest(local_item), {"issues": [self._applied(legacy, plan)]}
+        )
+        self.assertEqual([], [a for a in settled.actions if a.kind == "issue.update"])
+
+    def test_a_preserved_body_is_never_vouched_for_and_is_held_after_a_mode_switch(
+        self,
+    ) -> None:
+        local_item = item("T-1", title="Ship it")
+        prose = "Written by a person, not the kit."
+        remote = _remote("T-1", title="Old title", body=prose)
+
+        preserved = build_sync_plan(
+            manifest(local_item), {"issues": [remote]}, manage_body=False
+        )
+        written = self._applied(remote, preserved)
+
+        title_digest, body_digest = extract_written_digests(written["body"])
+        self.assertEqual(compute_title_digest("Ship it"), title_digest)
+        self.assertIsNone(body_digest)
+
+        managed = build_sync_plan(manifest(local_item), {"issues": [written]})
+
+        self.assertEqual(["body"], managed.held_remote_edits[0]["fields"])
+        self.assertEqual([], [a for a in managed.actions if a.kind == "issue.update"])
+
+        overwritten = build_sync_plan(
+            manifest(local_item),
+            {"issues": [written]},
+            overwrite_remote_edits=["T-1"],
+        )
+        update = next(a for a in overwritten.actions if a.kind == "issue.update")
+        self.assertEqual(self._baseline(local_item), update.payload["body"])
 
     def test_crlf_normalization_does_not_register_as_an_edit(self) -> None:
         local_item = item("T-1", title="Ship it")

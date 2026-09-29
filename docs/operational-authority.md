@@ -96,8 +96,9 @@ Each of these, with no extra flags, resolves operational state in this order:
    says - unchanged from before R35.
 2. **`--offline`**, if given, uses local intent only. No snapshot is read or
    written. This is the previous default, now explicit.
-3. **Otherwise (the new default): auto.** A small cache at
-   `.agentic-backlog/cache/observed-snapshot.json` (gitignored) is reused when
+3. **Otherwise (the new default): auto.** A small cache in `cache/` beside the
+   manifest (`.agentic-backlog/cache/observed-snapshot.json` for the default
+   manifest, gitignored) is reused when
    it is younger than `--max-age SECONDS` (default 300) and targets the same
    owner/repository/project the manifest declares. Otherwise the command
    fetches a fresh snapshot the same way `abk snapshot` does, uses it, and
@@ -118,6 +119,12 @@ that already reads it is unaffected. `freshness.source` says how that state was
 obtained: `cache` (reused), `fetched` (just read), `explicit` (an exact
 snapshot file), or `offline`.
 
+The cache only saves the next command a fetch, so failing to store it never
+fails a command whose fresh read succeeded. A read-only checkout, or Windows
+refusing a replace while another session holds the file, adds
+`freshness.cache_not_written` with the reason. Concurrent sessions each write
+through their own temporary file, and the last complete write wins.
+
 Add `--report-operational-drift` to see exactly what differed, same as before.
 
 ### A failed auto-fetch fails closed
@@ -131,9 +138,10 @@ kit would rather ask than guess.
 ### Every write invalidates the cache
 
 `sync-apply`, `import-apply`, `scaffold-apply`, `iteration-apply`, and
-`init-apply` delete the cache after a successful apply, so the very next
+`init-apply` delete the cache before their first write, so the very next
 planning command refetches rather than answering from the state that write
-just changed. `abk snapshot` also refreshes the cache as a side effect, since
+just changed. Deleting it before rather than after matters: an apply that
+fails partway has still changed GitHub. `abk snapshot` also refreshes the cache as a side effect, since
 it reads the manifest's own target anyway.
 
 ### Offline preview is a preview
@@ -241,6 +249,11 @@ overlap, and the identity marker byte layout does not change. The comment is
 parsed defensively: an unrecognized version or anything malformed is treated
 as no baseline at all, the same as an issue that was never written this way.
 
+A field's digest is recorded only when the kit can vouch for it, which means
+GitHub holds exactly what the manifest wants for that field. A preserved body
+is a person's prose and is never vouched for, so under `--preserve-body` the
+comment carries the title alone: `written=v1;title=<16 hex chars>`.
+
 **Detection, per field.** The next `sync-plan` recomputes each field's digest
 from the remote issue's *current* title and body content and compares it with
 the digest the remote's comment still carries for that field:
@@ -267,11 +280,19 @@ the digest the remote's comment still carries for that field:
   unheld body update, and vice versa. Type, label, and Project field actions
   for the same item are unaffected either way.
 - **Does not match, but the field already equals what the manifest
-  wants** - nothing to do for that field: no hold, no action.
+  wants** - the edit has been accepted into the manifest. Nothing is held,
+  and the plan refreshes the baseline to the accepted value, as a
+  comment-only body update. Without that refresh the stale digest would hold
+  the owner's next legitimate change as if a person had made it.
 - **No baseline for that field** (comment missing or unreadable) - every
-  issue written before this feature falls here for both fields. The kit
-  behaves exactly as it did previously: the field is planned, and the next
-  write that touches this issue installs a baseline for it.
+  issue written before this feature falls here for both fields. There is
+  nothing to compare against, so the field is planned exactly as before, and
+  that write installs a baseline. An issue that already matches the manifest
+  gets a comment-only update installing one.
+- **The title is vouched for but the body is not** - the comment was written
+  while the body was preserved. When the body is managed again, it is held
+  rather than overwritten: that prose is a person's, and switching modes is
+  not a decision to discard it.
 
 When only one field is held and the other is being written anyway, the body
 still has to be rewritten to keep the held field's own digest legible: it is
@@ -287,7 +308,7 @@ recorded title digest.
 `--preserve-body` never holds the body: the kit only ever touches the
 identity marker there, never arbitrary prose, so there is no kit-managed
 content for a human edit to conflict with. Its title is held on the same
-terms as a managed body's.
+terms as a managed body's, and its body is never given a digest.
 
 Held edits are folded into the plan digest, so a plan reviewed with one held
 field cannot later be silently re-confirmed against a plan without it.
@@ -310,13 +331,18 @@ description to match what is now on GitHub, and the next plan finds nothing
 to hold for that field.
 
 **Migration note.** An issue the kit wrote before 2026-09-28 has no baseline
-comment yet. Nothing breaks: the first `sync-plan` after upgrading plans its
-title/body exactly as it would have before, and the write that applies it
-installs the issue's first baseline. From then on, an edit made directly on
-GitHub is detected and held. There is no mass rewrite to backfill a baseline
-onto every existing issue at once, and that is intentional - an issue nobody
-is touching stays untouched, and the baseline arrives the same way every other
-correction does, as a side effect of the kit's next legitimate write to it.
+comment yet, so until it gets one, a person's edit to it cannot be told apart
+from a manifest change. The owner chose on 2026-09-29 to close that window at
+once rather than issue by issue: the first `sync-plan` after upgrading
+includes one comment-only `issue.update` for every managed issue that already
+matches the manifest, installing its baseline. The plan is reviewed and
+digest-confirmed like any other. GitHub marks each of those issues as
+edited but does not notify watchers. From then on, an edit made directly on
+GitHub is detected and held.
+
+An issue that differs from the manifest at upgrade time is still planned, not
+held, because nothing records whether a person or the manifest moved it. Read
+the first post-upgrade plan's title and body updates with that in mind.
 
 **Known limit: deleting the comment.** The baseline lives entirely inside the
 issue body, so a person who deletes that hidden comment (deliberately or by
