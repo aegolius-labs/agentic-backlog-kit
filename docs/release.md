@@ -20,6 +20,24 @@ stopped safely after deleting Project #4 when the following repository deletion
 failed; no retry or API-target action occurred. Remaining cleanup requires a
 new plan and is not part of the successful R07 release result.
 
+## Repository governance
+
+Decided by the owner on 2026-10-01. Pull requests merge by squash only, with
+the PR title as the commit title, so each PR's title is the single Conventional
+Commit the release calculator reads. Repository rulesets, not classic branch
+protection, hold the rules:
+
+- `main`: pull request required, one approving Code Owner review
+  (`.github/CODEOWNERS`), stale approvals dismissed, conversations resolved,
+  linear history, the `test` check up to date, CodeQL results gating, no force
+  push or deletion. Repository admins may bypass only through a pull request,
+  so the owner can merge their own PRs but nobody pushes to `main` directly.
+- `v*` tags: no update or deletion; creation only by GitHub Actions, which is
+  how `release_assets.py` mints each release tag.
+
+Fork pull requests from any outside collaborator wait for approval before
+Actions run.
+
 ## Ongoing organization-managed releases
 
 The shared workflows merged in [organization PR #4](https://github.com/aegolius-labs/.github/pull/4)
