@@ -32,8 +32,9 @@ protection, hold the rules:
   linear history, the `test` check up to date, CodeQL results gating, no force
   push or deletion. Repository admins may bypass only through a pull request,
   so the owner can merge their own PRs but nobody pushes to `main` directly.
-- `v*` tags: no update or deletion; creation only by GitHub Actions, which is
-  how `release_assets.py` mints each release tag.
+- `v*` tags: no update or deletion, with no bypass. Creation stays open to
+  writers because GitHub does not accept the GitHub Actions app as a ruleset
+  bypass actor, and `release_assets.py` mints each tag with the Actions token.
 
 Fork pull requests from any outside collaborator wait for approval before
 Actions run.
