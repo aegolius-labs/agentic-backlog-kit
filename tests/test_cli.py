@@ -472,6 +472,7 @@ class CliTests(unittest.TestCase):
                             str(manifest_path),
                             "--limit",
                             "1",
+                            "--offline",
                         ]
                     ),
                 )

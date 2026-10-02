@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aegolius-labs/agentic-backlog-kit/schemas/observed-state.schema.json",
+  "title": "Agentic Backlog Kit observed-state evidence",
+  "description": "Evidence about GitHub's current state for issues this kit manages - never intent. A consumer folds this into its own model of reality (an observation), and must never treat it as an edit to what should be built. See docs/observed-state.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract", "contract_version", "observed_at", "source", "target",
+    "items", "unmanaged_issue_count", "digest"
+  ],
+  "properties": {
+    "contract": { "const": "abk-observed-state" },
+    "contract_version": { "type": "integer", "minimum": 1 },
+    "observed_at": {
+      "type": "string",
+      "description": "UTC ISO-8601 timestamp ending in Z",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "version", "route"],
+      "properties": {
+        "tool": { "const": "agentic-backlog-kit" },
+        "version": { "type": "string", "minLength": 1 },
+        "route": {
+          "description": "How the data was obtained: a resolved --backend for a fresh fetch, 'cache' for the auto-refreshed cache, or 'offline-snapshot' for an exact file.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "repository", "project_number"],
+      "properties": {
+        "owner": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "minLength": 1 },
+        "project_number": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "unmanaged_issue_count": { "type": "integer", "minimum": 0 },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id", "guid", "issue_number", "state", "status", "sprint",
+        "in_project", "in_manifest"
+      ],
+      "properties": {
+        "item_id": { "type": "string", "minLength": 1 },
+        "guid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            { "type": "null" }
+          ]
+        },
+        "issue_number": { "type": "integer", "minimum": 1 },
+        "url": { "type": "string", "minLength": 1 },
+        "state": { "enum": ["open", "closed"] },
+        "closed_at": { "type": "string" },
+        "status": { "type": ["string", "null"] },
+        "sprint": { "type": ["string", "null"] },
+        "in_project": { "type": "boolean" },
+        "in_manifest": { "type": "boolean" }
+      }
+    }
+  }
+}

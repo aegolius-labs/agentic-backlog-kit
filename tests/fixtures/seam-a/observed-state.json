@@ -1,0 +1,30 @@
+{
+  "contract": "abk-observed-state",
+  "contract_version": 1,
+  "observed_at": "2026-09-28T12:00:00Z",
+  "source": {
+    "tool": "agentic-backlog-kit",
+    "version": "0.2.0",
+    "route": "gh"
+  },
+  "target": {
+    "owner": "aegolius-labs",
+    "repository": "example",
+    "project_number": 1
+  },
+  "items": [
+    {
+      "item_id": "F-SEAM-A",
+      "guid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "issue_number": 42,
+      "state": "open",
+      "status": "Ready",
+      "sprint": "Sprint 4",
+      "in_project": true,
+      "in_manifest": true,
+      "url": "https://github.com/aegolius-labs/example/issues/42"
+    }
+  ],
+  "unmanaged_issue_count": 2,
+  "digest": "sha256:4a66a0b97546a4b9b9a8109d3bbbfc51801278c89f30f2eece7c93b873627eac"
+}

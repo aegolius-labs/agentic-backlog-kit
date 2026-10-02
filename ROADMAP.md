@@ -114,6 +114,18 @@ release fixture.
 engine ready and the product not: 3 of 12 gates met and 3 partly met. The gaps are
 filed as R28-R34 under `EPIC-PROD`, and the owner put scale ahead of R10.
 
+**2026-09-28.** The owner asked why the manifest showed shipped stories as
+`Ready`. That is D1 working as designed - the manifest never records
+observations - but it exposed three real gaps: planning answered from stale
+local intent unless someone remembered to pass a snapshot, a teammate's GitHub
+edit to a managed title or body was proposed for reversion by the next sync,
+and aio-agentic-sdlc had no defined format for GitHub observations to return as
+evidence. The owner decided all three the same day, filed as **R35** under
+`EPIC-PROD`: planning is fresh by default with `--offline` explicit (S-R35-1),
+human edits are detected and held (S-R35-2), and `abk observe` exports a
+versioned `abk-observed-state` evidence contract (S-R35-3). The aio-agentic-sdlc
+consumer of that contract belongs to that repository.
+
 Outstanding product work: **R28** and **R29** (scale and GitHub lag), then
 installation and evaluation (**R30**-**R32**), then **R10**, then the stability
 policy and an outside pilot (**R33**, **R34**). Outstanding operations work,
@@ -148,7 +160,7 @@ What shipped is recorded after the fact.
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
 | Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R25 ready, R10 refined into four stories |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
-| Production readiness | R28-R34 | pending | Filed 2026-09-24 from the [readiness report](docs/production-readiness-2026-09-24.md); scale first |
+| Production readiness | R28-R35 | pending | Filed 2026-09-24 from the [readiness report](docs/production-readiness-2026-09-24.md); scale first. R35 added 2026-09-28 |
 | Unscheduled | R12, R24 | - | Deferred |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
