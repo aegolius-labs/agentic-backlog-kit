@@ -93,7 +93,7 @@ jobs:
         run: python scripts/release_inventory.py
       - name: Preserve the exact bundle for publication and recovery
         id: bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-bundle-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-bundle/
