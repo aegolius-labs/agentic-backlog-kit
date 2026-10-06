@@ -1,4 +1,4 @@
-# Token and byte benchmarks
+# Token, byte and API-call benchmarks
 
 R09 uses a deterministic, model-free benchmark to protect the context shape of
 the local backlog commands. Run it from the repository root with:
@@ -8,7 +8,9 @@ python scripts/benchmark.py --check
 ```
 
 The command generates the same 100-, 1,000-, and 10,000-item fixtures on every
-run. It does not contact GitHub and does not make model calls. A report can be
+run for byte budgets, and 100-, 1,000- and 5,000-issue fixtures for
+[API-call budgets](#api-call-budgets). It does not contact GitHub and does not
+make model calls. A report can be
 saved for review with `--output path/to/report.json`; the report includes a
 SHA-256 digest for every serialized payload so a byte-count change is easy to
 trace.
@@ -61,7 +63,9 @@ the retained and carryover lists as well, which is what keeps the 1,000- and
 10,000-item cases flat at roughly 8 KB instead of scaling with the backlog.
 
 The current report SHA-256 is
-`df5cf57d650ae5d584137ec937b00ca9b910f18360f49a83572f6e55644b2955`.
+`1a41f3f9e1022667c00d5e70294bbea83ad3a444bac1451ce899cd4a9647aca7`. It covers
+the API-call section below as well; the byte measurements in the table are
+unchanged by S-R28-3.
 
 | Operation | 100 items | 1,000 items | 10,000 items |
 | --- | ---: | ---: | ---: |
@@ -87,12 +91,73 @@ envelopes chosen to keep model-facing responses bounded:
 | `sprint-plan` | 8,192 | 58 | 588,192 |
 | `sprint-plan-compact` (`--skipped-limit 50`) | 8,192 | 0 | 8,192 |
 | `snapshot` artifact | 16,384 | 900 | 9,016,384 |
-| cold `sync-plan` artifact | 16,384 | 750 | 7,516,384 |
+| cold `sync-plan` artifact | 16,384 | 815 | 8,166,384 |
 
 The `--check` gate fails when any measured compact payload exceeds its
 operation envelope. Because the budgets are byte-based and the fixture is
 fixed, the check is CI-friendly and does not depend on network state or model
 availability.
+
+## API-call budgets
+
+GitHub rate-limits by request, so a change that adds one call per issue is
+invisible to the byte budgets yet caps how large a backlog can sync in an hour.
+S-R28-3 counts transport calls for each phase at 100, 1,000 and 5,000 issues
+and fails `--check` when a phase exceeds its budget.
+
+The counts come from running the real snapshot reader, sync planner and plan
+executor against an in-memory repository and organization Project
+(`agentic_backlog_kit.api_benchmark.SimulatedGitHub`). It answers exactly the
+REST and GraphQL requests those components send and fails on any other, so a
+new kind of call cannot go uncounted. It does not contact GitHub, and the
+counts are a pure function of the fixture. Use `--api-size` to measure other
+sizes.
+
+The phases are:
+
+- `snapshot`: one `snapshot` read of the converged repository.
+- `plan`: `sync-plan` against that snapshot. Planning is pure and must make no
+  call.
+- `apply`: `sync-apply` of the resulting empty plan, which is the refresh read
+  plus the capability check.
+- `cold-apply`: `sync-apply` of a cold plan against an empty repository, so
+  every item is created, added to the Project and written.
+
+The benchmark also checks that the cold apply converges: re-planning against
+the repository it produced must yield no actions.
+
+Each cell is total calls (REST + GraphQL):
+
+| Phase | 100 issues | 1,000 issues | 5,000 issues |
+| --- | ---: | ---: | ---: |
+| `snapshot` | 5 (2 + 3) | 41 (11 + 30) | 201 (51 + 150) |
+| `plan` | 0 | 0 | 0 |
+| `apply` (converged) | 5 (2 + 3) | 41 (11 + 30) | 201 (51 + 150) |
+| `cold-apply` | 845 (123 + 722) | 8,423 (1,221 + 7,202) | 42,107 (6,105 + 36,002) |
+
+Reads are paged: one issue-listing page per 100 issues, one Project page per
+100 items and one batched relationship query per 50 issues (S-R28-1), about 40
+calls per 1,000 issues. Writes are not: a cold apply costs one issue creation,
+one Project add, and one field write per Project field for every item, plus a
+call for each dependency. That is about 8.4 calls per issue, and no batching
+endpoint exists for those mutations. A 5,000-issue cold sync is therefore a
+multi-hour operation under GitHub's secondary limits, while a steady-state
+sync of the same backlog costs about 200 calls.
+
+Budgets are a fixed allowance plus an allowance per 1,000 issues, rounded up:
+
+| Phase | Fixed allowance | Per 1,000 issues | 5,000-issue envelope |
+| --- | ---: | ---: | ---: |
+| `snapshot` | 4 | 50 | 254 |
+| `plan` | 0 | 0 | 0 |
+| `apply` (converged) | 4 | 50 | 254 |
+| `cold-apply` | 8 | 8,600 | 43,008 |
+
+The read budgets leave about 25% headroom over the paged slope. A regression to
+one read per issue adds 1,000 calls per 1,000 issues and fails at every size.
+The cold-apply headroom is kept below one call per issue, so losing the cached
+Project metadata or adding a per-item write fails the check rather than
+hiding inside the allowance.
 
 ## Interpreting large artifacts
 
