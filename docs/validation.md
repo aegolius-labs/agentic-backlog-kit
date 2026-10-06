@@ -370,3 +370,42 @@ evaluation assets, not product releases.
 [The GH-63 validation record](adoption-live-validation-2026-09-22.md) links to
 `abk-adopt-eval-20260922`; those links now 404, and the record's own evidence -
 command output and receipts - is unaffected.
+
+## Remote install (S-R30-1, 2026-10-06)
+
+Both hosts installed the plugin directly from `aegolius-labs/agentic-backlog-kit`
+on GitHub, each into an empty home directory (`HOME`, and `CODEX_HOME` for
+Codex) with no clone of this repository, on Linux.
+
+| Host | Version | Commands | Result |
+| --- | --- | --- | --- |
+| Claude Code | 2.1.290 | `claude plugin marketplace add aegolius-labs/agentic-backlog-kit`, then `claude plugin install agentic-backlog-kit@aegolius-labs-backlog` | Cloned, validated and added marketplace `aegolius-labs-backlog`; installed at user scope; `claude plugin list` shows it enabled at 0.2.0 |
+| Codex CLI | 0.160.1 | `codex plugin marketplace add aegolius-labs/agentic-backlog-kit`, then `codex plugin add agentic-backlog-kit@aegolius-labs-backlog` | Added the Git marketplace; `codex plugin list` shows `installed, enabled` at 0.2.0 |
+
+On both hosts the installed cache held all six skills: `backlog-adopt`,
+`backlog-ingest`, `backlog-init`, `backlog-prioritize`, `backlog-sprint-plan`
+and `backlog-sync-github`. Codex reads the marketplace from
+`.claude-plugin/marketplace.json` and the plugin from `.codex-plugin/plugin.json`,
+so the one marketplace file serves both hosts. Pinning a tag also worked on both
+(`#v0.14.1` for Claude Code, `--ref v0.14.1` for Codex); Claude Code recorded the
+tag's commit, `803b93b`.
+
+**Updates.** A marker line was pushed to a test branch after installing from it.
+
+- Codex: `codex plugin marketplace upgrade` refreshed the installed copy; the
+  marker appeared.
+- Claude Code: `claude plugin marketplace update` refreshed the marketplace
+  clone, but `claude plugin update` answered "already at the latest version
+  (0.2.0)" and kept the old copy. Claude Code keys its cache on the manifest
+  version, and the tree's version never changes because releases stamp it only
+  into the built artifacts ([release.md](release.md)). Uninstalling and
+  reinstalling picked up the marker. With `version` removed from the two Claude
+  manifests, a local test showed `claude plugin update` versioning by commit SHA
+  (`0.2.0` to `a42e719e5e89`) and delivering each change.
+
+The README documents the reinstall step. Changing how the Claude manifests carry
+a version touches the release contract and the manifest parity test, so it is
+left to a separate change.
+
+Not covered: Windows and macOS, and the skills actually triggering in a live
+session. Session-level behavior is S-R31-1 and S-R31-2.
