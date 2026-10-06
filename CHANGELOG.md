@@ -6,6 +6,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Documentation
+
+- The README installs from GitHub first on both hosts, with no clone, and says
+  how to take updates in Claude Code, where `claude plugin update` keeps the old
+  copy because the manifest version is fixed (S-R30-1).
+
 ### Changed
 
 - Snapshots read issue relationships in batched GraphQL instead of two REST

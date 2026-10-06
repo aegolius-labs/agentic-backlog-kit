@@ -17,15 +17,37 @@ The kit combines focused skills with a zero-runtime-dependency Python engine. Ag
 
 GitHub currently supports nested sub-issues, issue dependencies, issue types, Project iteration fields, and programmatic Project views. The kit maps directly to those native capabilities rather than encoding relationships only in issue text. See the [GitHub Issues documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/learning-about-issues/about-issues) and [Project view API](https://docs.github.com/en/rest/projects/views).
 
-## Install for local plugin testing
+## Install
 
 The kit ships one thin manifest per supported host over a single shared
-`skills/` directory.
+`skills/` directory. Both hosts install it straight from this GitHub
+repository, with no clone. Both routes were verified from clean host homes on
+2026-10-06; see [docs/validation.md](docs/validation.md#remote-install-s-r30-1-2026-10-06).
 
 ### Claude Code
 
-```powershell
-claude plugin marketplace add ./agentic-backlog-kit
+```bash
+claude plugin marketplace add aegolius-labs/agentic-backlog-kit
+claude plugin install agentic-backlog-kit@aegolius-labs-backlog
+```
+
+`claude plugin list` then shows `agentic-backlog-kit@aegolius-labs-backlog`
+enabled, with all six skills: `backlog-adopt`, `backlog-ingest`,
+`backlog-init`, `backlog-prioritize`, `backlog-sprint-plan` and
+`backlog-sync-github`. Start a new session to load them.
+
+To pin a [release](https://github.com/aegolius-labs/agentic-backlog-kit/releases)
+instead of following `main`, add the marketplace at its tag:
+`claude plugin marketplace add aegolius-labs/agentic-backlog-kit#vX.Y.Z`.
+
+**Updating.** The manifests keep a fixed version (releases stamp the version
+into the built artifacts, not the tree; see [docs/release.md](docs/release.md)),
+so `claude plugin update` reports "already at the latest version" and keeps the
+old copy. To take new skills, refresh the marketplace and reinstall:
+
+```bash
+claude plugin marketplace update aegolius-labs-backlog
+claude plugin uninstall agentic-backlog-kit@aegolius-labs-backlog
 claude plugin install agentic-backlog-kit@aegolius-labs-backlog
 ```
 
@@ -36,7 +58,23 @@ including why no `.mcp.json` is declared.
 
 ### Codex
 
-This repository is the plugin source. Add it to a local marketplace, install it from the Plugins Directory, and start a new task with the plugin enabled, following OpenAI's [complete-plugin test flow](https://developers.openai.com/plugins/deploy/connect-chatgpt#test-the-complete-plugin). A machine-specific personal marketplace entry is intentionally not committed to this public repository.
+```bash
+codex plugin marketplace add aegolius-labs/agentic-backlog-kit
+codex plugin add agentic-backlog-kit@aegolius-labs-backlog
+```
+
+`codex plugin list` then shows the plugin `installed, enabled`; start a new
+task to use it. Pin a release with `--ref vX.Y.Z` on the marketplace add.
+`codex plugin marketplace upgrade` refreshes the installed copy in place.
+
+### From a local clone
+
+For testing unmerged changes, point either host at a checkout instead:
+`claude plugin marketplace add ./agentic-backlog-kit`, or add the checkout to a
+local Codex marketplace and follow OpenAI's
+[complete-plugin test flow](https://developers.openai.com/plugins/deploy/connect-chatgpt#test-the-complete-plugin).
+A machine-specific personal marketplace entry is intentionally not committed to
+this public repository.
 
 ## Quick start
 
