@@ -46,14 +46,16 @@ def _tree(directory: Path, *, changelog: str = CHANGELOG, version: str = "0.1.0"
         f'[project]\nname = "agentic-backlog-kit"\nversion = "{version}"\n',
         encoding="utf-8",
     )
-    for manifest in (".codex-plugin/plugin.json", ".claude-plugin/plugin.json"):
-        (directory / manifest).write_text(
-            json.dumps({"name": "agentic-backlog-kit", "version": version}, indent=2),
-            encoding="utf-8",
-        )
-    (directory / ".claude-plugin/marketplace.json").write_text(
-        json.dumps({"plugins": [{"name": "abk", "version": version}]}, indent=2),
+    (directory / ".codex-plugin/plugin.json").write_text(
+        json.dumps({"name": "agentic-backlog-kit", "version": version}, indent=2),
         encoding="utf-8",
+    )
+    # Claude Code manifests carry no version, so Claude Code versions by commit.
+    (directory / ".claude-plugin/plugin.json").write_text(
+        json.dumps({"name": "agentic-backlog-kit"}, indent=2), encoding="utf-8"
+    )
+    (directory / ".claude-plugin/marketplace.json").write_text(
+        json.dumps({"plugins": [{"name": "abk"}]}, indent=2), encoding="utf-8"
     )
     (directory / "src" / "agentic_backlog_kit" / "__init__.py").write_text(
         f'"""Kit."""\n\n__version__ = "{version}"\n', encoding="utf-8"
@@ -75,6 +77,19 @@ class StampDeclarationsTests(unittest.TestCase):
                 text = (root / declaration.path).read_text(encoding="utf-8")
                 self.assertIn("0.2.0", text, declaration.path)
                 self.assertNotIn('"0.1.0"', text, declaration.path)
+
+    def test_leaves_claude_code_manifests_unversioned(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = _tree(Path(directory))
+
+            set_version(root, "0.2.0", "2026-09-19")
+
+            for manifest in (
+                ".claude-plugin/plugin.json",
+                ".claude-plugin/marketplace.json",
+            ):
+                text = (root / manifest).read_text(encoding="utf-8")
+                self.assertNotIn("version", text, manifest)
 
     def test_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -103,8 +118,8 @@ class StampDeclarationsTests(unittest.TestCase):
 
             # The failure must happen before any file is rewritten.
             self.assertIn(
-                '"0.1.0"',
-                (root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"),
+                'version = "0.1.0"',
+                (root / "pyproject.toml").read_text(encoding="utf-8"),
             )
 
     def test_writes_nothing_when_a_declaration_has_no_version(self) -> None:

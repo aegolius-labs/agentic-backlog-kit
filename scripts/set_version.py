@@ -53,16 +53,6 @@ DECLARATIONS: tuple[Declaration, ...] = (
         r"\g<1>{version}\g<2>",
     ),
     Declaration(
-        ".claude-plugin/plugin.json",
-        re.compile(r'("version"\s*:\s*")[^"]+(")'),
-        r"\g<1>{version}\g<2>",
-    ),
-    Declaration(
-        ".claude-plugin/marketplace.json",
-        re.compile(r'("version"\s*:\s*")[^"]+(")'),
-        r"\g<1>{version}\g<2>",
-    ),
-    Declaration(
         "src/agentic_backlog_kit/__init__.py",
         re.compile(r'(?m)^(__version__\s*=\s*")[^"]+(")$'),
         r"\g<1>{version}\g<2>",

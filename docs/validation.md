@@ -403,9 +403,23 @@ tag's commit, `803b93b`.
   manifests, a local test showed `claude plugin update` versioning by commit SHA
   (`0.2.0` to `a42e719e5e89`) and delivering each change.
 
-The README documents the reinstall step. Changing how the Claude manifests carry
-a version touches the release contract and the manifest parity test, so it is
-left to a separate change.
+The first README revision documented a reinstall; the fix below replaced it.
 
 Not covered: Windows and macOS, and the skills actually triggering in a live
 session. Session-level behavior is S-R31-1 and S-R31-2.
+
+**Fix (2026-10-06).** `version` was removed from `.claude-plugin/plugin.json`
+and the marketplace entry, and `set_version.py` no longer stamps them. Tested
+from GitHub on a branch, in empty homes on both hosts:
+
+- Claude Code installed all six skills at version `9262b31602a9`, the commit.
+  After a marker commit, `claude plugin marketplace update` and `claude plugin
+  update` moved it to `704ab8e72a03` and the marker arrived.
+- Codex still installed all six skills at `0.2.0`, read from
+  `.codex-plugin/plugin.json`, and `codex plugin marketplace upgrade` still
+  delivered the marker.
+
+`claude plugin validate` on both Claude Code manifests now passes with an
+accepted `No version specified` warning, so the marketplace also runs without
+`--strict`;
+`tests/test_host_manifest_parity.py` fails if a Claude Code version returns.
