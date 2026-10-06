@@ -10,10 +10,12 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from agentic_backlog_kit.bootstrap import build_bootstrap_plan
+from agentic_backlog_kit.api_benchmark import SimulatedGitHub
 from agentic_backlog_kit.cli import main
 from agentic_backlog_kit.github import GitHubCliTransport
 from agentic_backlog_kit.iterations import build_iteration_plan
 from agentic_backlog_kit.scaffold import build_scaffold_plan
+from agentic_backlog_kit.snapshot import GitHubSnapshotReader
 from agentic_backlog_kit.sync import build_sync_plan
 
 from tests.helpers import is_relationship_query, item, manifest, relationship_data
@@ -506,22 +508,17 @@ class CliTests(unittest.TestCase):
             manifest_path = root / "manifest.json"
             plan_path = root / "plan.json"
             receipt_path = root / "receipt.json"
-            data = manifest(item("T-1"))
-            snapshot = {"issues": []}
+            data = manifest(item("T-1"), item("T-2", depends_on=["T-1"]))
             manifest_path.write_text(json.dumps(data), encoding="utf-8")
-            plan = build_sync_plan(data, snapshot)
+            github = SimulatedGitHub(data)
+            remote = GitHubSnapshotReader(
+                github, owner="aegolius-labs", repository="example", project_number=1
+            ).read()
+            plan = build_sync_plan(data, remote)
             plan_path.write_text(json.dumps(plan.as_dict()), encoding="utf-8")
-            reader = Mock()
-            reader.return_value.read.return_value = snapshot
 
             with (
-                patch("agentic_backlog_kit.cli._transport", return_value=object()),
-                patch("agentic_backlog_kit.cli.GitHubSnapshotReader", reader),
-                patch("agentic_backlog_kit.cli.GitHubService"),
-                patch(
-                    "agentic_backlog_kit.cli.GitHubPlanExecutor",
-                    return_value=lambda action: None,
-                ),
+                patch("agentic_backlog_kit.cli._transport", return_value=github),
                 redirect_stdout(io.StringIO()),
             ):
                 result = main(
@@ -539,10 +536,12 @@ class CliTests(unittest.TestCase):
                 )
 
             self.assertEqual(0, result)
-            reader.return_value.read.assert_called_once_with()
-            self.assertEqual(
-                "completed", json.loads(receipt_path.read_text())["status"]
-            )
+            self.assertEqual(2, len(github.issues))
+            saved = json.loads(receipt_path.read_text())
+            self.assertEqual("completed", saved["status"])
+            self.assertEqual("converged", saved["verification"]["status"])
+            self.assertFalse(saved["verification"]["lag_observed"])
+            self.assertEqual(1, saved["verification"]["reads"])
 
     def test_scaffold_apply_refreshes_remote_state_and_writes_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

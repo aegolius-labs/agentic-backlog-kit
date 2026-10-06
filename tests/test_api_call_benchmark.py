@@ -32,11 +32,15 @@ class ApiCallBenchmarkTests(unittest.TestCase):
         for counts in first["phases"].values():
             self.assertEqual(counts["rest"] + counts["graphql"], counts["total"])
 
-    def test_planning_makes_no_calls_and_converged_apply_only_refreshes(self) -> None:
+    def test_planning_makes_no_calls_and_converged_apply_only_reads(self) -> None:
         phases = measure_api_calls(representative_manifest(100))["phases"]
 
         self.assertEqual(0, phases["plan"]["total"])
-        self.assertEqual(phases["snapshot"], phases["apply"])
+        # The refresh before apply and the verification read after it.
+        self.assertEqual(
+            {key: 2 * value for key, value in phases["snapshot"].items()},
+            phases["apply"],
+        )
 
     def test_reads_grow_with_pages_not_issues(self) -> None:
         small = measure_api_calls(representative_manifest(100))["phases"]["snapshot"]
