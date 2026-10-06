@@ -106,3 +106,24 @@ def relationship_data(
             for number in numbers
         }
     }
+
+
+def is_membership_query(query: str) -> bool:
+    return "query ProjectMembership" in query
+
+
+def membership_data(variables: dict, memberships: dict | None = None) -> dict:
+    """Answer the issue-side Project membership read the snapshot reader sends.
+
+    `memberships` maps an issue node id to its list of Project items, each with
+    `id`, `project` (`number` and `owner.login`) and `fieldValues`. Issues the
+    query names but the mapping omits are in no Project.
+    """
+
+    known = memberships or {}
+    return {
+        "nodes": [
+            {"id": node_id, "projectItems": {"nodes": list(known.get(node_id, []))}}
+            for node_id in variables["ids"]
+        ]
+    }
