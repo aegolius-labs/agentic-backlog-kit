@@ -36,8 +36,8 @@ class BenchmarkTests(unittest.TestCase):
         )
 
     def test_benchmark_covers_each_operation_and_is_repeatable(self) -> None:
-        first = benchmark((100,))
-        second = benchmark((100,))
+        first = benchmark((100,), (100,))
+        second = benchmark((100,), (100,))
 
         self.assertEqual(first, second)
         self.assertEqual([100], first["sizes"])
@@ -58,7 +58,7 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(b'{"message":"caf\xc3\xa9"}\n', serialize_json({"message": "café"}))
 
     def test_budget_check_reports_byte_and_token_regressions(self) -> None:
-        result = benchmark((100,))
+        result = benchmark((100,), (100,))
         measurement = result["runs"][0]["measurements"]["summary"]
         budget = budget_for("summary", 100)
         measurement["bytes"] = budget["max_bytes"] + 1

@@ -1,9 +1,11 @@
-"""Deterministic byte and token-efficiency measurements for local backlog commands.
+"""Deterministic byte, token and API-call measurements for backlog commands.
 
 The benchmark deliberately measures serialized payloads rather than wall-clock
 time.  Runtime measurements are sensitive to the host and are not useful as a
 context-size regression signal.  The fixture and JSON serializer are stable so
 that the same commit produces the same byte counts in local development and CI.
+The API-call counts in ``api_benchmark`` follow the same rule: they come from
+an in-memory repository, never from GitHub.
 """
 
 from __future__ import annotations
@@ -16,6 +18,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .api_benchmark import (
+    API_CALL_BUDGETS,
+    API_CALL_SIZES,
+    assert_api_call_budgets,
+    measure_api_calls,
+)
 from .manifest import validate_manifest
 from .priority import prioritize, select_next
 from .sprint import plan_sprint, sprint_plan_payload
@@ -342,12 +350,16 @@ def _measurement(
     }
 
 
-def benchmark(sizes: Sequence[int] = BACKLOG_SIZES) -> dict[str, Any]:
-    """Measure all compact local operations for each requested backlog size."""
+def benchmark(
+    sizes: Sequence[int] = BACKLOG_SIZES,
+    api_call_sizes: Sequence[int] = API_CALL_SIZES,
+) -> dict[str, Any]:
+    """Measure payload sizes and per-phase API calls for each requested size."""
 
     normalized_sizes = tuple(_validate_size(size) for size in sizes)
     if not normalized_sizes:
         raise ValueError("At least one benchmark size is required")
+    normalized_api_sizes = tuple(_validate_size(size) for size in api_call_sizes)
 
     runs: list[dict[str, Any]] = []
     for item_count in normalized_sizes:
@@ -420,6 +432,14 @@ def benchmark(sizes: Sequence[int] = BACKLOG_SIZES) -> dict[str, Any]:
             for operation, spec in OUTPUT_BUDGETS.items()
         },
         "runs": runs,
+        "api_call_sizes": list(normalized_api_sizes),
+        "api_call_budgets": {
+            phase: dict(spec) for phase, spec in API_CALL_BUDGETS.items()
+        },
+        "api_call_runs": [
+            measure_api_calls(representative_manifest(item_count))
+            for item_count in normalized_api_sizes
+        ],
     }
     failures = assert_budgets(result)
     result["within_budget"] = not failures
@@ -464,13 +484,14 @@ def assert_budgets(result: Mapping[str, Any]) -> list[str]:
                     f"{item_count} items {operation}: {actual_tokens} estimated tokens "
                     f"exceeds {token_limit}"
                 )
+    failures.extend(assert_api_call_budgets(result.get("api_call_runs", [])))
     return failures
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="benchmark",
-        description="Measure deterministic backlog command payload sizes",
+        description="Measure deterministic backlog payload sizes and API calls",
     )
     parser.add_argument(
         "--size",
@@ -480,13 +501,23 @@ def _parser() -> argparse.ArgumentParser:
         help="Backlog size to measure (repeatable; defaults to 100, 1000, 10000)",
     )
     parser.add_argument(
+        "--api-size",
+        type=int,
+        action="append",
+        dest="api_sizes",
+        help=(
+            "Issue count for the API-call measurement (repeatable; defaults to "
+            "100, 1000, 5000)"
+        ),
+    )
+    parser.add_argument(
         "--output",
         help="Write the full JSON report to this path instead of stdout",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Exit non-zero when a documented byte budget is exceeded",
+        help="Exit non-zero when a documented byte or API-call budget is exceeded",
     )
     return parser
 
@@ -494,7 +525,10 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        result = benchmark(tuple(args.sizes) if args.sizes else BACKLOG_SIZES)
+        result = benchmark(
+            tuple(args.sizes) if args.sizes else BACKLOG_SIZES,
+            tuple(args.api_sizes) if args.api_sizes else API_CALL_SIZES,
+        )
     except ValueError as exc:
         _parser().error(str(exc))
 
