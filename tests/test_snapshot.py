@@ -13,7 +13,13 @@ from agentic_backlog_kit.snapshot import (
     GitHubSnapshotReader,
 )
 
-from tests.helpers import is_relationship_query, manifest, relationship_data
+from tests.helpers import (
+    is_membership_query,
+    is_relationship_query,
+    manifest,
+    membership_data,
+    relationship_data,
+)
 
 
 class RoutedTransport:
@@ -22,6 +28,7 @@ class RoutedTransport:
         self.graphql_responses: list[dict] = []
         self.graphql_calls: list[tuple[str, dict]] = []
         self.relationships: dict[int, tuple] = {}
+        self.memberships: dict[str, list[dict]] = {}
 
     def rest(self, method: str, path: str, payload=None):
         response = self.rest_responses[(method, path)]
@@ -33,6 +40,8 @@ class RoutedTransport:
         self.graphql_calls.append((query, variables))
         if is_relationship_query(query):
             return relationship_data(query, self.relationships)
+        if is_membership_query(query):
+            return membership_data(variables, self.memberships)
         return self.graphql_responses.pop(0)
 
 

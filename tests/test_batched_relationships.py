@@ -9,7 +9,14 @@ from agentic_backlog_kit.github import GitHubApiError
 from agentic_backlog_kit.importing import build_import_plan
 from agentic_backlog_kit.snapshot import RELATIONSHIP_BATCH_SIZE, GitHubSnapshotReader
 
-from tests.helpers import is_relationship_query, item, manifest, relationship_data
+from tests.helpers import (
+    is_membership_query,
+    is_relationship_query,
+    item,
+    manifest,
+    membership_data,
+    relationship_data,
+)
 
 
 ISSUES_PATH = "/repos/aegolius-labs/example/issues?state=all&per_page=100&page={page}"
@@ -49,6 +56,7 @@ class CountingTransport:
         self.relationship_queries: list[str] = []
         self.blocked_by_pages: dict[int, list[list[dict]]] = {}
         self.follow_up_calls: list[dict] = []
+        self.membership_queries: list[dict] = []
 
     def rest(self, method: str, path: str, payload=None):
         self.rest_calls.append((method, path))
@@ -89,6 +97,9 @@ class CountingTransport:
             }
         if "query ProjectItems" in query:
             return EMPTY_PROJECT
+        if is_membership_query(query):
+            self.membership_queries.append(variables)
+            return membership_data(variables)
         raise AssertionError("unexpected GraphQL query")
 
 

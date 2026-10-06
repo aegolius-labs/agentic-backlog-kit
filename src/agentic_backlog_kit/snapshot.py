@@ -12,6 +12,25 @@ from .views import normalize_project_views
 # Issues per relationship query. Each carries up to 100 dependencies, so a batch
 # stays far inside GitHub's per-query node limit and costs about one point.
 RELATIONSHIP_BATCH_SIZE = 50
+# Issues asked for their own Project membership per request when the Project
+# item list omits them (S-R29-1). Each carries up to 20 Project items with up
+# to 100 field values, so the batch stays well inside GitHub's node limit.
+MEMBERSHIP_BATCH_SIZE = 50
+_FIELD_VALUES = """
+fieldValues(first: 100) {
+  nodes {
+    ... on ProjectV2ItemFieldTextValue { field { ... on ProjectV2Field { name } } text }
+    ... on ProjectV2ItemFieldNumberValue { field { ... on ProjectV2Field { name } } number }
+    ... on ProjectV2ItemFieldSingleSelectValue {
+      field { ... on ProjectV2SingleSelectField { name } } name
+    }
+    ... on ProjectV2ItemFieldIterationValue {
+      field { ... on ProjectV2IterationField { name } } title
+    }
+    ... on ProjectV2ItemFieldDateValue { field { ... on ProjectV2Field { name } } date }
+  }
+}
+"""
 
 VIEW_GRAPHQL_FRAGMENT = """
   id number name layout filter
@@ -321,23 +340,86 @@ class GitHubSnapshotReader:
                 node_id = content.get("id")
                 if not node_id:
                     continue
-                fields: dict[str, Any] = {}
-                for field_value in (project_item.get("fieldValues") or {}).get("nodes") or []:
-                    field_name = (field_value.get("field") or {}).get("name")
-                    if not field_name:
-                        continue
-                    for key in ("text", "number", "name", "title", "date"):
-                        if field_value.get(key) is not None:
-                            fields[field_name] = field_value[key]
-                            break
                 result[str(node_id)] = {
                     "project_item_id": project_item.get("id"),
-                    "project_fields": fields,
+                    "project_fields": self._field_values(project_item),
                 }
             page_info = connection.get("pageInfo") or {}
             if not page_info.get("hasNextPage"):
                 return result
             cursor = page_info.get("endCursor")
+
+    @staticmethod
+    def _field_values(project_item: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        for field_value in (project_item.get("fieldValues") or {}).get("nodes") or []:
+            field_name = (field_value.get("field") or {}).get("name")
+            if not field_name:
+                continue
+            for key in ("text", "number", "name", "title", "date"):
+                if field_value.get(key) is not None:
+                    fields[field_name] = field_value[key]
+                    break
+        return fields
+
+    def _membership_from_issues(
+        self, node_ids: Iterable[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Read Project membership from the issues the item list left out.
+
+        GitHub's ProjectV2.items can lag behind an issue's own projectItems
+        for many minutes after a write, which made a freshly added issue look
+        absent and produced a false residual plan. Asking the issues settles
+        it. Only issues missing from the list are asked, in batches, so a
+        converged Project costs no extra request.
+        """
+
+        wanted = sorted(set(node_ids))
+        result: dict[str, dict[str, Any]] = {}
+        for start in range(0, len(wanted), MEMBERSHIP_BATCH_SIZE):
+            batch = wanted[start : start + MEMBERSHIP_BATCH_SIZE]
+            data = self.transport.graphql(
+                f"""
+                query ProjectMembership($ids: [ID!]!) {{
+                  nodes(ids: $ids) {{
+                    ... on Issue {{
+                      id
+                      projectItems(first: 20) {{
+                        nodes {{
+                          id
+                          project {{
+                            number
+                            owner {{
+                              ... on Organization {{ login }}
+                              ... on User {{ login }}
+                            }}
+                          }}
+                          {_FIELD_VALUES}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+                """,
+                {"ids": batch},
+            )
+            for issue in data.get("nodes") or []:
+                if not isinstance(issue, dict) or not issue.get("id"):
+                    continue
+                for project_item in (issue.get("projectItems") or {}).get("nodes") or []:
+                    project = project_item.get("project") or {}
+                    owner = ((project.get("owner") or {}).get("login")) or ""
+                    if (
+                        project.get("number") != self.project_number
+                        or owner.casefold() != self.owner.casefold()
+                    ):
+                        continue
+                    result[str(issue["id"])] = {
+                        "project_item_id": project_item.get("id"),
+                        "project_fields": self._field_values(project_item),
+                    }
+                    break
+        return result
 
     @staticmethod
     def _item_id_from_issue(issue: dict[str, Any] | None) -> str | None:
@@ -507,6 +589,13 @@ class GitHubSnapshotReader:
             issue for issue in all_issues if self._item_id_from_issue(issue) is not None
         ]
         project_items = self._project_items()
+        missing = [
+            str(issue["node_id"])
+            for issue in managed
+            if str(issue["node_id"]) not in project_items
+        ]
+        if missing:
+            project_items.update(self._membership_from_issues(missing))
         relationships = self._relationships(int(issue["number"]) for issue in managed)
         snapshot_issues: list[dict[str, Any]] = []
 

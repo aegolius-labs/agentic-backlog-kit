@@ -45,6 +45,15 @@ even when the journaled actions succeeded. The executor records that state,
 does not replay the old plan, and requires a later refresh and re-plan; the
 Wave C direct-API evaluation converged on that later read.
 
+The most common form of that lag is the Project item list itself: on
+2026-09-24 `ProjectV2.items` omitted freshly added issues for over 25 minutes
+while each issue's own `projectItems` already showed the membership. The
+snapshot reader therefore asks every managed issue the list omitted for its own
+Project items, in batches of 50, and counts it as in the configured Project
+(matched by owner and number) with the fields found there. An issue absent from
+both is still reported as not in the Project. A converged Project costs no
+extra request.
+
 Iteration lifecycle plans resolve exact titles, `@current`, or `@next` from canonical active/completed state. A schedule can be extended only from a contiguous, cadence-matching numeric title sequence. GitHub-owned iteration IDs and completion state are bound as preconditions and rechecked after refresh before assignment proceeds.
 
 Native GitHub Projects access is a transport invariant, not an MCP-only feature. A compatible Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API are peer execution routes over the same deterministic engine contract. Capability discovery must prove that a route exposes every operation and identity required by a plan. An incomplete MCP surface is reported and the workflow selects one complete route; writes from different transports are never silently mixed within one apply. The same canonical snapshot, plan, digest, receipt, and post-apply verification contract applies regardless of executor.
