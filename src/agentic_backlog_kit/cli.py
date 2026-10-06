@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import shutil
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -76,6 +76,7 @@ from .snapshot import (
     GitHubSnapshotReader,
 )
 from .sprint import plan_sprint, sprint_plan_payload
+from .verification import DEFAULT_VERIFY_WINDOW, verify_sync_apply
 from .sync import (
     ApplyAuthorizationError,
     apply_plan,
@@ -414,6 +415,15 @@ def _parser() -> argparse.ArgumentParser:
         "--receipt", default=".agentic-backlog/receipts/sync-apply.json"
     )
     sync_apply.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+    sync_apply.add_argument(
+        "--verify-window",
+        type=float,
+        default=DEFAULT_VERIFY_WINDOW,
+        help=(
+            "Seconds to keep re-reading residuals that repeat just-applied writes "
+            "before calling them drift (0 reads once)"
+        ),
+    )
 
     scaffold_snapshot = commands.add_parser(
         "scaffold-snapshot", help="Read GitHub Project fields, views, and labels"
@@ -1086,12 +1096,13 @@ def _dispatch(args: argparse.Namespace) -> int:
         fresh_manifest = load_manifest(args.manifest)
         github = fresh_manifest["github"]
         transport = _transport(args.backend)
-        snapshot = GitHubSnapshotReader(
+        reader = GitHubSnapshotReader(
             transport,
             owner=github["owner"],
             repository=github["repository"],
             project_number=github["project_number"],
-        ).read()
+        )
+        snapshot = reader.read()
         service = GitHubService(
             transport,
             owner=github["owner"],
@@ -1111,9 +1122,13 @@ def _dispatch(args: argparse.Namespace) -> int:
             remote_snapshot=snapshot,
             journal=lambda value: _write_json(Path(args.receipt), asdict(value)),
         )
-        payload = asdict(receipt)
-        _print_json(payload)
-        return 0
+        verification = verify_sync_apply(
+            plan, fresh_manifest, reader.read, window=args.verify_window
+        )
+        receipt = replace(receipt, verification=verification.as_dict())
+        _write_json(Path(args.receipt), asdict(receipt))
+        _print_json(asdict(receipt))
+        return 0 if verification.converged else 1
     if args.command in {"scaffold-snapshot", "scaffold-plan"}:
         github = manifest["github"]
         if args.command == "scaffold-plan" and args.snapshot:

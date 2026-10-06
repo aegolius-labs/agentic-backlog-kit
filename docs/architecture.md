@@ -41,9 +41,16 @@ Managed views are compared across layout, filter, ordered visible fields, horizo
 
 Project membership writes are subject to GitHub's eventual consistency. A
 fresh read immediately after an apply can temporarily retain residual additions
-even when the journaled actions succeeded. The executor records that state,
-does not replay the old plan, and requires a later refresh and re-plan; the
-Wave C direct-API evaluation converged on that later read.
+even when the journaled actions succeeded. `sync-apply` therefore verifies
+itself (S-R29-2): after the last write it re-reads and re-plans. A residual that
+asks again, on the same item, for values the apply just wrote is lag, and is
+re-read after waits that double from 2 seconds until `--verify-window` (default
+60 seconds) is spent. A residual the apply did not write is drift at once,
+because lag can only delay a write and never invents one; lag that outlasts the
+window is drift too. The receipt's `verification` block records the outcome,
+whether lag was observed, the number of reads and how long convergence took,
+and the command exits non-zero on drift. It never replays the old plan: drift
+requires a refresh and a newly confirmed plan.
 
 The most common form of that lag is the Project item list itself: on
 2026-09-24 `ProjectV2.items` omitted freshly added issues for over 25 minutes

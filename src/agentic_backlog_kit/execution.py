@@ -38,6 +38,9 @@ class ApplyReceipt:
     failed_action: dict[str, Any] | None = None
     error: str | None = None
     hint: str | None = None
+    # Post-apply verification (S-R29-2): whether a fresh read converged, and
+    # whether GitHub's read-after-write lag was observed on the way.
+    verification: dict[str, Any] | None = None
 
 
 Journal = Callable[[ApplyReceipt], Any]

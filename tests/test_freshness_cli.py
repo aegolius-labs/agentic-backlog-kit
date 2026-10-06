@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 from agentic_backlog_kit.cli import main
 from agentic_backlog_kit.freshness import DEFAULT_CACHE_PATH, read_cache
 from agentic_backlog_kit.sync import build_sync_plan
+from agentic_backlog_kit.verification import SyncVerification
 
 from tests.helpers import item, manifest
 
@@ -324,6 +325,16 @@ class PrioritizeFreshnessCliTests(unittest.TestCase):
                 self.assertEqual("local-intent", payload["operational_state"])
 
 
+CONVERGED = SyncVerification(
+    status="converged",
+    lag_observed=False,
+    reads=1,
+    elapsed_seconds=0.0,
+    convergence_seconds=0.0,
+    window_seconds=0.0,
+)
+
+
 class ApplyInvalidatesCacheTests(unittest.TestCase):
     def _apply_with_executor(self, executor: Any) -> tuple[int | None, Path]:
         with tempfile.TemporaryDirectory() as directory:
@@ -369,6 +380,12 @@ class ApplyInvalidatesCacheTests(unittest.TestCase):
                 patch(
                     "agentic_backlog_kit.cli.GitHubPlanExecutor",
                     return_value=executor,
+                ),
+                # The executor writes nothing, so a real post-apply read would
+                # never converge; verification is covered on its own.
+                patch(
+                    "agentic_backlog_kit.cli.verify_sync_apply",
+                    return_value=CONVERGED,
                 ),
                 redirect_stdout(io.StringIO()),
                 redirect_stderr(io.StringIO()),

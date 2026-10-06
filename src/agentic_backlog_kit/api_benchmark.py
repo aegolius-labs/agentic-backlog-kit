@@ -23,6 +23,7 @@ from .capabilities import require_capabilities
 from .github import GitHubPlanExecutor, GitHubService
 from .snapshot import GitHubSnapshotReader
 from .sync import apply_plan, build_sync_plan
+from .verification import verify_sync_apply
 
 
 API_CALL_SIZES = (100, 1_000, 5_000)
@@ -40,10 +41,11 @@ API_CALL_BUDGETS: dict[str, dict[str, int]] = {
     "snapshot": {"base_calls": 4, "per_1000_issues": 50},
     # Planning is pure: it reads the snapshot it is given and calls nothing.
     "plan": {"base_calls": 0, "per_1000_issues": 0},
-    # Re-applying a converged backlog costs only the refresh before apply.
-    "apply": {"base_calls": 4, "per_1000_issues": 50},
+    # Re-applying a converged backlog costs the refresh before apply and the
+    # verification read after it (S-R29-2): two snapshot reads.
+    "apply": {"base_calls": 8, "per_1000_issues": 100},
     # Create, add to the Project, then one write per Project field; plus the
-    # dependency writes the fixture's fan-out needs.
+    # dependency writes the fixture's fan-out needs and the verification read.
     "cold-apply": {"base_calls": 8, "per_1000_issues": 8_600},
 }
 
@@ -332,10 +334,11 @@ def _reader(transport: SimulatedGitHub, manifest: Mapping[str, Any]) -> GitHubSn
 
 
 def _apply(transport: SimulatedGitHub, manifest: dict[str, Any], plan: Any) -> None:
-    """Run the same refresh, capability check and apply that ``sync-apply`` runs."""
+    """Run the refresh, capability check, apply and verification of ``sync-apply``."""
 
     github = manifest["github"]
-    snapshot = _reader(transport, manifest).read()
+    reader = _reader(transport, manifest)
+    snapshot = reader.read()
     service = GitHubService(
         transport,
         owner=github["owner"],
@@ -351,6 +354,11 @@ def _apply(transport: SimulatedGitHub, manifest: dict[str, Any], plan: Any) -> N
         manifest=manifest,
         remote_snapshot=snapshot,
     )
+    # The simulated repository has no read-after-write lag, so verification
+    # converges on its first read and the count reflects the steady state.
+    verification = verify_sync_apply(plan, manifest, reader.read, window=0)
+    if not verification.converged:
+        raise AssertionError("The simulated apply did not verify on its first read")
 
 
 def measure_api_calls(manifest: dict[str, Any]) -> dict[str, Any]:

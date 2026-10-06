@@ -146,7 +146,9 @@ the view in GitHub, refresh, and re-plan. The kit never deletes and recreates a
 same-name view. Project membership can also be eventually consistent: a
 post-apply refresh may temporarily show residual additions. The snapshot asks
 any managed issue the Project item list omits for its own membership before
-reporting it absent, which removes the most common case. Do not replay the
+reporting it absent, which removes the most common case, and `sync-apply`
+re-reads residuals that repeat its own writes for up to `--verify-window`
+seconds before reporting drift in the receipt. Do not replay the
 old plan; refresh and re-plan after propagation. Wave C's direct-API run
 converged on a later read-only refresh.
 

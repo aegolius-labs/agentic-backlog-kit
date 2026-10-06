@@ -63,9 +63,9 @@ the retained and carryover lists as well, which is what keeps the 1,000- and
 10,000-item cases flat at roughly 8 KB instead of scaling with the backlog.
 
 The current report SHA-256 is
-`1a41f3f9e1022667c00d5e70294bbea83ad3a444bac1451ce899cd4a9647aca7`. It covers
+`5d43f3dae4f4fe5b821840bbe6fa5a8f47852d0f817d024ed1318a6e98746bdc`. It covers
 the API-call section below as well; the byte measurements in the table are
-unchanged by S-R28-3.
+unchanged by S-R28-3 and S-R29-2.
 
 | Operation | 100 items | 1,000 items | 10,000 items |
 | --- | ---: | ---: | ---: |
@@ -118,10 +118,10 @@ The phases are:
 - `snapshot`: one `snapshot` read of the converged repository.
 - `plan`: `sync-plan` against that snapshot. Planning is pure and must make no
   call.
-- `apply`: `sync-apply` of the resulting empty plan, which is the refresh read
-  plus the capability check.
+- `apply`: `sync-apply` of the resulting empty plan: the refresh read, the
+  capability check, and the post-apply verification read (S-R29-2).
 - `cold-apply`: `sync-apply` of a cold plan against an empty repository, so
-  every item is created, added to the Project and written.
+  every item is created, added to the Project and written, then verified.
 
 The benchmark also checks that the cold apply converges: re-planning against
 the repository it produced must yield no actions.
@@ -132,8 +132,8 @@ Each cell is total calls (REST + GraphQL):
 | --- | ---: | ---: | ---: |
 | `snapshot` | 5 (2 + 3) | 41 (11 + 30) | 201 (51 + 150) |
 | `plan` | 0 | 0 | 0 |
-| `apply` (converged) | 5 (2 + 3) | 41 (11 + 30) | 201 (51 + 150) |
-| `cold-apply` | 845 (123 + 722) | 8,423 (1,221 + 7,202) | 42,107 (6,105 + 36,002) |
+| `apply` (converged) | 10 (4 + 6) | 82 (22 + 60) | 402 (102 + 300) |
+| `cold-apply` | 850 (125 + 725) | 8,464 (1,232 + 7,232) | 42,308 (6,156 + 36,152) |
 
 Reads are paged: one issue-listing page per 100 issues, one Project page per
 100 items and one batched relationship query per 50 issues (S-R28-1), about 40
@@ -142,7 +142,10 @@ one Project add, and one field write per Project field for every item, plus a
 call for each dependency. That is about 8.4 calls per issue, and no batching
 endpoint exists for those mutations. A 5,000-issue cold sync is therefore a
 multi-hour operation under GitHub's secondary limits, while a steady-state
-sync of the same backlog costs about 200 calls.
+sync of the same backlog costs about 400 calls: one read before the apply and
+one to verify it. The simulated repository has no read-after-write lag, so
+verification converges on its first read; each re-read GitHub's lag forces
+costs one more snapshot.
 
 Budgets are a fixed allowance plus an allowance per 1,000 issues, rounded up:
 
@@ -150,7 +153,7 @@ Budgets are a fixed allowance plus an allowance per 1,000 issues, rounded up:
 | --- | ---: | ---: | ---: |
 | `snapshot` | 4 | 50 | 254 |
 | `plan` | 0 | 0 | 0 |
-| `apply` (converged) | 4 | 50 | 254 |
+| `apply` (converged) | 8 | 100 | 508 |
 | `cold-apply` | 8 | 8,600 | 43,008 |
 
 The read budgets leave about 25% headroom over the paged slope. A regression to
