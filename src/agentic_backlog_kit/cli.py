@@ -21,7 +21,18 @@ from .capabilities import (
     inspect_route,
     require_capabilities,
 )
+from .evidence import observed_state
 from .execution import failure_hint
+from .freshness import (
+    DEFAULT_CACHE_PATH,
+    DEFAULT_MAX_AGE_SECONDS,
+    FreshnessError,
+    invalidate_cache,
+    manifest_behind,
+    resolve_snapshot,
+    try_write_cache,
+    utc_now_iso,
+)
 from .importing import (
     ImportExecutor,
     apply_import_plan,
@@ -212,7 +223,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     _add_operational_arguments(sprint)
     sprint.add_argument("--as-of", help="ISO date used to resolve @current and @next")
-    sprint.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
     sprint.add_argument(
         "--skipped-limit",
         type=int,
@@ -277,6 +287,28 @@ def _parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--manifest", default=DEFAULT_MANIFEST)
     snapshot.add_argument("--output")
     snapshot.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+
+    observe = commands.add_parser(
+        "observe",
+        help="Export observed GitHub state as evidence for a downstream system",
+    )
+    observe.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    observe.add_argument("--output")
+    observe.add_argument(
+        "--offline-snapshot",
+        help="Use this exact snapshot file instead of the auto-refreshed cache",
+    )
+    observe.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
+    observe.add_argument(
+        "--max-age",
+        type=int,
+        default=DEFAULT_MAX_AGE_SECONDS,
+        metavar="SECONDS",
+        help=(
+            "Treat the observed-state cache as fresh for this many seconds "
+            f"before refetching (default {DEFAULT_MAX_AGE_SECONDS})"
+        ),
+    )
 
     import_plan = commands.add_parser(
         "import-plan", help="Preview adopting issues the repository already has"
@@ -360,6 +392,17 @@ def _parser() -> argparse.ArgumentParser:
         metavar="ID=SPRINT",
         help="Explicitly move one item's iteration to an exact active title",
     )
+    sync_plan.add_argument(
+        "--overwrite-remote-edit",
+        action="append",
+        dest="overwrite_remote_edit",
+        metavar="ITEM_ID",
+        help=(
+            "Plan the manifest's title/body for an item whose GitHub edit is "
+            "being held, restoring the manifest's version; repeat per item. "
+            "Rejected if the item is unknown or not currently held."
+        ),
+    )
 
     sync_apply = commands.add_parser(
         "sync-apply", help="Apply one exact reviewed plan"
@@ -432,13 +475,37 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
-    """Let a planning command read Status and Sprint from fresh GitHub state."""
+    """Let a planning command read Status and Sprint from GitHub's current state.
+
+    Fresh by default, offline explicit (owner decision D1, R35): without
+    `--offline` or `--operational-snapshot`, planning auto-refreshes a small
+    on-disk cache of observed state rather than falling back to local intent.
+    """
 
     parser.add_argument(
         "--operational-snapshot",
         help=(
-            "Remote sync snapshot supplying fresh Status and Sprint. Without it, "
-            "planning uses local intent, which may be stale."
+            "Exact remote sync snapshot supplying fresh Status and Sprint, used "
+            "as given instead of the auto-refreshed cache."
+        ),
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help=(
+            "Use local intent only; never read or refresh the observed-state "
+            "cache. A preview, not an answer: work finished on the board still "
+            "looks open. Conflicts with --operational-snapshot."
+        ),
+    )
+    parser.add_argument(
+        "--max-age",
+        type=int,
+        default=DEFAULT_MAX_AGE_SECONDS,
+        metavar="SECONDS",
+        help=(
+            "Treat the observed-state cache as fresh for this many seconds "
+            f"before refetching (default {DEFAULT_MAX_AGE_SECONDS})"
         ),
     )
     parser.add_argument(
@@ -446,24 +513,44 @@ def _add_operational_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Include the observed local/remote operational differences",
     )
+    if not any("--backend" in action.option_strings for action in parser._actions):
+        parser.add_argument(
+            "--backend", choices=("auto", "gh", "api"), default="auto"
+        )
+
+
+def _cache_path(args: argparse.Namespace) -> Path:
+    """Keep the observed-state cache beside the manifest it describes."""
+
+    manifest_path = Path(getattr(args, "manifest", None) or DEFAULT_MANIFEST)
+    return manifest_path.parent / "cache" / DEFAULT_CACHE_PATH.name
 
 
 def _operational_manifest(
     manifest: dict[str, Any], args: argparse.Namespace
-) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
-    """Return the manifest planning should use, plus any observed differences.
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]] | None, dict[str, Any] | None]:
+    """Return the manifest planning should use, its freshness, and any drift.
 
-    Offline preview is supported and is the default, but it is a preview: with
-    no snapshot the answer reflects local intent rather than what GitHub is
-    currently reporting.
+    Resolution order (D1, R35): an explicit `--operational-snapshot` is used
+    exactly as given; `--offline` uses local intent only; otherwise the
+    auto-refreshed cache (or a fresh fetch) supplies observed state. A failed
+    auto-fetch raises `FreshnessError` rather than silently answering from
+    stale local intent.
     """
 
-    path = getattr(args, "operational_snapshot", None)
-    if not path:
-        return manifest, None
-    snapshot = json.loads(Path(path).read_text(encoding="utf-8"))
-    composed, differences = compose_operational_state(manifest, snapshot)
-    return composed, differences
+    resolution = resolve_snapshot(
+        manifest,
+        snapshot_path=getattr(args, "operational_snapshot", None),
+        offline=getattr(args, "offline", False),
+        max_age_seconds=getattr(args, "max_age", DEFAULT_MAX_AGE_SECONDS),
+        fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+        cache_path=_cache_path(args),
+    )
+    if resolution.snapshot is None:
+        return manifest, resolution.freshness, None, None
+    composed, differences = compose_operational_state(manifest, resolution.snapshot)
+    behind = manifest_behind(manifest, resolution.snapshot)
+    return composed, resolution.freshness, differences, behind
 
 
 def _parse_transitions(
@@ -495,6 +582,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         GitHubApiError,
         ApplyAuthorizationError,
         CapabilityError,
+        FreshnessError,
     ) as error:
         # A rejected write should read as a decision, not a stack trace. The
         # receipt already records the exact failing action; this is the line the
@@ -593,6 +681,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             repository=plan.repository,
             project_number=plan.project["number"] if plan.project else 1,
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_bootstrap_plan(
             plan,
@@ -646,7 +737,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         )
         return 0
     if args.command == "prioritize":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         done_statuses = set(planning["workflow"]["done_statuses"])
         ranked = [
             entry
@@ -658,12 +749,15 @@ def _dispatch(args: argparse.Namespace) -> int:
         payload["operational_state"] = (
             "github" if differences is not None else "local-intent"
         )
+        payload["freshness"] = freshness
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
         return 0
     if args.command == "next":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         item, passed_over = explain_next(planning, limit=max(args.explain, 0))
         payload = {
             "item": asdict(item) if item else None,
@@ -671,13 +765,16 @@ def _dispatch(args: argparse.Namespace) -> int:
             "operational_state": (
                 "github" if differences is not None else "local-intent"
             ),
+            "freshness": freshness,
         }
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
         return 0
     if args.command == "gantt":
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         schedule = build_schedule(
             planning,
             start=args.start,
@@ -685,8 +782,10 @@ def _dispatch(args: argparse.Namespace) -> int:
             lanes=args.lanes,
             include_completed=args.include_completed,
         )
+        # The chart names the command that reproduces it, so an offline
+        # projection says so: rerun without the flag it would read GitHub.
         command = (
-            f"abk gantt --lanes {args.lanes} "
+            f"abk gantt {'--offline ' if args.offline else ''}--lanes {args.lanes} "
             f"--days-per-effort {args.days_per_effort}"
         )
         if args.format == "json":
@@ -694,6 +793,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             payload["operational_state"] = (
                 "github" if differences is not None else "local-intent"
             )
+            payload["freshness"] = freshness
+            if behind is not None:
+                payload["manifest_behind"] = behind
             if args.report_operational_drift and differences is not None:
                 payload["operational_drift"] = differences
             if args.output:
@@ -738,7 +840,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                     repository=github["repository"],
                     project_number=github["project_number"],
                 ).read()
-        planning, differences = _operational_manifest(manifest, args)
+        planning, freshness, differences, behind = _operational_manifest(manifest, args)
         plan = plan_sprint(
             planning,
             capacity=args.capacity,
@@ -751,6 +853,9 @@ def _dispatch(args: argparse.Namespace) -> int:
         payload["operational_state"] = (
             "github" if differences is not None else "local-intent"
         )
+        payload["freshness"] = freshness
+        if behind is not None:
+            payload["manifest_behind"] = behind
         if args.report_operational_drift and differences is not None:
             payload["operational_drift"] = differences
         _print_json(payload)
@@ -793,11 +898,47 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "snapshot":
         snapshot = _read_snapshot(None, manifest, args.backend)
+        # A manual snapshot reads the manifest's own target, so it doubles as
+        # a refresh of the auto-fresh planning cache: the next planning
+        # command need not refetch what an operator just pulled by hand.
+        try_write_cache(_cache_path(args), manifest, snapshot)
         if args.output:
             _write_json(Path(args.output), snapshot)
             _print_json({"snapshot": args.output, "issues": len(snapshot["issues"])})
         else:
             _print_json(snapshot)
+        return 0
+    if args.command == "observe":
+        resolution = resolve_snapshot(
+            manifest,
+            snapshot_path=args.offline_snapshot,
+            offline=False,
+            max_age_seconds=args.max_age,
+            fetch_snapshot=lambda: _read_snapshot(None, manifest, args.backend),
+            cache_path=_cache_path(args),
+        )
+        source = resolution.freshness["source"]
+        if source == "explicit":
+            route = "offline-snapshot"
+            observed_at = resolution.freshness.get("observed_at") or utc_now_iso()
+        elif source == "cache":
+            route = "cache"
+            observed_at = resolution.freshness["observed_at"]
+        else:
+            route = args.backend
+            observed_at = resolution.freshness["observed_at"]
+        document = observed_state(manifest, resolution.snapshot, observed_at, route)
+        if args.output:
+            _write_json(Path(args.output), document)
+            _print_json(
+                {
+                    "output": args.output,
+                    "items": len(document["items"]),
+                    "digest": document["digest"],
+                }
+            )
+        else:
+            _print_json(document)
         return 0
     if args.command in {"import-plan", "import-apply", "import-reconcile"}:
         github = manifest["github"]
@@ -886,6 +1027,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         applied = apply_import_plan(
             plan,
@@ -921,6 +1065,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                 args.transition_sprint,
                 iteration.get("field", "Sprint"),
             ),
+            overwrite_remote_edits=args.overwrite_remote_edit,
         )
         payload = plan.as_dict()
         if args.output:
@@ -954,6 +1099,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_plan(
             plan,
@@ -1050,6 +1198,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         result = apply_iteration_plan(
             plan,
@@ -1089,6 +1240,9 @@ def _dispatch(args: argparse.Namespace) -> int:
             project_number=github["project_number"],
             issue_type_mode=github["issue_type_mode"],
         )
+        # A partially failed apply still changed GitHub, so the cache is
+        # dropped before the first write rather than after a clean finish.
+        invalidate_cache(_cache_path(args))
         require_capabilities(transport, [a.kind for a in plan.actions])
         receipt = apply_scaffold_plan(
             plan,

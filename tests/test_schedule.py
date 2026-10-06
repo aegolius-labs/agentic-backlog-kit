@@ -234,7 +234,7 @@ class GeneratedProjectionTests(unittest.TestCase):
 
     ROOT = Path(__file__).resolve().parents[1]
     CHART = ROOT / "docs" / "roadmap-gantt.md"
-    COMMAND = "abk gantt --lanes 1 --days-per-effort 2"
+    COMMAND = "abk gantt --offline --lanes 1 --days-per-effort 2"
     TITLE = "Agentic Backlog Kit roadmap projection"
 
     def test_the_committed_chart_matches_the_committed_manifest(self) -> None:
@@ -254,7 +254,7 @@ class GeneratedProjectionTests(unittest.TestCase):
             expected,
             self.CHART.read_text(encoding="utf-8"),
             "docs/roadmap-gantt.md is stale; regenerate it with "
-            f"`python scripts/backlog.py gantt --lanes 1 --days-per-effort 2 "
+            f"`python scripts/backlog.py gantt --offline --lanes 1 --days-per-effort 2 "
             f'--title "{self.TITLE}" --output docs/roadmap-gantt.md`',
         )
 if __name__ == "__main__":

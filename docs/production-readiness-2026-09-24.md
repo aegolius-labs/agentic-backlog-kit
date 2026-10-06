@@ -8,7 +8,7 @@ kit's own backlog converged to a zero-action sync plan.
 ## Verdict
 
 The engine is ready. The product is not. **3 of 12 production gates are met and
-3 are partly met.** None of the gaps needs a redesign; each is tracked as an
+3 are partly met.** A thirteenth gate was added on 2026-09-28 (R35). None of the gaps needs a redesign; each is tracked as an
 item under `EPIC-PROD`.
 
 ## Gates
@@ -27,6 +27,7 @@ item under `EPIC-PROD`.
 | 10 | Supported configurations stated | Partly met | Every Project query is organization-scoped; the README implies it without saying so | R33 |
 | 11 | Stability promise | Open | 0.x, Alpha classifier, manifest schema just moved to 2, no compatibility policy | R33 |
 | 12 | Proven outside Aegolius Labs | Open | No external issues or users | R34 |
+| 13 | Correct across sessions, machines and users | Open | Added 2026-09-28: planning defaulted to stale local intent, and sync proposed reverting teammates' GitHub edits | R35 |
 
 Licensing is not a gate but matters to any production user: the kit is
 PolyForm Noncommercial, and for-profit use requires a separate paid agreement.

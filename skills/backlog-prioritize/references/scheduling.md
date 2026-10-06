@@ -37,7 +37,7 @@ The longest chain of scheduled dependencies, which is what sets the finish date.
 
 ## Fresh state versus committed state
 
-Pass `--operational-snapshot` whenever the chart is for a person: without one the projection uses local intent, which lags GitHub. A chart committed to a repository is the exception — it must be reproducible offline, so it projects the tracked manifest alone.
+`gantt` reads fresh operational state by default (auto-refreshing a short-lived cache), which is right whenever the chart is for a person. A chart committed to a repository is the exception — it must be reproducible offline, so generate it with `--offline`, which projects the tracked manifest alone.
 
 ## Persisting one
 

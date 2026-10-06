@@ -341,9 +341,14 @@ class TransitionConvergenceTests(unittest.TestCase):
 
         # Replay the plan onto the snapshot the way GitHub would record it.
         applied = _snapshot(_remote(status="Ready"))
-        fields = applied["issues"][0]["project_fields"]
+        issue = applied["issues"][0]
+        fields = issue["project_fields"]
         for action in plan.actions:
             fields.update(action.payload.get("fields", {}))
+            if action.kind == "issue.update":
+                for key in ("title", "body"):
+                    if key in action.payload:
+                        issue[key] = action.payload[key]
 
         settled = build_sync_plan(data, applied, manage_body=False)
 

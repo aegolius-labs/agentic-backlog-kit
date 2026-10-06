@@ -17,8 +17,7 @@ version written earlier today named S-R11-4 as the next work and was wrong
 within hours, because S-R11-4 shipped the same day. Ask the kit instead:
 
 ```bash
-abk snapshot --output .agentic-backlog/cache/remote.json
-abk next --explain 5 --operational-snapshot .agentic-backlog/cache/remote.json
+abk next --explain 5
 abk gantt --lanes 1 --days-per-effort 2
 ```
 

@@ -19,3 +19,5 @@ Use GitHub MCP when it exposes the exact operations in the plan. Otherwise use t
 Read [references/github-mapping.md](references/github-mapping.md) for the remote mapping, executor choices, and non-destructive boundary.
 
 Never delete issues, archive Project items, remove relationships, or close completed issues. This release intentionally treats those operations as out of scope.
+
+If the plan reports `held_remote_edits`, a human changed that issue's title or body on GitHub since the kit's last write. Present each held item and its `hint` to the user; never pass `--overwrite-remote-edit` on your own judgment. Only apply it after the user explicitly says to restore the manifest's version over the GitHub edit.
