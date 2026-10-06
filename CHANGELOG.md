@@ -6,6 +6,13 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- `claude plugin update` now delivers new skills. The Claude Code manifests no
+  longer declare a version, so Claude Code versions the plugin by commit instead
+  of reporting the fixed `0.2.0` as already up to date. An install made before
+  this change needs one uninstall and install to leave `0.2.0`.
+
 ### Documentation
 
 - The README installs from GitHub first on both hosts, with no clone, and says

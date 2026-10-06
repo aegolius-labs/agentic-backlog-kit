@@ -4,6 +4,13 @@
 thin manifest over it. These tests enforce that the manifests describe the same
 plugin, that every host discovers the same skill set, and that the marketplace
 entry agrees with the plugin manifest it points at.
+
+Only the Codex manifest declares a version. Claude Code keys its plugin cache on
+a declared version and falls back to the commit when there is none. Releases
+stamp the version into built artifacts only, so the tree's declaration never
+moves, and a declared version would leave `claude plugin update` reporting
+"already at the latest version" forever. Without one, every commit is a new
+version and updates arrive.
 """
 
 from __future__ import annotations
@@ -40,9 +47,14 @@ class HostManifestParityTests(unittest.TestCase):
 
         self.assertEqual(codex["name"], claude["name"])
         self.assertEqual(codex["description"], claude["description"])
-        self.assertEqual(
-            _base_version(codex["version"]), _base_version(claude["version"])
-        )
+        self.assertRegex(_base_version(codex["version"]), r"^\d+\.\d+\.\d+$")
+
+    def test_claude_code_manifests_declare_no_version(self) -> None:
+        marketplace = _load(CLAUDE_MARKETPLACE)
+
+        self.assertNotIn("version", _load(CLAUDE_MANIFEST))
+        for entry in marketplace["plugins"]:
+            self.assertNotIn("version", entry, entry["name"])
 
     def test_marketplace_entry_matches_plugin_manifest(self) -> None:
         claude = _load(CLAUDE_MANIFEST)
@@ -57,9 +69,6 @@ class HostManifestParityTests(unittest.TestCase):
         entry = entries[0]
 
         self.assertEqual(claude["description"], entry["description"])
-        self.assertEqual(
-            _base_version(claude["version"]), _base_version(entry["version"])
-        )
 
         source = entry["source"]
         self.assertIsInstance(source, str, "local marketplace source must be a path")

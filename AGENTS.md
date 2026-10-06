@@ -47,17 +47,25 @@ For Claude Code, the bundled validator is:
 
 ```powershell
 claude plugin validate .claude-plugin/plugin.json
-claude plugin validate .claude-plugin/marketplace.json --strict
+claude plugin validate .claude-plugin/marketplace.json
 claude plugin validate skills --strict
 ```
 
-The plugin manifest is validated without `--strict` because it emits one known,
-accepted warning:
+The two manifests are validated without `--strict` because they emit known,
+accepted warnings. The plugin manifest emits:
 
 > `root: CLAUDE.md at the plugin root is not loaded as project context.`
 
 That is correct and expected. `CLAUDE.md` here is guidance for contributors
 working *in* this repository, not context shipped to plugin consumers. Everything
 a consumer needs lives in `skills/`. Do not silence the warning by moving
-repository guidance into a skill. The marketplace manifest and `skills/` must
-keep passing `--strict`.
+repository guidance into a skill.
+
+Both manifests also emit `version: No version specified` (the marketplace as
+`plugins[0] plugin.json → version`). That is deliberate (decided 2026-10-06). The Claude Code manifests declare no
+version, so Claude Code versions the plugin by commit and `claude plugin update`
+delivers new skills. Releases stamp the version only into built artifacts, so a
+declared version would never move and updates would never arrive.
+`tests/test_host_manifest_parity.py` fails if a version is added back. Any other
+warning from either manifest is a failure, and `skills/` must keep passing
+`--strict`.

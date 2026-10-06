@@ -40,16 +40,19 @@ To pin a [release](https://github.com/aegolius-labs/agentic-backlog-kit/releases
 instead of following `main`, add the marketplace at its tag:
 `claude plugin marketplace add aegolius-labs/agentic-backlog-kit#vX.Y.Z`.
 
-**Updating.** The manifests keep a fixed version (releases stamp the version
-into the built artifacts, not the tree; see [docs/release.md](docs/release.md)),
-so `claude plugin update` reports "already at the latest version" and keeps the
-old copy. To take new skills, refresh the marketplace and reinstall:
+**Updating.** Refresh the marketplace, update, and restart Claude Code:
 
 ```bash
 claude plugin marketplace update aegolius-labs-backlog
-claude plugin uninstall agentic-backlog-kit@aegolius-labs-backlog
-claude plugin install agentic-backlog-kit@aegolius-labs-backlog
+claude plugin update agentic-backlog-kit@aegolius-labs-backlog
 ```
+
+Claude Code shows the plugin's version as a short commit id, such as
+`704ab8e72a03`, not a release number. The Claude Code manifests declare no
+version on purpose, so that each commit counts as a new version; see
+[docs/release.md](docs/release.md). An install made before 2026-10-06 is stuck
+at `0.2.0` and says it is already up to date: uninstall and install it once, and
+updates work from then on.
 
 Skill bodies use Codex's `$skill-name` syntax when one skill references another;
 in Claude Code that means model invocation by description, or an explicit
