@@ -1013,7 +1013,7 @@
       "type": "Feature",
       "parent": "EPIC-PROD",
       "maturity": "refined",
-      "status": "In Review",
+      "status": "Done",
       "title": "R35 - Keep every session, machine and user on current state",
       "description": "Planning read stale local intent unless an operator remembered to pass a snapshot, snapshots were never refreshed on their own, a teammate's GitHub edit to a managed title or body was proposed for reversion by the next sync, and nothing gave aio-agentic-sdlc a defined format for GitHub observations to return as evidence. Owner decided on 2026-09-28: fresh by default with offline explicit, detect and hold human edits, and define the evidence export here. D1 stands: the manifest is never written with observations.",
       "acceptance_criteria": [
@@ -1719,7 +1719,7 @@
     {
       "depends_on": [],
       "sprint": null,
-      "status": "In Review",
+      "status": "Done",
       "maturity": "ready",
       "type": "Story",
       "parent": "R35",
@@ -1740,7 +1740,7 @@
     {
       "depends_on": [],
       "sprint": null,
-      "status": "In Review",
+      "status": "Done",
       "maturity": "ready",
       "type": "Story",
       "parent": "R35",
@@ -1763,7 +1763,7 @@
         "S-R35-1"
       ],
       "sprint": null,
-      "status": "In Review",
+      "status": "Done",
       "maturity": "ready",
       "type": "Story",
       "parent": "R35",
