@@ -20,6 +20,6 @@ A plan whose `priority_only` is `true` consists solely of Priority field updates
 
 Read [references/github-mapping.md](references/github-mapping.md) for the remote mapping, executor choices, and non-destructive boundary.
 
-Never delete issues, archive Project items, remove relationships, or close completed issues. This release intentionally treats those operations as out of scope.
+Never delete issues, archive Project items, or remove relationships, and never close an issue yourself. The one closure the engine proposes is `issue.close_parent`: a parent whose children are all closed on GitHub, closed as completed and marked Done. Present it like any other action; it needs the same digest confirmation. Never close an issue because the manifest no longer lists it.
 
 If the plan reports `held_remote_edits`, a human changed that issue's title or body on GitHub since the kit's last write. Present each held item and its `hint` to the user; never pass `--overwrite-remote-edit` on your own judgment. Only apply it after the user explicitly says to restore the manifest's version over the GitHub edit.

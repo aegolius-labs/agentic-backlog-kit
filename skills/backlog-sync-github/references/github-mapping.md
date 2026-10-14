@@ -43,3 +43,5 @@ the plan, aborts if the digest moved, verifies after apply, and records
 still match.
 
 The current reconciler is additive and update-only. It creates or updates managed issues, adds them to the Project, sets fields, adds parents, and adds missing dependencies. It does not infer deletion intent from a missing local item.
+
+One closure is proposed, from evidence: `issue.close_parent` for an open parent whose manifest children are all closed on GitHub. It closes the parent with `state_reason: completed` and sets Status to the first done status when the Project does not already show it. The precondition records each child's number and closed state, so a child reopened after review changes the digest and apply aborts before its first write. A parent with no children, an open child, or a child not yet on GitHub is never proposed, and an issue the manifest no longer lists is never closed.
