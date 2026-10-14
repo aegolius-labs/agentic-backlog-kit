@@ -41,6 +41,10 @@ class ApplyReceipt:
     # Post-apply verification (S-R29-2): whether a fresh read converged, and
     # whether GitHub's read-after-write lag was observed on the way.
     verification: dict[str, Any] | None = None
+    # How the apply was authorized: "digest" when the reviewed digest was
+    # confirmed, "priority-only" under the S-R10-4 exemption. None for
+    # applies that have no exemption to distinguish.
+    authorization: str | None = None
 
 
 Journal = Callable[[ApplyReceipt], Any]
@@ -58,6 +62,7 @@ def receipt(
     failed_action: dict[str, Any] | None = None,
     error: str | None = None,
     hint: str | None = None,
+    authorization: str | None = None,
 ) -> ApplyReceipt:
     updated_at = datetime.now(UTC).isoformat()
     return ApplyReceipt(
@@ -74,6 +79,7 @@ def receipt(
         failed_action=failed_action,
         error=error,
         hint=hint,
+        authorization=authorization,
     )
 
 _UNAVAILABLE_TYPE_KINDS = frozenset({"issue.create", "issue.update"})

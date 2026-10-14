@@ -33,6 +33,13 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- A sync plan made solely of Priority field updates reports `priority_only: true`,
+  and `sync-apply` applies it without `--confirm` (S-R10-4). The engine decides
+  this from the actions, so a plan file cannot claim it. Any other plan is still
+  refused without its digest, and a given `--confirm` must still match. The plan
+  is rebuilt against fresh state, verified after apply, and the receipt records
+  the basis in `authorization` (`digest` or `priority-only`).
+
 - A request GitHub refuses for a rate limit is retried after the wait GitHub
   names (`retry-after`, else the quota reset, else one minute doubled per
   repeat), on both the CLI and direct API routes (S-R28-2). Waits share a

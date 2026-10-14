@@ -410,7 +410,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     sync_apply.add_argument("--manifest", default=DEFAULT_MANIFEST)
     sync_apply.add_argument("--plan", required=True)
-    sync_apply.add_argument("--confirm", required=True)
+    sync_apply.add_argument(
+        "--confirm",
+        help=(
+            "Exact digest of the reviewed plan. Optional only for a plan made "
+            "solely of Priority field updates, which is pre-authorized"
+        ),
+    )
     sync_apply.add_argument(
         "--receipt", default=".agentic-backlog/receipts/sync-apply.json"
     )
@@ -1085,6 +1091,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                     "plan": args.output,
                     "digest": plan.digest,
                     "actions": len(plan.actions),
+                    "priority_only": plan.priority_only,
                 }
             )
         else:

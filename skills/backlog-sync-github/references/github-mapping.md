@@ -35,4 +35,11 @@ has the confirmed digest before performing its first mutation. Its receipt is
 atomically rewritten after every completed action. After interruption, refresh
 and confirm a newly generated remaining plan instead of replaying the old one.
 
+The one exception to digest confirmation is a plan made solely of Priority field
+updates, which the plan reports as `priority_only: true`. `sync-apply` accepts it
+without `--confirm`. Every other check still applies: it refreshes GitHub, rebuilds
+the plan, aborts if the digest moved, verifies after apply, and records
+`authorization: "priority-only"` in the receipt. A `--confirm` that is given must
+still match.
+
 The current reconciler is additive and update-only. It creates or updates managed issues, adds them to the Project, sets fields, adds parents, and adds missing dependencies. It does not infer deletion intent from a missing local item.

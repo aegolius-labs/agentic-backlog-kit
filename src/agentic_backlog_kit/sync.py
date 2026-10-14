@@ -43,18 +43,51 @@ class SyncPlan:
     held_remote_edits: list[dict[str, Any]] = field(default_factory=list)
     overwrite_remote_edits: list[str] = field(default_factory=list)
 
+    @property
+    def priority_only(self) -> bool:
+        return is_priority_only(self.actions)
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "digest": self.digest,
             "manifest_fingerprint": self.manifest_fingerprint,
             "snapshot_fingerprint": self.snapshot_fingerprint,
             "manage_body": self.manage_body,
+            "priority_only": self.priority_only,
             "transitions": self.transitions,
             "held_remote_edits": self.held_remote_edits,
             "overwrite_remote_edits": self.overwrite_remote_edits,
             "action_count": len(self.actions),
             "actions": [action.as_dict() for action in self.actions],
         }
+
+
+PRIORITY_ONLY_AUTHORIZATION = "priority-only"
+"""Receipt authorization for a plan applied under the Priority-only exemption."""
+
+DIGEST_AUTHORIZATION = "digest"
+"""Receipt authorization for a plan applied with its confirmed digest."""
+
+
+def is_priority_only(actions: Iterable[SyncAction]) -> bool:
+    """Return whether a plan consists solely of Priority field updates.
+
+    Owner decision 2026-09-24 (S-R10-4): such a plan is pre-authorized, so it
+    may be applied without a separate digest confirmation. The engine decides
+    this from the actions themselves; nothing a plan file claims about itself
+    is trusted. An empty plan is not Priority-only: there is nothing to
+    authorize. Any other action kind, or a set_fields action that touches any
+    field besides Priority, disqualifies the whole plan.
+    """
+
+    actions = list(actions)
+    return bool(actions) and all(
+        action.kind == "project.set_fields"
+        and isinstance(action.payload.get("fields"), dict)
+        and set(action.payload["fields"]) == {"Priority"}
+        and set(action.payload) == {"fields"}
+        for action in actions
+    )
 
 
 MARKER_PREFIX = "<!-- agentic-backlog-kit:"
@@ -891,9 +924,25 @@ def apply_plan(
     remote_snapshot: dict[str, Any] | None = None,
     journal: Journal | None = None,
 ) -> ApplyReceipt:
-    """Execute only the exact plan the caller reviewed and confirmed."""
+    """Execute only the exact plan the caller reviewed and confirmed.
 
-    if not confirmation or confirmation != plan.digest:
+    A plan made solely of Priority field updates is pre-authorized (S-R10-4)
+    and may be applied with no confirmation. It is still rebuilt against fresh
+    state below and must match exactly, so the exemption cannot carry any
+    other change. A confirmation that is given must match the digest, even
+    for a Priority-only plan.
+    """
+
+    if confirmation is None and plan.priority_only:
+        authorization = PRIORITY_ONLY_AUTHORIZATION
+    elif confirmation and confirmation == plan.digest:
+        authorization = DIGEST_AUTHORIZATION
+    elif confirmation is None:
+        raise ApplyAuthorizationError(
+            "Apply requires the exact digest of the reviewed sync plan; only a "
+            "plan made solely of Priority field updates is pre-authorized"
+        )
+    else:
         raise ApplyAuthorizationError(
             "Apply requires the exact digest of the reviewed sync plan"
         )
@@ -933,6 +982,7 @@ def apply_plan(
         len(plan.actions),
         completed,
         started_at,
+        authorization=authorization,
     )
     if journal:
         journal(current)
@@ -951,6 +1001,7 @@ def apply_plan(
                 failed_action=action.as_dict(),
                 error=f"{type(exc).__name__}: {exc}",
                 hint=failure_hint(action.kind, action.payload, exc),
+                authorization=authorization,
             )
             if journal:
                 journal(current)
@@ -964,6 +1015,7 @@ def apply_plan(
             len(plan.actions),
             completed,
             started_at,
+            authorization=authorization,
         )
         if journal:
             journal(current)
@@ -975,6 +1027,7 @@ def apply_plan(
         len(plan.actions),
         completed,
         started_at,
+        authorization=authorization,
     )
     if journal:
         journal(current)
