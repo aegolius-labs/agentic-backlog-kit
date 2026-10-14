@@ -15,6 +15,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Documentation
 
+- The prioritize and sprint-plan skills tell an agent handed kit work to put
+  `Closes #N` in the pull request body for each kit-managed issue it completes,
+  and not to close a parent that way unless the pull request completes the
+  parent's acceptance criteria (S-R10-1). GitHub then closes the issue on merge
+  and the Project marks it Done, so closure follows evidence.
+
 - The README installs from GitHub first on both hosts, with no clone, and says
   how to take updates in Claude Code, where `claude plugin update` keeps the old
   copy because the manifest version is fixed (S-R30-1).

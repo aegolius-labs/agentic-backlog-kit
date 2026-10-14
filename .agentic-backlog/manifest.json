@@ -1033,7 +1033,7 @@
       "depends_on": [],
       "sprint": null,
       "maturity": "ready",
-      "status": "Ready",
+      "status": "In Review",
       "id": "S-R10-1",
       "parent": "R10",
       "title": "Make agents link PRs to kit issues with closing keywords",

@@ -13,6 +13,12 @@ description: Rank an Agentic Backlog Kit manifest, select its next executable it
 6. Never assign missing scores or dependencies silently. Use `$backlog-ingest` when refinement is required.
 7. Use `gantt` when the request is about sequence over time, a roadmap view, or a chart. Read [references/scheduling.md](references/scheduling.md) first, and state the basis with the chart: durations are effort points times one declared factor, order is the declared dependency graph, and there is no velocity history behind the dates. Never present it as a delivery estimate, and never raise `--lanes` to make a date look better — that measures the lane count, not the work.
 
+When the selected item is handed to an agent to implement, tell it to link the pull request to the work. GitHub closes an issue when a pull request whose body says `Closes #N` merges, and the Project's workflow then marks it Done, so closure follows the merge as evidence rather than anyone's memory:
+
+- Put one closing keyword (`Closes #N`) in the pull request body for each kit-managed issue the pull request completes. Find `N` with `observe`, which maps each stable item ID to its issue number, or from the issue carrying the hidden marker `agentic-backlog-kit:id=ITEM_ID`. Never guess a number.
+- Do not close a parent (Feature, Epic, Initiative) this way unless the pull request itself completes the parent's acceptance criteria. Finishing one child does not finish the parent; reference it without a closing keyword, such as `Part of #N`.
+- A pull request that only advances an item, without meeting its acceptance criteria, references it without a closing keyword.
+
 Default base score is `Impact*2 + BusinessValue*2 + EnablerValue + (6-Effort)`. Each prerequisite receives 25% of each direct dependent's final score. The final list is dependency-valid; completed items score zero, and blocked or unrefined items are not returned by `next`.
 
 Report IDs, concise titles, base/final scores, material dependency effects, the next executable item, and what it passed over. This workflow does not mutate GitHub.
