@@ -21,6 +21,11 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Changed
 
+- CI runs the suite, the CLI check, the budgets and the wheel smoke test on
+  Linux, Windows and macOS with every Python from 3.11 to 3.14, instead of
+  Ubuntu with 3.11 only (R32). The classifiers now list the same versions, and a
+  test fails if the two drift apart.
+
 - Snapshots read issue relationships in batched GraphQL instead of two REST
   requests per issue (S-R28-1). A relationship request covers 50 issues, so the
   cost grows with batches rather than issues: this repository's 81-issue

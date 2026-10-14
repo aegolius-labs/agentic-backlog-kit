@@ -9,19 +9,24 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  suite:
+    name: suite (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Every minor version pyproject.toml claims. The classifiers must list
+        # the same set; tests/test_supported_platforms.py fails if they drift.
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
-      - name: Verify pinned release contract
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python -m pip install PyYAML==6.0.3
-          python scripts/release_contract.py --verify-remote
+          python-version: ${{ matrix.python }}
       - name: Run unit tests
         env:
           PYTHONPATH: src
@@ -37,3 +42,32 @@ jobs:
           abk --help
       - name: Check token and byte budgets
         run: python scripts/benchmark.py --check
+
+  release-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Verify pinned release contract
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m pip install PyYAML==6.0.3
+          python scripts/release_contract.py --verify-remote
+
+  # One stable check name for branch protection, whatever the matrix holds.
+  test:
+    needs: [suite, release-contract]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every platform and the release contract to pass
+        env:
+          SUITE: ${{ needs.suite.result }}
+          CONTRACT: ${{ needs.release-contract.result }}
+        run: |
+          echo "suite=$SUITE release-contract=$CONTRACT"
+          test "$SUITE" = success
+          test "$CONTRACT" = success
