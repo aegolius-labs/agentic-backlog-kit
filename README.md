@@ -153,6 +153,11 @@ python scripts/backlog.py sync-apply `
   --receipt .agentic-backlog/receipts/apply.json
 ```
 
+A sync plan made solely of Priority field updates reports `priority_only: true`
+and may be applied without `--confirm`: the kit derives Priority, GitHub cannot,
+and the owner pre-authorized that housekeeping. Every other plan needs the
+reviewed digest.
+
 Apply commands do not trust saved snapshots. They refresh GitHub, rebuild the
 plan against the current validated manifest, and abort before the first write
 unless its digest still matches the reviewed plan. Plans bind normalized local

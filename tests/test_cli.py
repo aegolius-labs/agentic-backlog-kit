@@ -5,7 +5,7 @@ import json
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -542,6 +542,58 @@ class CliTests(unittest.TestCase):
             self.assertEqual("converged", saved["verification"]["status"])
             self.assertFalse(saved["verification"]["lag_observed"])
             self.assertEqual(1, saved["verification"]["reads"])
+
+    def test_sync_apply_takes_a_priority_only_plan_without_confirm(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            plan_path = root / "plan.json"
+            receipt_path = root / "receipt.json"
+            data = manifest(item("T-1"), item("T-2", depends_on=["T-1"]))
+            manifest_path.write_text(json.dumps(data), encoding="utf-8")
+            github = SimulatedGitHub(data)
+            reader = GitHubSnapshotReader(
+                github, owner="aegolius-labs", repository="example", project_number=1
+            )
+            first = build_sync_plan(data, reader.read())
+            plan_path.write_text(json.dumps(first.as_dict()), encoding="utf-8")
+            command = [
+                "sync-apply",
+                "--manifest",
+                str(manifest_path),
+                "--plan",
+                str(plan_path),
+                "--receipt",
+                str(receipt_path),
+            ]
+
+            with (
+                patch("agentic_backlog_kit.cli._transport", return_value=github),
+                redirect_stdout(io.StringIO()),
+            ):
+                refused = io.StringIO()
+                with redirect_stderr(refused):
+                    self.assertEqual(1, main(command))
+                self.assertEqual(
+                    "ApplyAuthorizationError", json.loads(refused.getvalue())["error"]
+                )
+                self.assertIn("Priority", json.loads(refused.getvalue())["message"])
+                self.assertEqual([], github.issues)
+                self.assertEqual(0, main(command + ["--confirm", first.digest]))
+
+                # Only the kit-derived score is stale now.
+                for project_item in github.project_items:
+                    project_item["fields"]["Priority"] = 0.0
+                stale = build_sync_plan(data, reader.read())
+                self.assertTrue(stale.priority_only)
+                plan_path.write_text(json.dumps(stale.as_dict()), encoding="utf-8")
+
+                self.assertEqual(0, main(command))
+
+            saved = json.loads(receipt_path.read_text())
+            self.assertEqual("completed", saved["status"])
+            self.assertEqual("priority-only", saved["authorization"])
+            self.assertEqual("converged", saved["verification"]["status"])
 
     def test_scaffold_apply_refreshes_remote_state_and_writes_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1094,7 +1094,7 @@
       "depends_on": [],
       "sprint": null,
       "maturity": "ready",
-      "status": "Ready",
+      "status": "In Review",
       "id": "S-R10-4",
       "parent": "R10",
       "title": "Recognize Priority-only plans as pre-authorized",
