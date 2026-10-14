@@ -13,6 +13,8 @@ description: Build and optionally commit a capacity-bounded, dependency-safe spr
 6. Planning alone is read-only. If the user asks to commit, proceed only when `ready_to_commit: true`; patch each selected item with the resolved iteration title (never an alias) and `status: Planned`, validate, then invoke the GitHub sync workflow.
 7. If standard Project views are missing, produce a scaffold plan before synchronization. Do not create the Kanban or sprint board ad hoc.
 
+When committed items are handed to agents, each pull request carries `Closes #N` for every kit-managed issue it completes, and never for a parent unless it completes the parent's acceptance criteria. `$backlog-prioritize` states the full rule.
+
 Read [references/sprint-contract.md](references/sprint-contract.md) for eligibility and commitment rules.
 
 After a GitHub commit, refresh and re-plan to verify the current-sprint board and iteration assignments. Stop if the target is completed, ambiguous, overlapping, stale/gapped, missing metadata, or changed identity.

@@ -68,7 +68,7 @@ gantt
     section v0.1.2 - Apply ergonomics
     R23 - Converge a fresh Project in one scaffold apply :R23, 2027-01-20, 6d
     section R10 - Close the work lifecycle from evidence
-    Make agents link PRs to kit issues with closing keywords :S-R10-1, 2027-02-15, 2d
+    Make agents link PRs to kit issues with closing keywords :active, S-R10-1, 2027-02-15, 2d
     Recognize Priority-only plans as pre-authorized :active, S-R10-4, 2027-02-25, 4d
     Propose closing a parent once every child is closed :S-R10-2, 2027-03-13, 6d
     Remove relationships the manifest no longer declares :S-R10-3, 2027-03-19, 10d
