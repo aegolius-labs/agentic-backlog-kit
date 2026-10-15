@@ -48,7 +48,7 @@ gantt
     Offer explicit carryover review for work assigned elsewhere :S-R16-2, 2026-12-21, 6d
     section R31 - Re-verify agent behavior on the current release in...
     Re-run the installed-plugin evaluation in Codex on the cu... :S-R31-1, 2026-11-15, 6d
-    Run the first end-to-end evaluation in Claude Code :S-R31-2, 2026-11-21, 6d
+    Run the first end-to-end evaluation in Claude Code :active, S-R31-2, 2026-11-21, 6d
     section R21 - Run the kit against its own backlog
     Write up first-use friction against the responsible item :active, S-R21-3, 2026-11-27, 2d
     section Planning and handoff - leave a backlog another agent can...

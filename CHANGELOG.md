@@ -26,6 +26,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   the access the kit needs (S-R33-1). The init skill states the same limit and
   stops before planning for a personal account.
 
+- First end-to-end installed-plugin evaluation in Claude Code (S-R31-2). The
+  corpus ran against v0.18.0 through the new
+  `scripts/installed_plugin_eval.py claude-code` runner: 15 of 21 cases pass,
+  with no apply, GitHub command or out-of-scope manifest change. The findings
+  are recorded in `docs/validation.md`.
+
 - The prioritize and sprint-plan skills tell an agent handed kit work to put
   `Closes #N` in the pull request body for each kit-managed issue it completes,
   and not to close a parent that way unless the pull request completes the

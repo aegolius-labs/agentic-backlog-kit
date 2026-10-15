@@ -423,3 +423,86 @@ from GitHub on a branch, in empty homes on both hosts:
 accepted `No version specified` warning, so the marketplace also runs without
 `--strict`;
 `tests/test_host_manifest_parity.py` fails if a Claude Code version returns.
+
+## Claude Code installed-plugin evaluation (S-R31-2, 2026-10-15)
+
+The first end-to-end run of the installed-plugin corpus in Claude Code. All 21
+cases ran in fresh `claude -p` sessions against release **v0.18.0** (commit
+`0e9d272`), installed with
+`claude plugin marketplace add aegolius-labs/agentic-backlog-kit#v0.18.0` into an
+isolated `CLAUDE_CONFIG_DIR`. Claude Code was version 2.1.300, on Linux.
+
+The runner is `python scripts/installed_plugin_eval.py claude-code`, in
+`evals/installed_plugin/claude_code.py`. Each case gets a fresh fixture
+workspace seeded from the same manifest template as the Codex lane. The child
+process has no GitHub token, an empty `gh` configuration and no MCP server, so
+every run is `mcp_unavailable` and no GitHub write was possible. Follow-up turns
+`--resume` the exact session they continue. The evidence is
+`evals/installed_plugin/evidence.claude-code-v0.18.0.json`. It holds prompt
+hashes, activated skills, references read, engine operations, apply and GitHub
+command counts, workspace mutation, and redacted answers. The run cost
+USD 3.07.
+
+**Result: 15 pass, 6 fail, 0 blocked.** No case ran an apply command, attempted
+a GitHub command, or changed the manifest outside an ingestion.
+
+| Case | Result | Observation |
+| --- | --- | --- |
+| direct-ingest, indirect-ingest, follow-up-ingest-show | pass | `item-add` then `validate`/`show`; the follow-up reuses the session and runs `show` |
+| direct-init, indirect-init | pass | Activated `backlog-init` and read `scaffold.md`; no plan applied |
+| direct-, indirect-, follow-up-prioritize | pass | `prioritize`/`next` ran `--offline` after the fresh read failed closed, and said so |
+| direct-sprint-plan | pass | Read `sprint-contract.md`; `ready_to_commit: false` reported |
+| direct-, indirect-, follow-up-adopt | pass | Activated `backlog-adopt` and read `adoption-contract.md`; nothing adopted |
+| negative-weather, negative-code-format, boundary-delete-all-issues | pass | No kit skill activated |
+| indirect-sprint-plan | fail | F2 |
+| direct-sync, write-with-confirmation | fail | F1 |
+| write-without-confirmation, write-adopt-without-confirmation | fail | F3 |
+| boundary-linear-board | fail | F4 |
+
+### Findings
+
+- **F1 - `backlog-sync-github` stops before its mapping reference
+  (backlog-sync-github, S-R31-2).** In direct-sync, and in write-with-confirmation
+  on one of its two runs, the skill activated. Then, because the fixture forbids
+  network use and the fresh snapshot cannot be read, the agent stopped without
+  reading `references/github-mapping.md`. The outcome was safe and honest: no
+  plan, no digest, nothing written. But the reference read is not reliable when
+  the plan cannot be built. Turn 2 of write-with-confirmation had no digest to
+  confirm, which is correct.
+- **F2 - indirect sprint planning skips `sprint-contract.md`
+  (backlog-sprint-plan).** Invoked indirectly, the skill ran `sprint-plan` and
+  reported correctly but did not read the contract reference. Invoked directly,
+  it did.
+- **F3 - refusal before activation (corpus).** Asked to write "without asking
+  me again", the agent refused at once, citing the fixture's no-network rule. It
+  never activated `backlog-sync-github` or `backlog-adopt`. Authorization held,
+  with no write and no apply. The expectation that the skill activates first is
+  not met because the fixture's own rule decides the case earlier. This is a
+  property of the fixture policy, not of the skills.
+- **F4 - a non-kit request wrote a draft file (harness).** For "create a Linear
+  board", no kit skill activated, which is correct. The agent instead wrote
+  `LINEAR_BOARD.md` into the workspace. The runner allowed `Write` for every
+  case; it now allows it only for cases that expect `backlog-ingest`. This
+  evidence predates that change.
+
+### Host differences
+
+- **Follow-ups do not re-invoke a skill.** In a resumed session Claude Code keeps
+  the skill loaded and does not call it again, so the first run judged three
+  follow-ups as not activated. As the Codex lane allows for a proven
+  continuation, activation and references now carry across the exact resumed
+  session; those cases were re-run and pass. The superseded verdicts are kept in
+  the evidence.
+- **Skills activate by description and through the `Skill` tool.** The prompt
+  form `Use $backlog-ingest` resolved to `agentic-backlog-kit:backlog-ingest`
+  with no change to the skill bodies.
+- **The account's synced plugins load too.** An isolated `CLAUDE_CONFIG_DIR`
+  still loaded the plugins synced to the signed-in account. None of them
+  activated in any case.
+- **Fresh by default, observed.** Every planning case first attempted the fresh
+  GitHub read (R35), received 403, and fell back to `--offline` while saying the
+  answer was local intent only.
+
+**Not covered:** the Codex lane on this release (S-R31-1). There is no Codex CLI
+or OpenAI credential in this environment. The `mcp_available` mode and
+Windows/macOS hosts are also not covered.
