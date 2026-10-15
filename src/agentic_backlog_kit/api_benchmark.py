@@ -192,6 +192,16 @@ class SimulatedGitHub:
                 child = self._number_for_database_id(payload["sub_issue_id"])
                 self.parents[child] = number
                 return {}
+            if method == "DELETE" and suffix == "/sub_issue":
+                child = self._number_for_database_id(payload["sub_issue_id"])
+                if self.parents.get(child) != number:
+                    raise AssertionError(f"#{child} is not a sub-issue of #{number}")
+                del self.parents[child]
+                return {}
+            if method == "DELETE" and suffix.startswith("/dependencies/blocked_by/"):
+                blocker = self._number_for_database_id(int(suffix.rsplit("/", 1)[1]))
+                self.blocked_by[number].remove(blocker)
+                return {}
             if method == "POST" and suffix == "/dependencies/blocked_by":
                 blocker = self._number_for_database_id(payload["issue_id"])
                 self.blocked_by.setdefault(number, []).append(blocker)
