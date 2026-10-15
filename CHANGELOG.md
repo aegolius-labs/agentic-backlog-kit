@@ -8,6 +8,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Fixed
 
+- `backlog-sync-github` and `backlog-sprint-plan` read their rules reference
+  (`github-mapping.md`, `sprint-contract.md`) as step 1. In the Claude Code
+  evaluation, the sync skill could stop before reading it when GitHub was
+  unreachable, and indirect sprint planning skipped it (F1, F2). Nine re-runs
+  all read it.
+
 - `claude plugin update` now delivers new skills. The Claude Code manifests no
   longer declare a version, so Claude Code versions the plugin by commit instead
   of reporting the fixed `0.2.0` as already up to date. An install made before
