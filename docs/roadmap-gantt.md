@@ -39,7 +39,7 @@ gantt
     Re-read within a bounded window before calling post-apply... :S-R29-2, 2027-01-26, 6d
     section R30 - Install without cloning, and start from a quickstart
     Install from the GitHub marketplace on both hosts, verified :S-R30-1, 2026-10-20, 4d
-    Write a quickstart from install to first converged sync :S-R30-2, 2026-11-05, 4d
+    Write a quickstart from install to first converged sync :active, S-R30-2, 2026-11-05, 4d
     section R22 - Report actionable apply failures
     Name the item and rejected field on apply failure :S-R22-1, 2026-10-24, 6d
     Explain an unavailable native issue type :S-R22-2, 2026-12-03, 2d

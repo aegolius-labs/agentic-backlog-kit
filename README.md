@@ -81,6 +81,10 @@ this public repository.
 
 ## Quick start
 
+New to the kit? Follow [docs/quickstart.md](docs/quickstart.md). It goes from
+install to a first converged sync, covering account type, token permissions,
+and how to read a plan and its digest. The commands below are a reference.
+
 Discover a matching organization Project or preview creation from only the organization and repository:
 
 ```powershell
