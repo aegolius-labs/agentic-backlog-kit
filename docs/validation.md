@@ -485,6 +485,16 @@ a GitHub command, or changed the manifest outside an ingestion.
   case; it now allows it only for cases that expect `backlog-ingest`. This
   evidence predates that change.
 
+**Resolution of F1 and F2 (2026-10-15).** Both skills now read their rules
+reference as step 1, before validating or contacting GitHub, and
+`tests/test_skill_reference_order.py` pins that. I re-ran direct-sync,
+indirect-sprint-plan and write-with-confirmation three times each against the
+change, installed from a local checkout in a fresh `CLAUDE_CONFIG_DIR`. All
+nine runs read the reference. direct-sync and indirect-sprint-plan passed
+3 of 3. write-with-confirmation was `blocked` 3 of 3, which is correct: turn 1
+showed no digest, because the fixture has no GitHub access, so turn 2 had
+nothing to confirm.
+
 ### Host differences
 
 - **Follow-ups do not re-invoke a skill.** In a resumed session Claude Code keeps

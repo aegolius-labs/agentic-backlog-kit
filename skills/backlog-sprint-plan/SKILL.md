@@ -5,7 +5,7 @@ description: Build and optionally commit a capacity-bounded, dependency-safe spr
 
 # Plan a sprint
 
-1. Locate the plugin root and validate the manifest.
+1. Read [references/sprint-contract.md](references/sprint-contract.md) first, however the request is phrased; it holds the eligibility and commitment rules every later step applies. Then locate the plugin root and validate the manifest.
 2. Refresh a Project scaffold snapshot whenever a sprint target is supplied. Accept an exact title, `@current`, or `@next`; never resolve those from remembered dates or board state.
 3. Use the requested capacity, or the manifest default when none is supplied. Run `python <plugin-root>/scripts/backlog.py sprint-plan --capacity N --sprint TARGET --snapshot .agentic-backlog/cache/scaffold.json [--as-of YYYY-MM-DD]`.
 4. Present the resolved title and GitHub iteration ID, selected items in returned order, committed/remaining effort, and only the most material skipped reasons. Do not manually add an item the engine excluded.
@@ -14,7 +14,5 @@ description: Build and optionally commit a capacity-bounded, dependency-safe spr
 7. If standard Project views are missing, produce a scaffold plan before synchronization. Do not create the Kanban or sprint board ad hoc.
 
 When committed items are handed to agents, each pull request carries `Closes #N` for every kit-managed issue it completes, and never for a parent unless it completes the parent's acceptance criteria. `$backlog-prioritize` states the full rule.
-
-Read [references/sprint-contract.md](references/sprint-contract.md) for eligibility and commitment rules.
 
 After a GitHub commit, refresh and re-plan to verify the current-sprint board and iteration assignments. Stop if the target is completed, ambiguous, overlapping, stale/gapped, missing metadata, or changed identity.

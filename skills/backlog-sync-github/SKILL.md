@@ -7,7 +7,7 @@ description: Reconcile managed Agentic Backlog Kit items with GitHub Issues and 
 
 Use GitHub MCP when it exposes the exact operations in the plan. Otherwise use the plugin launcher, which prefers authenticated GitHub CLI and falls back to direct API access.
 
-1. Locate the plugin root and validate the local manifest.
+1. Read [references/github-mapping.md](references/github-mapping.md) first, before anything else and even when GitHub turns out to be unreachable; it holds the remote mapping, executor choices, and the boundary of what sync may write. Then locate the plugin root and validate the local manifest.
 2. Refresh a remote snapshot. Never plan from remembered or conversational GitHub state.
 3. Run `sync-plan` and present the action count by kind, affected stable IDs, and digest. Planning is the default.
 4. If required Project fields or views are missing, stop and produce a scaffold plan first.
@@ -17,8 +17,6 @@ Use GitHub MCP when it exposes the exact operations in the plan. Otherwise use t
 8. After success, `sync-apply` verifies itself: it re-reads GitHub and re-plans. Residuals that ask again for values it just wrote are treated as GitHub's read-after-write lag and re-read for up to `--verify-window` seconds (default 60); a residual it did not write, or lag that outlasts the window, is drift. The receipt's `verification` records `status` (`converged` or `drift`), `lag_observed`, `reads`, and `convergence_seconds`, and the command exits non-zero on drift. After drift or interruption, refresh and re-plan. Zero actions means verified convergence. A remaining plan needs its own digest confirmation; never replay an interrupted plan blindly. Persist the receipt under `.agentic-backlog/receipts/` when using the launcher.
 
 A plan whose `priority_only` is `true` consists solely of Priority field updates. The owner pre-authorized those on 2026-09-24, because Priority is derived by the kit and GitHub cannot compute it. Apply it with `sync-apply` and no `--confirm`, then report the receipt as usual. The engine decides the flag from the actions; never edit a plan to obtain it, and never treat a plan with any other action, or a Priority update alongside any other field, as pre-authorized. If `sync-apply` refuses for lack of a confirmation, the plan is not Priority-only: present it and ask.
-
-Read [references/github-mapping.md](references/github-mapping.md) for the remote mapping, executor choices, and non-destructive boundary.
 
 Never delete issues or archive Project items, and never close an issue or remove a relationship yourself. The engine proposes `issue.remove_parent` and `issue.remove_dependency` for links between manifest items that the manifest no longer declares; report each with its `restore` record and confirm it like any other action. If a removal surprises the user, the link was probably added on GitHub by hand: offer to declare it in the manifest instead of removing it. The one closure the engine proposes is `issue.close_parent`: a parent whose children are all closed on GitHub, closed as completed and marked Done. Present it like any other action; it needs the same digest confirmation. Never close an issue because the manifest no longer lists it.
 
