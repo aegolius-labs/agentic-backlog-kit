@@ -21,6 +21,11 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   held edits and `priority_only` before confirming. It has not yet been followed
   end to end on a fresh fixture; that evidence is still owed.
 
+- The README opens with the supported configurations: organization-owned
+  Projects only, one repository and one Project per manifest, github.com, and
+  the access the kit needs (S-R33-1). The init skill states the same limit and
+  stops before planning for a personal account.
+
 - The prioritize and sprint-plan skills tell an agent handed kit work to put
   `Closes #N` in the pull request body for each kit-managed issue it completes,
   and not to close a parent that way unless the pull request completes the
