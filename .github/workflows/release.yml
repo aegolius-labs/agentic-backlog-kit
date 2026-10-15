@@ -17,7 +17,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
-    uses: aegolius-labs/.github/.github/workflows/compute-release.yml@9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
+    uses: aegolius-labs/.github/.github/workflows/compute-release.yml@3d2ef399b39ab1988fe7d5ba66cca5742dc3fbd2
 
   baseline-guard:
     # A no-bump is only trustworthy when there is a baseline to have bumped
