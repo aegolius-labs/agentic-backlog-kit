@@ -64,7 +64,7 @@ gantt
     R34 - Prove it with one outside pilot :R34, 2027-01-10, 6d
     section R33 - State what is supported and promise compatibility
     Publish a compatibility policy and 1.0 criteria :S-R33-2, 2027-01-16, 4d
-    State supported account types and repository scope up front :S-R33-1, 2027-02-13, 2d
+    State supported account types and repository scope up front :active, S-R33-1, 2027-02-13, 2d
     section v0.1.2 - Apply ergonomics
     R23 - Converge a fresh Project in one scaffold apply :R23, 2027-01-20, 6d
     section R10 - Close the work lifecycle from evidence

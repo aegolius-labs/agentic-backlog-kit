@@ -4,6 +4,23 @@ A Codex-first plugin for managing GitHub Issues and Projects as a structured, de
 
 The kit combines focused skills with a zero-runtime-dependency Python engine. Agents use natural language for judgment-heavy work such as idea refinement, then hand validation, scoring, sprint packing, remote discovery, and synchronization to deterministic code. This keeps large backlogs out of model context and makes mutations reviewable.
 
+## Supported configurations
+
+Read this before installing.
+
+- **Organization-owned Projects only.** Every Project query the kit sends is
+  `organization(login: ...)`. A Project owned by a personal account is not
+  supported: discovery, scaffolding and sync cannot reach it.
+- **One repository and one Project per manifest.** Issues, sub-issues and
+  dependencies are managed in that repository. A relationship that points into
+  another repository is withheld with its reason during adoption and is never
+  created, changed or removed by sync. Cross-repository backlogs are out of
+  scope.
+- **GitHub.com.** The kit has been validated against github.com only.
+- **Access:** repository Issues read/write and organization Projects read/write,
+  plus repository Contents to create or link a Project. With a classic token or
+  `gh`, that is the `repo` and `project` scopes.
+
 ## What is included
 
 - `Initiative -> Epic -> Feature -> Story/Bug -> Task` hierarchy backed by GitHub sub-issues.
