@@ -1663,7 +1663,7 @@
       "id": "S-R31-2",
       "depends_on": [],
       "sprint": null,
-      "status": "Ready",
+      "status": "In Review",
       "maturity": "ready",
       "type": "Story",
       "parent": "R31",

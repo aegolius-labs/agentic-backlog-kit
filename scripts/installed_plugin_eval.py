@@ -116,6 +116,18 @@ def _parser() -> argparse.ArgumentParser:
     trace_verify.add_argument("--mode", dest="modes", action="append", choices=EXECUTOR_MODES)
     trace_verify.add_argument("--full-corpus", action="store_true")
     trace_verify.add_argument("--report")
+
+    claude_code = commands.add_parser(
+        "claude-code",
+        help="Run corpus cases in fresh Claude Code sessions (S-R31-2)",
+    )
+    claude_code.add_argument("--output", required=True)
+    claude_code.add_argument(
+        "--config-dir",
+        required=True,
+        help="CLAUDE_CONFIG_DIR with only the plugin under test installed",
+    )
+    claude_code.add_argument("--case", dest="cases", action="append")
     return parser
 
 
@@ -151,6 +163,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "claude-code":
+            from evals.installed_plugin.claude_code import (
+                child_environment,
+                run_corpus,
+            )
+
+            output = Path(args.output).resolve()
+            gh_dir = output / "gh-config-empty"
+            gh_dir.mkdir(parents=True, exist_ok=True)
+            results = run_corpus(
+                output,
+                child_environment(Path(args.config_dir).resolve(), gh_dir),
+                cases=args.cases,
+            )
+            _write_json(output / "claude-code-results.json", results)
+            counts: dict[str, int] = {}
+            for result in results:
+                counts[result["status"]] = counts.get(result["status"], 0) + 1
+            print(json.dumps({"cases": len(results), "by_status": counts}, indent=2))
+            return 0 if not counts.get("fail") else 1
         suite_path = _suite_path(args.suite)
         suite = _read_json(suite_path)
         if args.command == "show":

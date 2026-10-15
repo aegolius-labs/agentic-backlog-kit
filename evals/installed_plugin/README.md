@@ -54,6 +54,21 @@ python scripts/installed_plugin_eval.py diagnose `
 An unavailable or access-denied executable is recorded as a diagnostic; it is
 not silently treated as an installed-task pass.
 
+## Claude Code lane (S-R31-2)
+
+The same corpus runs in fresh Claude Code sessions. Install the plugin under
+test into an isolated config directory, then run every case or selected ones:
+
+    CLAUDE_CONFIG_DIR=/tmp/abk-cc claude plugin marketplace add aegolius-labs/agentic-backlog-kit#vX.Y.Z
+    CLAUDE_CONFIG_DIR=/tmp/abk-cc claude plugin install agentic-backlog-kit@aegolius-labs-backlog
+    python scripts/installed_plugin_eval.py claude-code --output /tmp/abk-cc-run --config-dir /tmp/abk-cc [--case ID ...]
+
+The child gets no GitHub token, an empty `gh` configuration and no MCP server.
+`Write` is allowed only for ingestion cases, and follow-up turns resume the exact
+session. Results land in `claude-code-results.json`; the committed evidence for
+v0.18.0 is `evidence.claude-code-v0.18.0.json`, summarized in
+`docs/validation.md`.
+
 ## Record and verify fresh-task results
 
 ### Bounded installed-CLI traces
