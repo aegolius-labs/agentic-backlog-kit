@@ -200,8 +200,11 @@ converged on a later read-only refresh.
 
 The release scope is additive and update-only. It creates or updates managed
 issues, Project membership and fields, parent relationships, and missing
-dependencies. It does not delete issues, remove relationships, archive Project
-items, or automatically close completed issues. Disposable evaluation cleanup
+dependencies. It does not delete issues, remove relationships, or archive Project
+items. The one closure it proposes is a parent whose children are all closed on
+GitHub: `issue.close_parent` closes it as completed and marks it Done, through the
+ordinary confirmed plan, bound to each child's observed state (S-R10-2). It never
+closes an issue because the manifest no longer lists it. Disposable evaluation cleanup
 is a separate, explicitly confirmed destructive operation. The current
 manifest models one repository and one organization Project; cross-repository
 backlogs are outside this release.

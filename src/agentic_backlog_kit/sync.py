@@ -667,6 +667,45 @@ def _issue_title_body_plan(
     return issue_changes, held_fields, was_any_field_held
 
 
+def _completed_parents(
+    data: dict[str, Any],
+    local_by_id: dict[str, dict[str, Any]],
+    remote_by_id: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Return open parents whose every child is closed on GitHub (S-R10-2).
+
+    Children are the manifest items naming the parent. A parent with no
+    children, a child not yet on GitHub, or any open child is never proposed:
+    closing is supported only by the evidence of every child's closure. Maps
+    each proposed parent to the observed state of its children, which the
+    plan records as the action's remote precondition.
+    """
+
+    children: dict[str, list[str]] = {}
+    for item in data["items"]:
+        if item["parent"]:
+            children.setdefault(item["parent"], []).append(item["id"])
+    proposed: dict[str, dict[str, Any]] = {}
+    for parent_id in sorted(children):
+        parent_remote = remote_by_id.get(parent_id)
+        if parent_id not in local_by_id or parent_remote is None:
+            continue
+        if parent_remote.get("state") != "open":
+            continue
+        observed: dict[str, Any] = {}
+        for child_id in sorted(children[parent_id]):
+            child_remote = remote_by_id.get(child_id)
+            if child_remote is None or child_remote.get("state") != "closed":
+                break
+            observed[child_id] = {
+                "number": child_remote.get("number"),
+                "state": "closed",
+            }
+        else:
+            proposed[parent_id] = observed
+    return proposed
+
+
 def build_sync_plan(
     manifest: dict[str, Any],
     remote_snapshot: dict[str, Any],
@@ -712,6 +751,8 @@ def build_sync_plan(
     # settle the priorities it just invalidated.
     operational, _ = compose_operational_state(manifest, remote_snapshot)
     intended = {item["id"]: item for item in operational["items"]}
+    done_status = data["workflow"]["done_statuses"][0]
+    completed_parents = _completed_parents(data, local_by_id, remote_by_id)
     for item_id, fields in requested_transitions.items():
         target = intended.get(item_id)
         if target is None:  # pragma: no cover - rejected during normalization
@@ -720,6 +761,10 @@ def build_sync_plan(
             target["status"] = fields["Status"]
         if sprint_field in fields:
             target["sprint"] = fields[sprint_field]
+    # A proposed closure leaves its parent Done, so it is scored that way for
+    # the same reason a transition is.
+    for parent_id in completed_parents:
+        intended[parent_id]["status"] = done_status
     score_by_id = {entry.id: entry.priority_score for entry in prioritize(operational)}
 
     creates: list[SyncAction] = []
@@ -885,12 +930,29 @@ def build_sync_plan(
                 )
             )
 
+    closure_actions: list[SyncAction] = []
+    for parent_id, children in completed_parents.items():
+        remote = remote_by_id[parent_id]
+        payload: dict[str, Any] = {"state": "closed", "state_reason": "completed"}
+        current_status = (remote.get("project_fields") or {}).get("Status")
+        if remote.get("in_project", False) and current_status != done_status:
+            payload["fields"] = {"Status": done_status}
+        closure_actions.append(
+            SyncAction(
+                "issue.close_parent",
+                parent_id,
+                payload,
+                {"issue": remote, "children": children},
+            )
+        )
+
     actions = (
         creates
         + updates
         + project_actions
         + transition_actions
         + relationship_actions
+        + closure_actions
     )
     held_remote_edits.sort(key=lambda entry: entry["item_id"])
     manifest_fingerprint = state_fingerprint(data)

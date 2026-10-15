@@ -1052,7 +1052,7 @@
       "depends_on": [],
       "sprint": null,
       "maturity": "ready",
-      "status": "Ready",
+      "status": "In Review",
       "id": "S-R10-2",
       "parent": "R10",
       "title": "Propose closing a parent once every child is closed",

@@ -55,6 +55,7 @@ ACTION_CAPABILITIES: dict[str, frozenset[str]] = {
     "issue.update": frozenset({ISSUE_WRITE}),
     "issue.set_parent": frozenset({ISSUE_HIERARCHY}),
     "issue.add_dependency": frozenset({ISSUE_DEPENDENCY}),
+    "issue.close_parent": frozenset({ISSUE_WRITE, PROJECT_ITEM_WRITE}),
     "project.add_item": frozenset({PROJECT_ITEM_WRITE}),
     "project.set_fields": frozenset({PROJECT_ITEM_WRITE}),
     "project.transition": frozenset({PROJECT_ITEM_WRITE}),

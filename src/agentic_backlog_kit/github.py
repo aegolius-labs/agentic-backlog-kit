@@ -582,6 +582,13 @@ class GitHubService:
             {"body": body},
         )
 
+    def close_issue(self, issue: GitHubIssueRef, state_reason: str) -> None:
+        self.transport.rest(
+            "PATCH",
+            f"{self.repository_path}/issues/{issue.number}",
+            {"state": "closed", "state_reason": state_reason},
+        )
+
     def set_parent(self, child: GitHubIssueRef, parent: GitHubIssueRef) -> None:
         self.transport.rest(
             "POST",
@@ -1072,6 +1079,11 @@ class GitHubPlanExecutor:
             self.service.add_dependency(
                 self._get(action.item_id), self._get(action.payload["depends_on"])
             )
+        elif action.kind == "issue.close_parent":
+            issue = self._get(action.item_id)
+            self.service.close_issue(issue, action.payload["state_reason"])
+            if action.payload.get("fields"):
+                self.service.set_project_fields(issue, action.payload["fields"])
         else:
             raise ManifestError(f"Unsupported sync action kind '{action.kind}'")
 

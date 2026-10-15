@@ -176,7 +176,7 @@ class SimulatedGitHub:
             suffix = match.group(2) or ""
             if method == "PATCH" and not suffix:
                 issue = self._issue(number)
-                for key in ("title", "body", "state"):
+                for key in ("title", "body", "state", "state_reason"):
                     if key in payload:
                         issue[key] = payload[key]
                 if "type" in payload:

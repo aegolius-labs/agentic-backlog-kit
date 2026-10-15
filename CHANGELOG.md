@@ -39,6 +39,14 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- `sync-plan` proposes `issue.close_parent` for an open parent whose manifest
+  children are all closed on GitHub: it closes the parent as completed and marks
+  it Done (S-R10-2). It goes through the ordinary digest-confirmed plan. Its
+  precondition records each child's observed state, so a reopened child aborts
+  the apply. The parent is scored as Done in the same plan, so verification
+  converges. A parent with no children or any open child is never proposed, and
+  nothing is closed because the manifest stopped listing it.
+
 - A sync plan made solely of Priority field updates reports `priority_only: true`,
   and `sync-apply` applies it without `--confirm` (S-R10-4). The engine decides
   this from the actions, so a plan file cannot claim it. Any other plan is still
