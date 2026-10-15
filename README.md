@@ -198,10 +198,12 @@ seconds before reporting drift in the receipt. Do not replay the
 old plan; refresh and re-plan after propagation. Wave C's direct-API run
 converged on a later read-only refresh.
 
-The release scope is additive and update-only. It creates or updates managed
-issues, Project membership and fields, parent relationships, and missing
-dependencies. It does not delete issues, remove relationships, or archive Project
-items. The one closure it proposes is a parent whose children are all closed on
+Synchronization creates or updates managed issues, Project membership and
+fields, parent relationships, and missing dependencies. It does not delete issues
+or archive Project items. It removes a parent or dependency link only when both
+ends are manifest items and the manifest no longer declares the link; each
+removal carries a `restore` record naming the action and issue numbers that put
+it back (S-R10-3). Links to issues outside the manifest are never removed. The one closure it proposes is a parent whose children are all closed on
 GitHub: `issue.close_parent` closes it as completed and marks it Done, through the
 ordinary confirmed plan, bound to each child's observed state (S-R10-2). It never
 closes an issue because the manifest no longer lists it. Disposable evaluation cleanup

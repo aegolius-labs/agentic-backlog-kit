@@ -509,7 +509,7 @@
       "effort": 5,
       "business_value": 3,
       "enabler_value": 3,
-      "status": "Ready",
+      "status": "In Review",
       "maturity": "refined",
       "sprint": null
     },
@@ -1073,7 +1073,7 @@
       "depends_on": [],
       "sprint": null,
       "maturity": "ready",
-      "status": "Ready",
+      "status": "In Review",
       "id": "S-R10-3",
       "parent": "R10",
       "title": "Remove relationships the manifest no longer declares",

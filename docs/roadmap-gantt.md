@@ -71,7 +71,7 @@ gantt
     Make agents link PRs to kit issues with closing keywords :active, S-R10-1, 2027-02-15, 2d
     Recognize Priority-only plans as pre-authorized :active, S-R10-4, 2027-02-25, 4d
     Propose closing a parent once every child is closed :active, S-R10-2, 2027-03-13, 6d
-    Remove relationships the manifest no longer declares :S-R10-3, 2027-03-19, 10d
+    Remove relationships the manifest no longer declares :active, S-R10-3, 2027-03-19, 10d
     section R32 - Test every supported platform and Python version in CI
     Run the suite on Linux, Windows and macOS in CI :active, S-R32-1, 2027-02-21, 2d
     Cover every Python minor version the package claims :active, S-R32-2, 2027-02-23, 2d

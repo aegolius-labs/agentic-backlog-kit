@@ -73,10 +73,11 @@ A relationship into another repository is withheld with its reason rather than
 matched: one manifest models one repository, and an issue number means nothing
 outside its own.
 
-Flattening was not merely incomplete, it was a divergence: synchronization is
-additive and never removes a parent or a dependency, so an adopted issue kept
-its GitHub structure while the manifest said it had none, and nothing ever
-reconciled the two. Inferring the structure is what makes the manifest agree
+Flattening was not merely incomplete, it was a divergence: an adopted issue kept
+its GitHub structure while the manifest said it had none. Synchronization was
+additive then and never reconciled the two; since S-R10-3 it proposes removing
+links between manifest items that the manifest does not declare, so a flattened
+adoption would see its structure proposed for removal. Inferring the structure is what makes the manifest agree
 with the repository it adopted.
 
 ### What gets proposed, and what gets withheld
@@ -148,8 +149,8 @@ already using. It touches nothing on GitHub, because GitHub is already correct.
 
 Pass `--infer-relationships` here too. Recovery without it produces exactly the
 divergence relationship inference exists to prevent: the item claims no parent
-while GitHub still holds one, and additive synchronization will never reconcile
-that. Recovery resolves against the ids it is about to write as well as the
+while GitHub still holds one, and the next synchronization would propose removing
+that link. Recovery resolves against the ids it is about to write as well as the
 manifest, because one stranded issue can be the parent of another.
 
 This is not hypothetical: the first live adoption hit exactly this, and the

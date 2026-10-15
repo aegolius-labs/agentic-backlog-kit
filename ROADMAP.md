@@ -397,7 +397,7 @@ The gate on anyone other than the maintainer using the kit.
 
 #### R10 - Close the work lifecycle from evidence
 
-- **Status:** Refined 2026-09-24 by owner decision; decomposed into S-R10-1 to S-R10-4.
+- **Status:** All four stories built on 2026-10-15 (S-R10-4 #130, S-R10-1 #131, S-R10-2 #132, S-R10-3 with the aio-agentic-sdlc authority-model amendment); awaiting the owner's post-merge sync. Refined 2026-09-24 by owner decision.
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** Synchronization is deliberately additive and update-only. As first written, R10 would have added closing deleted work, removing relationships, archiving Project items, and reconciling remote changes back into local intent. aio-agentic-sdlc's authority model cites the absence of exactly those operations as what makes the projection one-way, and GitHub state must come back as evidence, never as intent.

@@ -39,6 +39,15 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- `sync-plan` proposes `issue.remove_parent` and `issue.remove_dependency` for
+  links between two manifest items that the manifest no longer declares
+  (S-R10-3). Each carries a `restore` record (action, item ID, payload and issue
+  numbers) that the receipt keeps. Removals run before additions. Links to
+  issues outside the manifest are never removed, and nothing is closed or
+  deleted. A link added on GitHub by hand between manifest items is now proposed
+  for removal unless the manifest declares it, and so are the links of an
+  adoption made without `--infer-relationships`.
+
 - `sync-plan` proposes `issue.close_parent` for an open parent whose manifest
   children are all closed on GitHub: it closes the parent as completed and marks
   it Done (S-R10-2). It goes through the ordinary digest-confirmed plan. Its
