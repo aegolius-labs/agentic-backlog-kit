@@ -15,6 +15,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Documentation
 
+- `docs/quickstart.md` takes a new user from install to a first converged
+  sync (S-R30-2). It states the account type and token permissions up front,
+  then covers init, scaffold, ingest or adopt, and how to read a plan, its digest,
+  held edits and `priority_only` before confirming. It has not yet been followed
+  end to end on a fresh fixture; that evidence is still owed.
+
 - The prioritize and sprint-plan skills tell an agent handed kit work to put
   `Closes #N` in the pull request body for each kit-managed issue it completes,
   and not to close a parent that way unless the pull request completes the
