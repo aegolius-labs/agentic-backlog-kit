@@ -40,9 +40,9 @@ _KIND_GROUPS = {
 
 def _write_key(action: SyncAction) -> tuple[str, ...]:
     group = _KIND_GROUPS.get(action.kind, action.kind)
-    if action.kind == "issue.set_parent":
+    if action.kind in {"issue.set_parent", "issue.remove_parent"}:
         return (group, action.item_id, str(action.payload.get("parent")))
-    if action.kind == "issue.add_dependency":
+    if action.kind in {"issue.add_dependency", "issue.remove_dependency"}:
         return (group, action.item_id, str(action.payload.get("depends_on")))
     return (group, action.item_id)
 

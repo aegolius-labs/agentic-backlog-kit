@@ -706,6 +706,13 @@ def _completed_parents(
     return proposed
 
 
+def _issue_number(
+    remote_by_id: dict[str, dict[str, Any]], item_id: str
+) -> int | None:
+    remote = remote_by_id.get(item_id)
+    return remote.get("number") if remote else None
+
+
 def build_sync_plan(
     manifest: dict[str, Any],
     remote_snapshot: dict[str, Any],
@@ -772,6 +779,7 @@ def build_sync_plan(
     project_actions: list[SyncAction] = []
     transition_actions: list[SyncAction] = []
     relationship_actions: list[SyncAction] = []
+    removal_actions: list[SyncAction] = []
     held_remote_edits: list[dict[str, Any]] = []
 
     for item_id in sorted(local_by_id):
@@ -907,6 +915,34 @@ def build_sync_plan(
                         )
 
         current_parent = remote.get("parent_abk_id") if remote else None
+        # S-R10-3: a link the manifest no longer declares is removed, but only
+        # when both ends are manifest items. A link to anything else, managed
+        # elsewhere or not managed at all, is never touched. A changed parent
+        # needs no removal: set_parent replaces it.
+        if (
+            remote is not None
+            and current_parent in local_by_id
+            and item["parent"] is None
+        ):
+            removal_actions.append(
+                SyncAction(
+                    "issue.remove_parent",
+                    item_id,
+                    {
+                        "parent": current_parent,
+                        "restore": {
+                            "kind": "issue.set_parent",
+                            "item_id": item_id,
+                            "payload": {"parent": current_parent},
+                            "issue_number": remote.get("number"),
+                            "parent_issue_number": _issue_number(
+                                remote_by_id, current_parent
+                            ),
+                        },
+                    },
+                    {"issue": remote},
+                )
+            )
         if item["parent"] and current_parent != item["parent"]:
             relationship_actions.append(
                 SyncAction(
@@ -920,6 +956,28 @@ def build_sync_plan(
         current_dependencies = set(
             remote.get("depends_on_abk_ids", []) if remote else []
         )
+        for dependency in sorted(current_dependencies - set(item["depends_on"])):
+            if remote is None or dependency not in local_by_id:
+                continue
+            removal_actions.append(
+                SyncAction(
+                    "issue.remove_dependency",
+                    item_id,
+                    {
+                        "depends_on": dependency,
+                        "restore": {
+                            "kind": "issue.add_dependency",
+                            "item_id": item_id,
+                            "payload": {"depends_on": dependency},
+                            "issue_number": remote.get("number"),
+                            "blocker_issue_number": _issue_number(
+                                remote_by_id, dependency
+                            ),
+                        },
+                    },
+                    {"issue": remote},
+                )
+            )
         for dependency in sorted(set(item["depends_on"]) - current_dependencies):
             relationship_actions.append(
                 SyncAction(
@@ -951,6 +1009,9 @@ def build_sync_plan(
         + updates
         + project_actions
         + transition_actions
+        # Removals precede additions so that reversing a dependency never asks
+        # GitHub to hold both directions, which it refuses as a cycle.
+        + removal_actions
         + relationship_actions
         + closure_actions
     )

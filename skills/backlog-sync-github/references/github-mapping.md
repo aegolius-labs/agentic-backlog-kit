@@ -42,6 +42,8 @@ the plan, aborts if the digest moved, verifies after apply, and records
 `authorization: "priority-only"` in the receipt. A `--confirm` that is given must
 still match.
 
-The current reconciler is additive and update-only. It creates or updates managed issues, adds them to the Project, sets fields, adds parents, and adds missing dependencies. It does not infer deletion intent from a missing local item.
+The reconciler creates or updates managed issues, adds them to the Project, sets fields, adds parents, and adds missing dependencies. It does not infer deletion intent from a missing local item.
+
+It removes a relationship only when the manifest no longer declares it and both ends are manifest items: `issue.remove_parent` when an item that has a GitHub parent now declares none (a changed parent is replaced by `issue.set_parent`), and `issue.remove_dependency` for a `blocked by` link the item no longer lists. Each payload carries `restore`: the action kind, item ID, payload, and issue numbers that recreate the link. The receipt records it, so a removal can be undone with an ordinary plan. Removals run before additions, so reversing a dependency never asks GitHub to hold both directions. A link to an issue outside the manifest, managed or not, is never removed, and no removal closes or deletes an issue.
 
 One closure is proposed, from evidence: `issue.close_parent` for an open parent whose manifest children are all closed on GitHub. It closes the parent with `state_reason: completed` and sets Status to the first done status when the Project does not already show it. The precondition records each child's number and closed state, so a child reopened after review changes the digest and apply aborts before its first write. A parent with no children, an open child, or a child not yet on GitHub is never proposed, and an issue the manifest no longer lists is never closed.

@@ -596,6 +596,22 @@ class GitHubService:
             {"sub_issue_id": child.database_id, "replace_parent": True},
         )
 
+    def remove_parent(self, child: GitHubIssueRef, parent: GitHubIssueRef) -> None:
+        self.transport.rest(
+            "DELETE",
+            f"{self.repository_path}/issues/{parent.number}/sub_issue",
+            {"sub_issue_id": child.database_id},
+        )
+
+    def remove_dependency(
+        self, issue: GitHubIssueRef, blocker: GitHubIssueRef
+    ) -> None:
+        self.transport.rest(
+            "DELETE",
+            f"{self.repository_path}/issues/{issue.number}"
+            f"/dependencies/blocked_by/{blocker.database_id}",
+        )
+
     def add_dependency(
         self, issue: GitHubIssueRef, blocker: GitHubIssueRef
     ) -> None:
@@ -1084,6 +1100,14 @@ class GitHubPlanExecutor:
             self.service.close_issue(issue, action.payload["state_reason"])
             if action.payload.get("fields"):
                 self.service.set_project_fields(issue, action.payload["fields"])
+        elif action.kind == "issue.remove_parent":
+            self.service.remove_parent(
+                self._get(action.item_id), self._get(action.payload["parent"])
+            )
+        elif action.kind == "issue.remove_dependency":
+            self.service.remove_dependency(
+                self._get(action.item_id), self._get(action.payload["depends_on"])
+            )
         else:
             raise ManifestError(f"Unsupported sync action kind '{action.kind}'")
 
