@@ -106,7 +106,7 @@ jobs:
     permissions:
       contents: write
       actions: read
-    uses: aegolius-labs/.github/.github/workflows/publish-release-assets.yml@9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
+    uses: aegolius-labs/.github/.github/workflows/publish-release-assets.yml@3d2ef399b39ab1988fe7d5ba66cca5742dc3fbd2
     with:
       automation-sha: 9f323e5ef1266f90f6b10c3aa3a595a0f3542ab9
       candidate-sha: ${{ needs.compute-version.outputs.candidate-sha }}
