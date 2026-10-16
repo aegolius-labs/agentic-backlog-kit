@@ -1679,44 +1679,6 @@
       "enabler_value": 3
     },
     {
-      "id": "S-R32-1",
-      "type": "Story",
-      "parent": "R32",
-      "status": "In Review",
-      "maturity": "ready",
-      "depends_on": [],
-      "sprint": null,
-      "title": "Run the suite on Linux, Windows and macOS in CI",
-      "description": "The test workflow runs the unit suite, the CLI check, the byte and call budgets and the wheel smoke test on ubuntu-latest, windows-latest and macos-latest, instead of Ubuntu only. Windows stops depending on hand validation.",
-      "acceptance_criteria": [
-        "Every pull request runs the suite, the CLI check, the budgets and the wheel smoke test on Linux, Windows and macOS",
-        "One aggregate check fails when any platform fails, so branch protection needs no per-platform names"
-      ],
-      "impact": 3,
-      "effort": 1,
-      "business_value": 2,
-      "enabler_value": 3
-    },
-    {
-      "id": "S-R32-2",
-      "type": "Story",
-      "parent": "R32",
-      "status": "In Review",
-      "maturity": "ready",
-      "depends_on": [],
-      "sprint": null,
-      "title": "Cover every Python minor version the package claims",
-      "description": "The package claims Python >=3.11. CI tests every released minor version from 3.11 to 3.14 on each platform, and the package classifiers list the same versions, so the claim and the evidence agree.",
-      "acceptance_criteria": [
-        "CI runs the suite on Python 3.11, 3.12, 3.13 and 3.14 on every platform",
-        "The pyproject classifiers list exactly the versions CI tests, and a test fails if they drift"
-      ],
-      "impact": 3,
-      "effort": 1,
-      "business_value": 2,
-      "enabler_value": 3
-    },
-    {
       "id": "S-R33-1",
       "depends_on": [],
       "sprint": null,
