@@ -14,7 +14,7 @@ never closes one because it stopped being listed.
 
 ## Who fits
 
-- A team of two or more that already plans work in GitHub Issues, or wants to.
+- A noncommercial team of two or more that already plans work in GitHub Issues, or wants to (see Licensing below).
 - An **organization-owned** GitHub Project. Personal-account Projects are not
   supported.
 - One repository. Cross-repository backlogs are out of scope for now.
@@ -24,10 +24,14 @@ never closes one because it stopped being listed.
 
 ## Licensing
 
-The kit is free under the PolyForm Noncommercial License for noncommercial use.
-Use by or for a for-profit organization, including evaluation, needs a written
-agreement; see [COMMERCIAL.md](../COMMERCIAL.md). Pilot terms are arranged with
-Aegolius Labs before the pilot starts.
+A pilot runs under the kit's ordinary
+[PolyForm Noncommercial License](../LICENSE.md), with no separate agreement
+(owner decision, 2026-10-15). That means the pilot team and its use must be
+noncommercial: for example an open-source project maintained by individuals, a
+student or research group, or a nonprofit. Use by or for a for-profit
+organization, including evaluating the kit for one, needs a commercial license
+first; see [COMMERCIAL.md](../COMMERCIAL.md). Such a team is not a pilot under
+this guide.
 
 ## Timeline
 
