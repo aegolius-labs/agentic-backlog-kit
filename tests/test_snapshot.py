@@ -60,7 +60,7 @@ class SnapshotReaderTests(unittest.TestCase):
             "labels": [],
         }
         project = {
-            "organization": {
+            "owner": {
                 "projectV2": {
                     "items": {
                         "nodes": [],
@@ -126,7 +126,7 @@ class SnapshotReaderTests(unittest.TestCase):
         transport.relationships = {2: (base, [base])}
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "items": {
                             "nodes": [
@@ -275,7 +275,7 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "id": "ORG_1",
                     "projectsV2": {
                         "nodes": [
@@ -307,7 +307,7 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
                 },
             },
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "fields": {
                             "nodes": [
@@ -356,7 +356,7 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "id": "ORG_1",
                     "projectsV2": {
                         "nodes": [
@@ -423,7 +423,7 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "id": "ORG_1",
                     "projectsV2": {
                         "nodes": [
@@ -458,7 +458,7 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
                 },
             },
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "fields": {"nodes": []},
                         "views": {"nodes": []},
@@ -477,7 +477,43 @@ class ProjectDiscoveryReaderTests(unittest.TestCase):
         self.assertEqual([2, 7], [entry["number"] for entry in result["projects"]])
         self.assertFalse(result["projects"][0]["linked"])
         self.assertTrue(result["projects"][1]["linked"])
-        self.assertEqual("ORG_1", result["organization"]["id"])
+        self.assertEqual("ORG_1", result["owner"]["id"])
+
+    def test_discovers_projects_owned_by_a_personal_account(self) -> None:
+        transport = RoutedTransport()
+        transport.graphql_responses = [
+            {
+                "owner": {
+                    "__typename": "User",
+                    "id": "USER_1",
+                    "projectsV2": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+                "repository": {
+                    "id": "REPO_1",
+                    "projectsV2": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            },
+        ]
+        transport.rest_responses[
+            ("GET", "/repos/MustacheMushroom/example/labels?per_page=100&page=1")
+        ] = []
+
+        result = GitHubProjectDiscoveryReader(
+            transport, owner="MustacheMushroom", repository="example"
+        ).read()
+
+        self.assertEqual(
+            {"login": "MustacheMushroom", "id": "USER_1", "type": "User"},
+            result["owner"],
+        )
+        self.assertIn("repositoryOwner(login: $owner)", transport.graphql_calls[0][0])
+        self.assertNotIn("organization(", transport.graphql_calls[0][0])
 
 
 class ScaffoldSnapshotReaderTests(unittest.TestCase):
@@ -485,7 +521,7 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "fields": {
                             "nodes": [
@@ -527,7 +563,7 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         transport = RoutedTransport()
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "fields": {
                             "nodes": [
@@ -591,7 +627,7 @@ class ScaffoldSnapshotReaderTests(unittest.TestCase):
         }
         transport.graphql_responses = [
             {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "fields": {
                             "nodes": [

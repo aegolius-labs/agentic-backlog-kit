@@ -5,9 +5,9 @@ description: Initialize or repair an Agentic Backlog Kit manifest and scaffold i
 
 # Initialize a backlog
 
-Only organization-owned Projects are supported: every Project query is organization-scoped, so a personal account's Project cannot be discovered, scaffolded or synchronized. If the owner is a personal account, stop and say so before planning anything. One manifest manages one repository and one organization Project.
+The Project belongs to the repository's owner, an organization or a personal account. Personal accounts have no native issue types, so use the `type:*` label fallback there. One manifest manages one repository and one Project.
 
-Use GitHub Issues and the configured organization Project as the operational system of record. The tracked manifest is compact desired configuration, not a second live board.
+Use GitHub Issues and the configured Project as the operational system of record. The tracked manifest is compact desired configuration, not a second live board.
 
 1. Locate the plugin root containing `.codex-plugin/plugin.json`; use `python <plugin-root>/scripts/backlog.py` for deterministic operations.
 2. Discover the repository owner/name from the current Git remote when possible. A Project title or number is optional.

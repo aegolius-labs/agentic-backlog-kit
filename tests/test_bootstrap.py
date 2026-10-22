@@ -14,7 +14,7 @@ from agentic_backlog_kit.manifest import ManifestError
 
 def discovery(*projects: dict) -> dict:
     return {
-        "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+        "owner": {"login": "aegolius-labs", "id": "ORG_1"},
         "repository": {"name": "example", "id": "REPO_1"},
         "projects": list(projects),
         "labels": [],
@@ -35,6 +35,29 @@ def project(number: int, title: str, *, linked: bool = False) -> dict:
 
 
 class BootstrapPlanningTests(unittest.TestCase):
+    def test_a_personal_account_project_is_created_for_its_user(self) -> None:
+        plan = build_bootstrap_plan(
+            "MustacheMushroom",
+            "example",
+            {
+                "owner": {"login": "MustacheMushroom", "id": "USER_1", "type": "User"},
+                "repository": {"name": "example", "id": "REPO_1"},
+                "projects": [],
+                "labels": [],
+            },
+        )
+
+        self.assertEqual("project.create", plan.actions[0].kind)
+        self.assertEqual("USER_1", plan.actions[0].payload["owner_id"])
+
+    def test_a_snapshot_written_before_personal_accounts_still_plans(self) -> None:
+        legacy = discovery()
+        legacy["organization"] = legacy.pop("owner")
+
+        plan = build_bootstrap_plan("aegolius-labs", "example", legacy)
+
+        self.assertEqual("ORG_1", plan.actions[0].payload["owner_id"])
+
     def test_number_selects_exact_project_and_plans_repository_link(self) -> None:
         plan = build_bootstrap_plan(
             "aegolius-labs",

@@ -12,22 +12,22 @@ plan it showed you.
 
 Check these first. Each one is a hard requirement, not a recommendation.
 
-- **An organization account.** The kit manages an *organization-owned* GitHub
-  Project. Every Project query it sends is `organization(login: ...)`, so a
-  Project owned by a personal account cannot be used. The repository itself may
-  belong to the organization or be linked to its Project.
+- **A repository owned by an organization or a personal account.** The kit
+  manages a GitHub Project owned by the same account as the repository.
+  Projects are free on every GitHub plan. A personal account has no native
+  issue types, so the kit marks each item's type with a `type:*` label instead.
 - **One repository per manifest.** A manifest models one repository and one
-  organization Project. Relationships to issues in other repositories are
+  Project. Relationships to issues in other repositories are
   withheld, not followed.
 - **GitHub access with these permissions:**
   - repository **Issues**: read and write;
-  - organization **Projects**: read and write;
+  - **Projects** on the owning account: read and write;
   - repository **Contents**: read and write, only if the kit will create a
     Project or link one to the repository.
 
   With a classic token or `gh`, that is the `repo` and `project` scopes. Add the
   missing scope with `gh auth refresh -s project`. Fine-grained tokens need the
-  permissions above on both the repository and the organization.
+  permissions above on both the repository and the owning account.
 - **One transport.** Either an authenticated `gh` CLI session, or `GH_TOKEN` or
   `GITHUB_TOKEN` in the environment. The kit prefers `gh` and falls back to the
   token; pass `--backend gh` or `--backend api` to choose.
@@ -47,7 +47,7 @@ from a clone it is `python scripts/backlog.py`.
 ## 2. Create the manifest and the Project
 
 Run these from the root of your repository. `init-plan` finds the
-organization Project linked to the repository or titled like it, or proposes
+Project linked to the repository or titled like it, or proposes
 creating one. It reads GitHub and writes nothing.
 
 ```bash

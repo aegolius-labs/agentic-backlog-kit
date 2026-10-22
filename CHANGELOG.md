@@ -6,6 +6,16 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Projects owned by a personal account are supported alongside organization
+  Projects. Every Project query now goes through `repositoryOwner(login:)`
+  instead of `organization(login:)`, project views are created through
+  `/users/{id}/projectsV2/...` for a user, and a personal account, which has no
+  native issue types, uses the `type:*` label fallback. Discovery snapshots name
+  the account `owner` with its `type`; snapshots that still say `organization`
+  are read as before.
+
 ### Fixed
 
 - `backlog-sync-github` and `backlog-sprint-plan` read their rules reference

@@ -82,7 +82,7 @@ class LaggingProjectTransport:
             return relationship_data(query)
         if "query ProjectItems" in query:
             return {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "items": {
                             "nodes": self.listed,
