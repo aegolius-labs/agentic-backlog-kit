@@ -277,7 +277,9 @@ class GitHubSnapshotReader:
             data = self.transport.graphql(
                 """
                 query ProjectItems($owner: String!, $number: Int!, $cursor: String) {
-                  organization(login: $owner) {
+                  owner: repositoryOwner(login: $owner) {
+                    __typename
+                    ... on ProjectV2Owner {
                     projectV2(number: $number) {
                       items(first: 100, after: $cursor) {
                         nodes {
@@ -316,6 +318,7 @@ class GitHubSnapshotReader:
                         pageInfo { hasNextPage endCursor }
                       }
                     }
+                    }
                   }
                 }
                 """,
@@ -325,11 +328,11 @@ class GitHubSnapshotReader:
                     "cursor": cursor,
                 },
             )
-            project = (data.get("organization") or {}).get("projectV2")
+            project = (data.get("owner") or {}).get("projectV2")
             if not project:
                 raise GitHubApiError(
                     404,
-                    f"Organization project {self.owner}#{self.project_number} was not found",
+                    f"Project {self.owner}#{self.project_number} was not found",
                 )
             connection = project.get("items") or {}
             for project_item in connection.get("nodes") or []:
@@ -732,10 +735,13 @@ class GitHubProjectDiscoveryReader:
         data = self.transport.graphql(
             f"""
             query DiscoverProjects($owner: String!, $repository: String!) {{
-              organization(login: $owner) {{
+              owner: repositoryOwner(login: $owner) {{
+                __typename
                 id
+                ... on ProjectV2Owner {{
                 projectsV2(first: 100, orderBy: {{field: NUMBER, direction: ASC}}) {{
                   {self._project_fragment()}
+                }}
                 }}
               }}
               repository(owner: $owner, name: $repository) {{
@@ -749,26 +755,31 @@ class GitHubProjectDiscoveryReader:
             """,
             {"owner": self.owner, "repository": self.repository},
         )
-        organization = data.get("organization")
+        account = data.get("owner")
         repository = data.get("repository")
-        if not isinstance(organization, dict):
-            raise GitHubApiError(404, f"Organization '{self.owner}' was not found")
+        if not isinstance(account, dict):
+            raise GitHubApiError(
+                404, f"Account '{self.owner}' was not found or cannot own Projects"
+            )
         if not isinstance(repository, dict):
             raise GitHubApiError(
                 404, f"Repository '{self.owner}/{self.repository}' was not found"
             )
 
-        project_connection = organization.get("projectsV2") or {}
+        project_connection = account.get("projectsV2") or {}
         raw_projects = list(project_connection.get("nodes") or [])
         cursor = (project_connection.get("pageInfo") or {}).get("endCursor")
         while (project_connection.get("pageInfo") or {}).get("hasNextPage"):
             page = self.transport.graphql(
                 f"""
                 query MoreProjects($owner: String!, $cursor: String!) {{
-                  organization(login: $owner) {{
+                  owner: repositoryOwner(login: $owner) {{
+                    __typename
+                    ... on ProjectV2Owner {{
                     projectsV2(first: 100, after: $cursor,
                       orderBy: {{field: NUMBER, direction: ASC}}) {{
                       {self._project_fragment()}
+                    }}
                     }}
                   }}
                 }}
@@ -776,7 +787,7 @@ class GitHubProjectDiscoveryReader:
                 {"owner": self.owner, "cursor": cursor},
             )
             project_connection = (
-                (page.get("organization") or {}).get("projectsV2") or {}
+                (page.get("owner") or {}).get("projectsV2") or {}
             )
             raw_projects.extend(project_connection.get("nodes") or [])
             cursor = (project_connection.get("pageInfo") or {}).get("endCursor")
@@ -851,7 +862,11 @@ class GitHubProjectDiscoveryReader:
             selected["views"] = scaffold["views"]
             labels = scaffold["labels"]
         return {
-            "organization": {"login": self.owner, "id": organization.get("id")},
+            "owner": {
+                "login": self.owner,
+                "id": account.get("id"),
+                "type": account.get("__typename"),
+            },
             "repository": {"name": self.repository, "id": repository.get("id")},
             "projects": projects,
             "labels": labels,
@@ -893,7 +908,9 @@ class GitHubScaffoldSnapshotReader:
         data = self.transport.graphql(
             """
             query ProjectScaffold($owner: String!, $number: Int!) {
-              organization(login: $owner) {
+              owner: repositoryOwner(login: $owner) {
+                __typename
+                ... on ProjectV2Owner {
                 projectV2(number: $number) {
                   fields(first: 100) {
                     nodes {
@@ -918,16 +935,17 @@ class GitHubScaffoldSnapshotReader:
                     pageInfo { hasNextPage endCursor }
                   }
                 }
+                }
               }
             }
             """ % VIEW_GRAPHQL_FRAGMENT,
             {"owner": self.owner, "number": self.project_number},
         )
-        project = (data.get("organization") or {}).get("projectV2")
+        project = (data.get("owner") or {}).get("projectV2")
         if not project:
             raise GitHubApiError(
                 404,
-                f"Organization project {self.owner}#{self.project_number} was not found",
+                f"Project {self.owner}#{self.project_number} was not found",
             )
         return {
             "fields": _scaffold_fields(project),

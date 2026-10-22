@@ -15,8 +15,8 @@ never closes one because it stopped being listed.
 ## Who fits
 
 - A noncommercial team of two or more that already plans work in GitHub Issues, or wants to (see Licensing below).
-- An **organization-owned** GitHub Project. Personal-account Projects are not
-  supported.
+- A repository owned by an organization or a personal account, with its
+  GitHub Project owned by the same account.
 - One repository. Cross-repository backlogs are out of scope for now.
 - Someone who will use Claude Code or Codex as the agent host. The engine also
   runs on its own from the command line.

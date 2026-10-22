@@ -139,7 +139,7 @@ def build_bootstrap_plan(
     project_title: str | None = None,
     project_number: int | None = None,
 ) -> BootstrapPlan:
-    """Select or create an organization Project, then plan its complete scaffold."""
+    """Select or create a Project owned by the repository's account, then plan its scaffold."""
 
     if not isinstance(owner, str) or not owner.strip():
         raise ManifestError("Owner must be a non-empty string")
@@ -153,12 +153,14 @@ def build_bootstrap_plan(
         project_title = project_title.strip()
     if not isinstance(discovery_snapshot, dict):
         raise ManifestError("Project discovery snapshot must be an object")
-    organization = discovery_snapshot.get("organization")
+    # Snapshots written before personal accounts were supported name the owner
+    # "organization"; both describe the account that owns the Project.
+    account = discovery_snapshot.get("owner") or discovery_snapshot.get("organization")
     remote_repository = discovery_snapshot.get("repository")
     projects = discovery_snapshot.get("projects")
     labels = discovery_snapshot.get("labels", [])
-    if not isinstance(organization, dict) or organization.get("login") != owner:
-        raise ManifestError("Discovery snapshot organization does not match requested owner")
+    if not isinstance(account, dict) or account.get("login") != owner:
+        raise ManifestError("Discovery snapshot owner does not match requested owner")
     if (
         not isinstance(remote_repository, dict)
         or remote_repository.get("name") != repository
@@ -176,7 +178,7 @@ def build_bootstrap_plan(
     actions: list[ScaffoldAction] = []
     if selected is None:
         title = project_title or repository
-        owner_id = organization.get("id")
+        owner_id = account.get("id")
         repository_id = remote_repository.get("id")
         if not owner_id or not repository_id:
             raise ManifestError("Discovery snapshot lacks owner or repository node identity")

@@ -146,7 +146,7 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--force", action="store_true")
 
     init_plan = commands.add_parser(
-        "init-plan", help="Discover or preview creation of an organization Project"
+        "init-plan", help="Discover or preview creation of the owner's Project"
     )
     init_plan.add_argument("--owner", required=True)
     init_plan.add_argument("--repository", required=True)

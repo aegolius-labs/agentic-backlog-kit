@@ -21,7 +21,7 @@ from tests.helpers import (
 
 ISSUES_PATH = "/repos/aegolius-labs/example/issues?state=all&per_page=100&page={page}"
 EMPTY_PROJECT = {
-    "organization": {
+    "owner": {
         "projectV2": {
             "items": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
         }

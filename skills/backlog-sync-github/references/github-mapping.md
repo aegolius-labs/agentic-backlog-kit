@@ -8,7 +8,7 @@ Every body the kit writes also carries a second, separate hidden comment at the 
 
 Mapping:
 
-- Item type: native organization issue type when available, otherwise `type:*` label.
+- Item type: native organization issue type when available, otherwise `type:*` label (always the label on a personal account).
 - Parent: native sub-issue relationship.
 - `depends_on`: native `blocked by` relationship.
 - Status, Sprint, dimensions, and computed Priority: GitHub Project fields.

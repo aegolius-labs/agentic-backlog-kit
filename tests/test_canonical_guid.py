@@ -279,7 +279,7 @@ class GuidReadAndRecoveryTests(unittest.TestCase):
             "labels": [],
         }
         project = {
-            "organization": {
+            "owner": {
                 "projectV2": {
                     "items": {
                         "nodes": [],

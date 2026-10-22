@@ -8,16 +8,18 @@ The kit combines focused skills with a zero-runtime-dependency Python engine. Ag
 
 Read this before installing.
 
-- **Organization-owned Projects only.** Every Project query the kit sends is
-  `organization(login: ...)`. A Project owned by a personal account is not
-  supported: discovery, scaffolding and sync cannot reach it.
+- **Organization or personal account.** The Project belongs to the account that
+  owns the repository, whether that is an organization or a personal account.
+  GitHub Projects are free on every plan. Native issue types exist only in
+  organizations, so a personal account always uses the `type:*` label
+  fallback.
 - **One repository and one Project per manifest.** Issues, sub-issues and
   dependencies are managed in that repository. A relationship that points into
   another repository is withheld with its reason during adoption and is never
   created, changed or removed by sync. Cross-repository backlogs are out of
   scope.
 - **GitHub.com.** The kit has been validated against github.com only.
-- **Access:** repository Issues read/write and organization Projects read/write,
+- **Access:** repository Issues read/write and Projects read/write on the owner,
   plus repository Contents to create or link a Project. With a classic token or
   `gh`, that is the `repo` and `project` scopes.
 
@@ -27,7 +29,7 @@ Read this before installing.
 - Native GitHub issue dependencies for blocking relationships.
 - Impact, Effort, Business Value, Enabler Value, and recursive dependency scoring.
 - Dependency-safe, capacity-aware sprint planning against refreshed active/completed iteration state.
-- Organization Project discovery/creation plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four fully reconciled views: Backlog, Kanban, Current Sprint, and Roadmap.
+- Project discovery/creation for the repository's organization or personal account, plus scaffolding for Status, Sprint, scoring fields, fallback type labels, and four fully reconciled views: Backlog, Kanban, Current Sprint, and Roadmap.
 - Native GitHub Projects workflows through any complete supported transport: the Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, or direct GraphQL/REST API.
 - Dry-run planning by default and digest-confirmed apply operations.
 - Compact per-item ingestion and optimistic, atomic manifest updates.
@@ -102,7 +104,7 @@ New to the kit? Follow [docs/quickstart.md](docs/quickstart.md). It goes from
 install to a first converged sync, covering account type, token permissions,
 and how to read a plan and its digest. The commands below are a reference.
 
-Discover a matching organization Project or preview creation from only the organization and repository:
+Discover a matching Project or preview creation from only the owner and repository:
 
 ```powershell
 python scripts/backlog.py init-plan `
@@ -186,7 +188,7 @@ and remote fingerprints and per-action preconditions. Receipts are updated
 atomically after every action, so an interrupted run records its completed
 prefix; refresh and create a new reviewed plan to resume safely.
 
-The skills capability-check the host GitHub integration/MCP before using it. The launcher uses an authenticated `gh` session when selected, while `GH_TOKEN` or `GITHUB_TOKEN` enables the equally native direct GraphQL/REST route. Every route must produce the same canonical snapshots, plans, digests, and receipts; an incomplete MCP surface is reported explicitly, and write transports are never silently mixed within an apply. Project creation/linking needs organization Projects write access and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
+The skills capability-check the host GitHub integration/MCP before using it. The launcher uses an authenticated `gh` session when selected, while `GH_TOKEN` or `GITHUB_TOKEN` enables the equally native direct GraphQL/REST route. Every route must produce the same canonical snapshots, plans, digests, and receipts; an incomplete MCP surface is reported explicitly, and write transports are never silently mixed within an apply. Project creation/linking needs Projects write access on the owner and repository Contents access; issue reconciliation also needs repository Issues write access. GitHub documents the additional Contents requirement when `createProjectV2` links a repository in its [Projects API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects).
 
 ## Release-candidate support and limitations
 
@@ -200,7 +202,8 @@ iterations, hierarchy, dependencies, issue types, and rate limits. The
 installed generic GitHub MCP evaluated in Wave C exposed repository reads and
 labels, but not that complete surface, so it failed closed before any write.
 
-GitHub organizations do not all expose the same native issue types. If the
+GitHub organizations do not all expose the same native issue types, and personal
+accounts have none. If the
 canonical `Story` type is unavailable, native-type mode stops at preflight and
 the kit uses the explicit label-fallback mode instead: each managed issue gets
 its corresponding `type:<lowercase>` label (for example, `type:story`) while
@@ -229,7 +232,7 @@ GitHub: `issue.close_parent` closes it as completed and marks it Done, through t
 ordinary confirmed plan, bound to each child's observed state (S-R10-2). It never
 closes an issue because the manifest no longer lists it. Disposable evaluation cleanup
 is a separate, explicitly confirmed destructive operation. The current
-manifest models one repository and one organization Project; cross-repository
+manifest models one repository and one Project; cross-repository
 backlogs are outside this release.
 
 The evidence and command-level limits are recorded in

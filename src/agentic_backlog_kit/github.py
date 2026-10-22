@@ -406,6 +406,7 @@ class GitHubService:
         self.issue_type_mode = issue_type_mode
         self._project_id: str | None = None
         self._project_fields: dict[str, dict[str, Any]] | None = None
+        self._owner_views_path: str | None = None
         self._project_items: dict[str, str] = {}
 
     @property
@@ -781,7 +782,7 @@ class GitHubService:
             ]
         self.transport.rest(
             "POST",
-            f"/orgs/{self.owner}/projectsV2/{self.project_number}/views",
+            f"{self._owner_views_path}/projectsV2/{self.project_number}/views",
             request_payload,
         )
 
@@ -874,7 +875,10 @@ class GitHubService:
         data = self.transport.graphql(
             """
             query Project($owner: String!, $number: Int!) {
-              organization(login: $owner) {
+              owner: repositoryOwner(login: $owner) {
+                __typename
+                ... on User { databaseId }
+                ... on ProjectV2Owner {
                 projectV2(number: $number) {
                   id
                   fields(first: 100) {
@@ -896,17 +900,25 @@ class GitHubService:
                     }
                   }
                 }
+                }
               }
             }
             """,
             {"owner": self.owner, "number": self.project_number},
         )
-        project = (data.get("organization") or {}).get("projectV2")
+        account = data.get("owner") or {}
+        project = account.get("projectV2")
         if not project:
             raise GitHubApiError(
                 404,
-                f"Organization project {self.owner}#{self.project_number} was not found",
+                f"Project {self.owner}#{self.project_number} was not found",
             )
+        # The REST views API addresses an organization by login but a user by
+        # numeric ID: POST /users/{user_id}/projectsV2/{number}/views.
+        if account.get("__typename") == "User":
+            self._owner_views_path = f"/users/{account['databaseId']}"
+        else:
+            self._owner_views_path = f"/orgs/{self.owner}"
         self._project_id = str(project["id"])
         nodes = (project.get("fields") or {}).get("nodes") or []
         self._project_fields = {

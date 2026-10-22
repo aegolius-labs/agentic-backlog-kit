@@ -280,7 +280,7 @@ class SimulatedGitHub:
                 for item in items
             ]
             return {
-                "organization": {
+                "owner": {
                     "projectV2": {"items": {"nodes": nodes, "pageInfo": page_info}}
                 }
             }
@@ -290,7 +290,7 @@ class SimulatedGitHub:
             return {"node": {"items": {"nodes": nodes, "pageInfo": page_info}}}
         if "query Project(" in query:
             return {
-                "organization": {
+                "owner": {
                     "projectV2": {"id": "PROJECT_1", "fields": {"nodes": self.fields}}
                 }
             }

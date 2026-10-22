@@ -37,7 +37,7 @@ class CliTests(unittest.TestCase):
         }
         project = {
             "data": {
-                "organization": {
+                "owner": {
                     "projectV2": {
                         "items": {
                             "nodes": [],
@@ -94,7 +94,7 @@ class CliTests(unittest.TestCase):
 
     def test_init_plan_bounds_discovery_for_gh_and_api_backends(self) -> None:
         discovery = {
-            "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+            "owner": {"login": "aegolius-labs", "id": "ORG_1"},
             "repository": {"name": "example", "id": "REPO_1"},
             "projects": [
                 {
@@ -339,7 +339,11 @@ class CliTests(unittest.TestCase):
                 "aegolius-labs",
                 "example",
                 {
-                    "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+                    "owner": {
+                        "login": "aegolius-labs",
+                        "id": "ORG_1",
+                        "type": "Organization",
+                    },
                     "repository": {"name": "example", "id": "REPO_1"},
                     "projects": [],
                     "labels": [],
@@ -383,7 +387,7 @@ class CliTests(unittest.TestCase):
             snapshot_path.write_text(
                 json.dumps(
                     {
-                        "organization": {"login": "aegolius-labs", "id": "ORG_1"},
+                        "owner": {"login": "aegolius-labs", "id": "ORG_1"},
                         "repository": {"name": "example", "id": "REPO_1"},
                         "projects": [],
                         "labels": [],
@@ -653,7 +657,8 @@ class InitApplyTransport:
         self.graphql_count += 1
         if "DiscoverProjects" in query:
             return {
-                "organization": {
+                "owner": {
+                    "__typename": "Organization",
                     "id": "ORG_1",
                     "projectsV2": {
                         "nodes": [],
@@ -681,7 +686,7 @@ class InitApplyTransport:
                 }
             }
         return {
-            "organization": {
+            "owner": {
                 "projectV2": {
                     "fields": {"nodes": []},
                     "views": {"nodes": []},

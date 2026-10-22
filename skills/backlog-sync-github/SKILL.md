@@ -1,6 +1,6 @@
 ---
 name: backlog-sync-github
-description: Reconcile managed Agentic Backlog Kit items with GitHub Issues and an organization Project through a safe plan, digest confirmation, apply, and verify workflow. Use for GitHub synchronization; do not use for unmanaged issue triage or destructive cleanup.
+description: Reconcile managed Agentic Backlog Kit items with GitHub Issues and an organization or personal Project through a safe plan, digest confirmation, apply, and verify workflow. Use for GitHub synchronization; do not use for unmanaged issue triage or destructive cleanup.
 ---
 
 # Synchronize with GitHub
