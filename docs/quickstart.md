@@ -46,12 +46,14 @@ from a clone it is `python scripts/backlog.py`.
 
 ## 2. Create the manifest and the Project
 
-Run these from the root of your repository. `init-plan` finds the
+Run these, and every command after them, from the root of your repository's
+clone: the kit reads and writes `.agentic-backlog/` in the current directory.
+`--owner` is the organization or user that owns the repository. `init-plan` finds the
 Project linked to the repository or titled like it, or proposes
 creating one. It reads GitHub and writes nothing.
 
 ```bash
-abk init-plan --owner YOUR-ORG --repository YOUR-REPO \
+abk init-plan --owner YOUR-ACCOUNT --repository YOUR-REPO \
   --output .agentic-backlog/cache/bootstrap-plan.json
 ```
 
@@ -86,28 +88,65 @@ control.
 
 Choose one route.
 
-**Start fresh.** Describe the work to your agent, or add one item yourself. The
-engine assigns a stable ID when you omit one:
+**Start fresh.** Describe the work to your agent, or add items yourself, one
+JSON file per item. A parent goes in first: an item can only name a parent or a
+dependency that is already in the manifest. Give an item an `id` when another
+item will point at it; the engine assigns a stable ID when you omit one.
+
+```json
+{
+  "id": "F-ACCOUNT",
+  "title": "Account recovery",
+  "type": "Feature",
+  "description": "Users who lose access to their account can get back in.",
+  "acceptance_criteria": ["A user can regain access without contacting support"],
+  "impact": 4, "effort": 3, "business_value": 4, "enabler_value": 2,
+  "status": "Ready",
+  "maturity": "refined"
+}
+```
+
+```json
+{
+  "id": "S-EMAIL",
+  "title": "Send transactional email",
+  "type": "Story",
+  "parent": "F-ACCOUNT",
+  "description": "The app can send a templated email to a user.",
+  "acceptance_criteria": ["A templated email reaches the user's inbox"],
+  "impact": 3, "effort": 2, "business_value": 2, "enabler_value": 4,
+  "status": "Ready",
+  "maturity": "ready"
+}
+```
 
 ```json
 {
   "title": "Users can reset their password",
   "type": "Story",
+  "parent": "F-ACCOUNT",
+  "depends_on": ["S-EMAIL"],
   "description": "A user who forgot their password can set a new one from an emailed link.",
   "acceptance_criteria": ["A reset link is emailed", "The link expires after one hour"],
-  "impact": 4,
-  "effort": 2,
-  "business_value": 4,
-  "enabler_value": 1,
+  "impact": 4, "effort": 2, "business_value": 4, "enabler_value": 1,
   "status": "Ready",
   "maturity": "ready"
 }
 ```
 
 ```bash
-abk item-add --input .agentic-backlog/cache/item.json
+abk item-add --input .agentic-backlog/cache/feature.json
+abk item-add --input .agentic-backlog/cache/email.json
+abk item-add --input .agentic-backlog/cache/reset.json
 abk validate
 ```
+
+`parent` becomes a GitHub sub-issue link and `depends_on` a "blocked by" link
+on the first sync. A parent must sit exactly one level above its child:
+Initiative, then Epic, then Feature, then Story or Bug, then Task. `validate`
+rejects a skipped level, an unknown ID, and a dependency cycle before anything
+reaches GitHub. `abk next` will not offer the reset story until the email story
+is done.
 
 **Adopt issues the repository already has.** Preview first. It writes nothing:
 
