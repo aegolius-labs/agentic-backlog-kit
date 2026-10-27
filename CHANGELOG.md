@@ -8,6 +8,14 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- Items accept an optional `source`: a producer's reference to the record the
+  item was handed over from, such as an Agentic QA Kit session and finding.
+  It is unique across the manifest, so `item-add` refuses a second item for the
+  same record, and it cannot be changed by `item-update` or projected to
+  GitHub. Before this, ingesting the same QA finding twice silently created a
+  second Bug (QA kit Q06-F02). The Seam B fixture is refreshed from a current
+  QA kit export, which now sets it.
+
 - Projects owned by a personal account are supported alongside organization
   Projects. Every Project query now goes through `repositoryOwner(login:)`
   instead of `organization(login:)`, project views are created through

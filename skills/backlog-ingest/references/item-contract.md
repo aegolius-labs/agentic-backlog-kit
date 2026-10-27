@@ -33,5 +33,9 @@ Optional canonical GUID:
 - It must be a canonical lowercase UUID exactly as `str(UUID(value))` renders it, unique across the manifest, and it needs `schema_version` 2. The kit reads version 1 manifests and writes them back as version 2.
 - Never invent one. A GUID that points at no Intention DAG node is worse than none.
 
-An add payload contains every item field except `id`, which may be omitted for deterministic generation, and the optional `guid`. An update payload contains only changed fields and cannot change `id`.
+Optional source reference:
+
+- `source` names the record a producer handed the item over from, such as `agentic-qa-kit:session=S;finding=F`. It is unique across the manifest, so `item-add` refuses a second item for the same record. Keep it as the producer wrote it, and never set one yourself.
+
+An add payload contains every item field except `id`, which may be omitted for deterministic generation, and the optional `guid` and `source`. An update payload contains only changed fields and cannot change `id`.
 

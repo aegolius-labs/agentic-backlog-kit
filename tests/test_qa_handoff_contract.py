@@ -18,6 +18,7 @@ import unittest
 from pathlib import Path
 
 from agentic_backlog_kit.manifest import ManifestError, validate_manifest
+from agentic_backlog_kit.mutations import add_item
 
 from tests import helpers
 
@@ -43,7 +44,9 @@ ITEM_FIELDS = {
     "maturity",
     "sprint",
 }
-QA_SUPPLIED_FIELDS = ITEM_FIELDS - {"id"}
+# Plus the optional `source`, which names the QA session and finding so that a
+# repeated handoff of the same finding is refused instead of duplicated.
+QA_SUPPLIED_FIELDS = ITEM_FIELDS - {"id"} | {"source"}
 
 
 def _payload() -> dict:
@@ -87,6 +90,16 @@ class QaHandoffContractTests(unittest.TestCase):
         self.assertIn("Target revision:", description)
         self.assertIn("Evidence:", description)
         self.assertIn("Limitations:", description)
+
+    def test_the_same_finding_cannot_be_ingested_twice(self) -> None:
+        payload = _payload()
+        self.assertEqual(
+            "agentic-qa-kit:session=q01-fixture;finding=F-001", payload["source"]
+        )
+        once, _ = add_item(helpers.manifest(), payload)
+
+        with self.assertRaisesRegex(ManifestError, "carry the same source"):
+            add_item(once, payload)
 
     def test_a_handoff_missing_planning_inputs_is_rejected(self) -> None:
         incomplete = dict(_payload(), id="ABK-1")
