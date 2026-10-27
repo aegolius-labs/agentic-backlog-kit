@@ -68,7 +68,8 @@ ITEM_FIELDS = {
     "maturity",
     "sprint",
 }
-OPTIONAL_ITEM_FIELDS = {"guid"}
+OPTIONAL_ITEM_FIELDS = {"guid", "source"}
+SOURCE_MAX_LENGTH = 256
 
 
 class ManifestError(ValueError):
@@ -318,6 +319,7 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
     by_id: dict[str, dict[str, Any]] = {}
     guids: dict[str, str] = {}
+    sources: dict[str, str] = {}
     for index, raw_item in enumerate(raw_items):
         backlog_item = _require_mapping(raw_item, f"items[{index}]")
         _reject_unknown(
@@ -412,6 +414,25 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
                 )
             else:
                 guids[guid] = item_id
+        if "source" in backlog_item:
+            source = backlog_item["source"]
+            if source is None:
+                del backlog_item["source"]
+            else:
+                # A producer's own reference for the record this item came
+                # from, such as a QA finding. Unique, so a repeated handoff is
+                # refused instead of becoming a second item for the same work.
+                source = _require_nonempty_string(source, f"Item '{item_id}' source")
+                if len(source) > SOURCE_MAX_LENGTH:
+                    raise ManifestError(
+                        f"Item '{item_id}' source must be at most {SOURCE_MAX_LENGTH} characters"
+                    )
+                if source in sources:
+                    raise ManifestError(
+                        f"Items '{sources[source]}' and '{item_id}' carry the same source {source!r}"
+                    )
+                backlog_item["source"] = source
+                sources[source] = item_id
         by_id[item_id] = backlog_item
 
     for item_id, backlog_item in by_id.items():

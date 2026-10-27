@@ -139,6 +139,13 @@
             },
             { "type": "null" }
           ]
+        },
+        "source": {
+          "description": "Optional reference, chosen by the producer that handed the item over, to the record it came from, such as an Agentic QA Kit session and finding. Unique across the manifest, so a repeated handoff is refused.",
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 256 },
+            { "type": "null" }
+          ]
         }
       }
     }
