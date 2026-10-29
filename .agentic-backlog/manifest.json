@@ -1779,6 +1779,25 @@
       "effort": 2,
       "business_value": 3,
       "enabler_value": 5
+    },
+    {
+      "id": "R36",
+      "title": "R36 - Dogfood every release on the kit's own backlog",
+      "type": "Feature",
+      "description": "R21 proved the kit could manage its own roadmap once and closed. Dogfooding is ongoing: each release should be synced against this repository's own Project, and each friction found should land against the responsible item.",
+      "acceptance_criteria": [
+        "After each release-bearing merge, a sync of the kit's own manifest converges to zero actions",
+        "Friction found while doing so is filed against the responsible work item"
+      ],
+      "parent": "EPIC-CONT",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 1,
+      "business_value": 3,
+      "enabler_value": 4,
+      "status": "In Progress",
+      "maturity": "ready",
+      "sprint": null
     }
   ]
 }
