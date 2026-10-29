@@ -490,8 +490,9 @@ class CliTests(unittest.TestCase):
             manifest_path = Path(directory) / "manifest.json"
             manifest_path.write_text("keep", encoding="utf-8")
 
-            with self.assertRaisesRegex(FileExistsError, "already exists"):
-                main(
+            refused = io.StringIO()
+            with redirect_stderr(refused):
+                status = main(
                     [
                         "init",
                         "--manifest",
@@ -504,6 +505,13 @@ class CliTests(unittest.TestCase):
                         "1",
                     ]
                 )
+
+            # A refusal reads as JSON on stderr, not a traceback.
+            self.assertEqual(1, status)
+            failure = json.loads(refused.getvalue())
+            self.assertEqual("FileExistsError", failure["error"])
+            self.assertIn("already exists", failure["message"])
+            self.assertIn("--force", failure["hint"])
             self.assertEqual("keep", manifest_path.read_text(encoding="utf-8"))
 
     def test_sync_apply_refreshes_remote_state_and_writes_receipt(self) -> None:

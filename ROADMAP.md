@@ -578,6 +578,12 @@ next, who did not watch the last session work. See
 - **Known cost:** Dogfooding before R15 lands means local intent overwrites GitHub `Status` and `Sprint` on ordinary sync. That is accepted deliberately: it produces the acceptance evidence R15 and R16 need.
 - **Result:** [Organization Project 6](https://github.com/orgs/aegolius-labs/projects/6) holds 50 items; the repository holds 50 issues with sub-issue and dependency links. Scaffold converged across three plans (17, 3, 0 actions) and sync across three (169 with a failure at 31, 139, 0), then an incremental 23-action pass converged again. Ten findings are recorded in [first-use findings](docs/dogfooding-findings-2026-09-18.md); two were fixed here, two became R22 and R23, and one became R24.
 
+#### R36 - Dogfood every release on the kit's own backlog
+
+- **Status:** Open, continuous. Added 2026-10-29 when R21 closed, so the continuous epic keeps an open child.
+- **Context:** R21 proved the kit could manage this roadmap once. Its closure left `EPIC-CONT` with every child closed, and the next sync proposed closing an epic that is ongoing by design.
+- **Done when:** It is not expected to close. Each release-bearing merge is followed by a converged sync of this repository's manifest, and friction is filed against the responsible item.
+
 ## Operations checklist
 
 These items are release plumbing and resource cleanup. They are tracked because
