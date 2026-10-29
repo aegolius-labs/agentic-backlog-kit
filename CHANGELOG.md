@@ -6,6 +6,12 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- `init` and `init-apply` over an existing manifest exit with a JSON error on
+  stderr and a hint to pass `--force`, instead of a Python traceback (QA kit
+  Q06-O01).
+
 ### Added
 
 - Items accept an optional `source`: a producer's reference to the record the

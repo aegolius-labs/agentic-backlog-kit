@@ -599,6 +599,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ApplyAuthorizationError,
         CapabilityError,
         FreshnessError,
+        FileExistsError,
     ) as error:
         # A rejected write should read as a decision, not a stack trace. The
         # receipt already records the exact failing action; this is the line the
@@ -608,11 +609,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             "error": type(error).__name__,
             "message": str(error),
         }
-        hint = failure_hint(
-            getattr(args, "command", "") or "",
-            {},
-            error,
-        )
+        if isinstance(error, FileExistsError):
+            hint = "Keep the existing file, or pass --force to replace it."
+        else:
+            hint = failure_hint(
+                getattr(args, "command", "") or "",
+                {},
+                error,
+            )
         receipt_path = getattr(args, "receipt", None)
         if receipt_path and Path(receipt_path).is_file():
             try:
