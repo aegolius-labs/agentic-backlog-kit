@@ -4,7 +4,7 @@ Last updated: 2026-09-18
 
 ## Product goal
 
-Create a Codex-first plugin that lets agents manage GitHub Issues and Projects through focused skills and deterministic, low-token local tooling.
+Create a host-portable plugin that lets agents manage GitHub Issues and Projects through focused skills and deterministic, low-token local tooling. Claude Code, Codex and Antigravity are equally supported hosts (owner decision, 2026-11-02, replacing the original Codex-first goal); each gets a thin manifest over one shared `skills/` directory.
 
 ## Architectural decisions
 

@@ -1,6 +1,6 @@
 # Agentic Backlog Kit
 
-A Codex-first plugin for managing GitHub Issues and Projects as a structured, deterministic Agile backlog.
+An agent plugin for managing GitHub Issues and Projects as a structured, deterministic Agile backlog. Claude Code, Codex and Antigravity are its supported hosts; Claude Code and Codex ship today, and Antigravity support is planned.
 
 The kit combines focused skills with a zero-runtime-dependency Python engine. Agents use natural language for judgment-heavy work such as idea refinement, then hand validation, scoring, sprint packing, remote discovery, and synchronization to deterministic code. This keeps large backlogs out of model context and makes mutations reviewable.
 
@@ -251,7 +251,7 @@ The plugin contains six focused skills:
 - `$backlog-sprint-plan` creates a dependency-safe capacity plan.
 - `$backlog-sync-github` previews, validates, applies, and verifies GitHub reconciliation.
 
-OpenAI plugins are universal packages that can be used by supported ChatGPT and Codex surfaces. This project is Codex-first because it relies on a coding workspace and local deterministic scripts, but its skills and GitHub MCP workflows remain portable. See the [OpenAI plugin architecture](https://developers.openai.com/plugins/concepts/plugins).
+The kit needs a coding workspace because it relies on local deterministic scripts, but no host is primary: every host runs the same `skills/` and engine, and support for another provider is welcome as a pull request that adds a thin manifest. For the Codex side, see the [OpenAI plugin architecture](https://developers.openai.com/plugins/concepts/plugins).
 
 ## Development
 
