@@ -148,12 +148,20 @@ def _parser() -> argparse.ArgumentParser:
     init_plan = commands.add_parser(
         "init-plan", help="Discover or preview creation of the owner's Project"
     )
-    init_plan.add_argument("--owner", required=True)
-    init_plan.add_argument("--repository", required=True)
-    init_plan.add_argument("--project-title")
-    init_plan.add_argument("--project-number", type=int)
-    init_plan.add_argument("--snapshot")
-    init_plan.add_argument("--output")
+    init_plan.add_argument(
+        "--owner", required=True, help="organization or user that owns the repository"
+    )
+    init_plan.add_argument(
+        "--repository", required=True, help="repository name, without the owner"
+    )
+    init_plan.add_argument("--project-title", help="select or create this Project title")
+    init_plan.add_argument(
+        "--project-number", type=int, help="select this existing Project number"
+    )
+    init_plan.add_argument(
+        "--snapshot", help="plan from a saved discovery snapshot instead of GitHub"
+    )
+    init_plan.add_argument("--output", help="write the plan here and print a summary")
     init_plan.add_argument("--backend", choices=("auto", "gh", "api"), default="auto")
 
     init_apply = commands.add_parser(

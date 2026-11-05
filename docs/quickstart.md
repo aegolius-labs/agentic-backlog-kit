@@ -5,8 +5,10 @@ has verified. Each step writes nothing to GitHub until you confirm the exact
 plan it showed you.
 
 > **Status.** Written 2026-10-15 for S-R30-2. It has not yet been followed end
-> to end on a fresh fixture repository. That run, and its evidence in
-> [validation.md](validation.md), is still owed before S-R30-2 is done.
+> to end on a fresh fixture repository. A run on 2026-10-29 reached the
+> scaffold step, and the friction it found is fixed here. Finishing that run,
+> and its evidence in [validation.md](validation.md), is still owed before
+> S-R30-2 is done.
 
 ## Before you start
 
@@ -40,33 +42,35 @@ Install the plugin in your agent host straight from GitHub, as the
 drives every step below in natural language, through the six `backlog-*` skills.
 
 The commands below are what those skills run. You can run them yourself to see
-each plan before your agent applies it. They are written as `abk`. Inside an
-installed plugin the same engine is `python <plugin-root>/scripts/backlog.py`;
-from a clone it is `python scripts/backlog.py`.
+each plan before your agent applies it. They are written as `abk`, which is
+shorthand, not an installed command: type `python <kit>/scripts/backlog.py` in
+its place, where `<kit>` is the plugin's install folder or your clone of this
+repository. Each command is on one line, so it pastes the same into bash, zsh
+and PowerShell.
 
 ## 2. Create the manifest and the Project
 
 Run these, and every command after them, from the root of your repository's
 clone: the kit reads and writes `.agentic-backlog/` in the current directory.
-`--owner` is the organization or user that owns the repository. `init-plan` finds the
+`--owner` is the organization or user that owns the repository, and
+`--repository` is the repository's bare name, without the owner. `init-plan` finds the
 Project linked to the repository or titled like it, or proposes
 creating one. It reads GitHub and writes nothing.
 
 ```bash
-abk init-plan --owner YOUR-ACCOUNT --repository YOUR-REPO \
-  --output .agentic-backlog/cache/bootstrap-plan.json
+abk init-plan --owner YOUR-ACCOUNT --repository YOUR-REPO --output .agentic-backlog/cache/bootstrap-plan.json
 ```
 
-Read the plan. It names the Project it selected, or shows a `project.create`
-action, and ends with a `digest`. Several matching Projects stop the plan; pass
+The console prints a short summary: the plan file, its `digest`, the action
+count, and the Project it selected, or `null` when it will create one. Open the
+plan file to read the actions themselves; a new Project shows as one
+`project.create` action. Several matching Projects stop the plan; pass
 `--project-number N` or `--project-title TITLE` to choose one.
 
 Apply exactly that plan by passing its digest:
 
 ```bash
-abk init-apply --plan .agentic-backlog/cache/bootstrap-plan.json \
-  --confirm DIGEST \
-  --scaffold-plan .agentic-backlog/cache/scaffold-plan.json
+abk init-apply --plan .agentic-backlog/cache/bootstrap-plan.json --confirm DIGEST --scaffold-plan .agentic-backlog/cache/scaffold-plan.json
 ```
 
 This writes `.agentic-backlog/manifest.json` and a scaffold plan for the
@@ -75,14 +79,18 @@ Value, Priority), its type labels, and its Backlog, Kanban, Current Sprint and
 Roadmap views. Review it and apply it the same way:
 
 ```bash
-abk scaffold-apply --plan .agentic-backlog/cache/scaffold-plan.json \
-  --confirm DIGEST \
-  --receipt .agentic-backlog/receipts/scaffold-apply.json
+abk scaffold-apply --plan .agentic-backlog/cache/scaffold-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/scaffold-apply.json
 ```
 
 Commit `.agentic-backlog/manifest.json`. It is the backlog's desired state.
-Keep `.agentic-backlog/cache/` and `.agentic-backlog/receipts/` out of version
-control.
+Keep plans and receipts out of version control by adding these lines to your
+`.gitignore` before your first commit; the kit does not write them for you:
+
+```gitignore
+.agentic-backlog/cache/
+.agentic-backlog/receipts/
+.agentic-backlog/*.lock
+```
 
 ## 3. Put work in
 
@@ -91,7 +99,10 @@ Choose one route.
 **Start fresh.** Describe the work to your agent, or add items yourself, one
 JSON file per item. A parent goes in first: an item can only name a parent or a
 dependency that is already in the manifest. Give an item an `id` when another
-item will point at it; the engine assigns a stable ID when you omit one.
+item will point at it; the engine assigns a stable ID when you omit one. Save
+each block to the file named above it.
+
+`.agentic-backlog/cache/feature.json`:
 
 ```json
 {
@@ -106,6 +117,8 @@ item will point at it; the engine assigns a stable ID when you omit one.
 }
 ```
 
+`.agentic-backlog/cache/email.json`:
+
 ```json
 {
   "id": "S-EMAIL",
@@ -119,6 +132,8 @@ item will point at it; the engine assigns a stable ID when you omit one.
   "maturity": "ready"
 }
 ```
+
+`.agentic-backlog/cache/reset.json`:
 
 ```json
 {
@@ -148,11 +163,14 @@ rejects a skipped level, an unknown ID, and a dependency cycle before anything
 reaches GitHub. `abk next` will not offer the reset story until the email story
 is done.
 
+`item-add` prints the item's ID. The reset story has none in its file, so it
+gets the next ID for its type, such as `STORY-0001`; `abk next` and the plans
+name it by that ID from then on.
+
 **Adopt issues the repository already has.** Preview first. It writes nothing:
 
 ```bash
-abk import-plan --infer-relationships \
-  --output .agentic-backlog/cache/import-plan.json
+abk import-plan --infer-relationships --output .agentic-backlog/cache/import-plan.json
 abk import-apply --plan .agentic-backlog/cache/import-plan.json --confirm DIGEST
 ```
 
@@ -189,9 +207,7 @@ and check these fields before you confirm anything:
 ## 5. Apply, and verify convergence
 
 ```bash
-abk sync-apply --plan .agentic-backlog/cache/sync-plan.json \
-  --confirm DIGEST \
-  --receipt .agentic-backlog/receipts/sync-apply.json
+abk sync-apply --plan .agentic-backlog/cache/sync-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/sync-apply.json
 ```
 
 `sync-apply` reads GitHub again and rebuilds the plan before its first write.
@@ -204,7 +220,10 @@ re-plans:
   manifest. `lag_observed: true` only means GitHub's reads took a few seconds to
   catch up.
 - `drift` exits non-zero and lists the residual actions. Plan again rather than
-  re-running the old plan.
+  re-running the old plan, and read the new plan before confirming it: an
+  apply that closed the last open child of a parent makes the next plan
+  propose `issue.close_parent` for that parent. Confirm that only if the
+  parent is really finished; otherwise give it an open child first.
 
 A first sync is converged when a fresh `abk sync-plan` reports `"actions": 0`.
 
