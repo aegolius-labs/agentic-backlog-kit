@@ -657,6 +657,50 @@ class CliTests(unittest.TestCase):
             )
 
 
+    def test_stale_scaffold_apply_reports_json_error_not_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            plan_path = root / "plan.json"
+            data = manifest()
+            data["workflow"]["iteration"] = {"field": "Sprint", "start_date": "2026-09-07", "duration_days": 14}
+            manifest_path.write_text(json.dumps(data), encoding="utf-8")
+            plan = build_scaffold_plan(data, {"fields": [], "views": [], "labels": []})
+            plan_path.write_text(json.dumps(plan.as_dict()), encoding="utf-8")
+            reader = Mock()
+            reader.return_value.read.return_value = {
+                "fields": [],
+                "views": [],
+                "labels": [{"name": "type:task"}],
+            }
+            stderr = io.StringIO()
+
+            with (
+                patch("agentic_backlog_kit.cli._transport", return_value=object()),
+                patch("agentic_backlog_kit.cli.GitHubScaffoldSnapshotReader", reader),
+                patch("agentic_backlog_kit.cli.GitHubService"),
+                patch("agentic_backlog_kit.cli.GitHubScaffoldExecutor"),
+                redirect_stdout(io.StringIO()),
+                redirect_stderr(stderr),
+            ):
+                result = main(
+                    [
+                        "scaffold-apply",
+                        "--manifest",
+                        str(manifest_path),
+                        "--plan",
+                        str(plan_path),
+                        "--confirm",
+                        plan.digest,
+                    ]
+                )
+
+            self.assertEqual(1, result)
+            failure = json.loads(stderr.getvalue())
+            self.assertEqual("ScaffoldAuthorizationError", failure["error"])
+            self.assertIn("rebuild and reconfirm", failure["message"])
+
+
 class InitApplyTransport:
     def __init__(self) -> None:
         self.graphql_count = 0

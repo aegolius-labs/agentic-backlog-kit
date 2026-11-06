@@ -4,11 +4,10 @@ This page takes a new user from nothing to a GitHub backlog the kit manages and
 has verified. Each step writes nothing to GitHub until you confirm the exact
 plan it showed you.
 
-> **Status.** Written 2026-10-15 for S-R30-2. It has not yet been followed end
-> to end on a fresh fixture repository. A run on 2026-10-29 reached the
-> scaffold step, and the friction it found is fixed here. Finishing that run,
-> and its evidence in [validation.md](validation.md), is still owed before
-> S-R30-2 is done.
+> **Status.** Written 2026-10-15 for S-R30-2. Followed end to end on a fresh
+> organization repository between 2026-10-29 and 2026-11-06, to a sync plan
+> with no actions left. The friction that run found is fixed here; the
+> evidence is in [validation.md](validation.md).
 
 ## Before you start
 
@@ -16,8 +15,12 @@ Check these first. Each one is a hard requirement, not a recommendation.
 
 - **A repository owned by an organization or a personal account.** The kit
   manages a GitHub Project owned by the same account as the repository.
-  Projects are free on every GitHub plan. A personal account has no native
-  issue types, so the kit marks each item's type with a `type:*` label instead.
+  Projects are free on every GitHub plan. When the owner has no native issue
+  type with exactly the item's type name, the kit marks that item with a
+  `type:*` label instead. This is decided per type: a personal account has no
+  native types, so every item gets a label, while an organization that defines
+  `Feature` but calls its story type `User Story` gets the native Feature type
+  and a `type:story` label.
 - **One repository per manifest.** A manifest models one repository and one
   Project. Relationships to issues in other repositories are
   withheld, not followed.
@@ -82,6 +85,20 @@ Roadmap views. Review it and apply it the same way:
 abk scaffold-apply --plan .agentic-backlog/cache/scaffold-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/scaffold-apply.json
 ```
 
+GitHub cannot configure a view while creating it, so a new Project takes a
+second round: the scaffold plan says so with `"converges_in_one_apply": false`
+and a `follow_up` note. After the apply, read the Project again, plan, and
+apply until the plan has no actions:
+
+```bash
+abk scaffold-snapshot --output .agentic-backlog/cache/scaffold.json
+abk scaffold-plan --snapshot .agentic-backlog/cache/scaffold.json --output .agentic-backlog/cache/scaffold-plan.json
+abk scaffold-apply --plan .agentic-backlog/cache/scaffold-plan.json --confirm DIGEST --receipt .agentic-backlog/receipts/scaffold-apply-2.json
+```
+
+On the first run the second plan holds one `project.view.update` for each of
+Backlog, Kanban and Current Sprint, and the third plan is empty.
+
 Commit `.agentic-backlog/manifest.json`. It is the backlog's desired state.
 Keep plans and receipts out of version control by adding these lines to your
 `.gitignore` before your first commit; the kit does not write them for you:
@@ -143,7 +160,7 @@ each block to the file named above it.
   "depends_on": ["S-EMAIL"],
   "description": "A user who forgot their password can set a new one from an emailed link.",
   "acceptance_criteria": ["A reset link is emailed", "The link expires after one hour"],
-  "impact": 4, "effort": 2, "business_value": 4, "enabler_value": 1,
+  "impact": 5, "effort": 2, "business_value": 5, "enabler_value": 1,
   "status": "Ready",
   "maturity": "ready"
 }
@@ -160,8 +177,10 @@ abk validate
 on the first sync. A parent must sit exactly one level above its child:
 Initiative, then Epic, then Feature, then Story or Bug, then Task. `validate`
 rejects a skipped level, an unknown ID, and a dependency cycle before anything
-reaches GitHub. `abk next` will not offer the reset story until the email story
-is done.
+reaches GitHub. The reset story scores higher than the email story, but
+`abk next` will not offer it until the email story is done:
+`abk next --explain 3` selects `S-EMAIL` and lists the reset story as passed
+over, "waiting on S-EMAIL".
 
 `item-add` prints the item's ID. The reset story has none in its file, so it
 gets the next ID for its type, such as `STORY-0001`; `abk next` and the plans
