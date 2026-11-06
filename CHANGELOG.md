@@ -8,6 +8,10 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Fixed
 
+- Init, scaffold, import and iteration receipts record `"authorization":
+  "digest"` like sync receipts, instead of `null`. Every one of those applies
+  already required the confirmed digest; the receipt now says so.
+
 - `init` and `init-apply` over an existing manifest exit with a JSON error on
   stderr and a hint to pass `--force`, instead of a Python traceback (QA kit
   Q06-O01).
