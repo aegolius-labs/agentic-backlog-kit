@@ -326,7 +326,12 @@ def build_scaffold_plan(
             )
 
     actions = field_actions + label_actions + view_actions
-    manifest_fingerprint = state_fingerprint(data)
+    # The scaffold reads only the GitHub target and the workflow, so only they
+    # bind the digest. Adding or editing items between review and apply must
+    # not invalidate a reviewed scaffold plan.
+    manifest_fingerprint = state_fingerprint(
+        {"github": data["github"], "workflow": data["workflow"]}
+    )
     snapshot_fingerprint = state_fingerprint(project_snapshot)
     return ScaffoldPlan(
         actions=actions,

@@ -9,7 +9,7 @@ from agentic_backlog_kit.scaffold import (
     build_scaffold_plan,
 )
 
-from tests.helpers import manifest
+from tests.helpers import item, manifest
 
 
 VIEW_FIELDS = [
@@ -303,6 +303,23 @@ class ScaffoldPlanningTests(unittest.TestCase):
 
         with self.assertRaises(ScaffoldAuthorizationError):
             apply_scaffold_plan(plan, executor=lambda action: None, confirmation="wrong")
+
+    def test_item_edits_do_not_invalidate_a_reviewed_scaffold_plan(self) -> None:
+        def configured() -> dict:
+            data = manifest()
+            data["workflow"]["iteration"] = {"field": "Sprint", "start_date": "2026-09-07", "duration_days": 14}
+            return data
+
+        snapshot = {"fields": [], "views": [], "labels": []}
+        reviewed = build_scaffold_plan(configured(), snapshot)
+
+        with_item = configured()
+        with_item["items"].append(item("TASK-9999"))
+        self.assertEqual(reviewed.digest, build_scaffold_plan(with_item, snapshot).digest)
+
+        renamed = configured()
+        renamed["workflow"]["statuses"] = [*renamed["workflow"]["statuses"], "Parked"]
+        self.assertNotEqual(reviewed.digest, build_scaffold_plan(renamed, snapshot).digest)
 
     def test_scaffold_apply_aborts_on_fresh_state_drift(self) -> None:
         data = manifest()

@@ -516,3 +516,52 @@ nothing to confirm.
 **Not covered:** the Codex lane on this release (S-R31-1). There is no Codex CLI
 or OpenAI credential in this environment. The `mcp_available` mode and
 Windows/macOS hosts are also not covered.
+
+## Quickstart on a fresh repository (S-R30-2, 2026-10-29 to 2026-11-06)
+
+[quickstart.md](quickstart.md) was followed on a new private organization
+repository, `aegolius-labs/abk-quickstart-20261029`, on Windows (Claude Code
+2.1.319, PowerShell). The kit ran from a local checkout of this repository.
+Every write went through plan, digest confirmation, apply and a receipt; no
+issue was filed by hand.
+
+| Step | Plan | Receipt | Result |
+| --- | --- | --- | --- |
+| `init-apply` | 1 action, `project.create` | `init-apply.json` | completed 1/1; Project #7 created |
+| `scaffold-apply` (first try) | `234a495d…`, reviewed before items were added | none | refused: "Local or remote state drifted after review; rebuild and reconfirm the plan". Nothing written |
+| `scaffold-apply` | `45b03916…`, 17 actions: 6 `project.field.create`, 1 `project.field.update_options`, 6 `repository.label.create`, 4 `project.view.create` | `scaffold-apply.json` | completed 17/17 |
+| `scaffold-apply` (second round) | `6df13985…`, 3 `project.view.update` (Backlog, Kanban, Current Sprint) | `scaffold-apply-2.json` | completed 3/3; the next scaffold plan had 0 actions |
+| `sync-apply` | `96938f0d…`, 9 actions: 3 `issue.create`, 3 `project.add_item`, 2 `issue.set_parent`, 1 `issue.add_dependency`; `held_remote_edits` empty | `sync-apply.json` | completed 9/9, `authorization` "digest", verification "converged" in 1.8 s |
+| `sync-plan` | `6a500055…` | none | 0 actions: converged |
+
+The three items became issues #1 to #3 with the Feature as their parent and the
+reset story blocked by the email story. `next --explain 5` selected `S-EMAIL`.
+
+**Friction found and fixed** (quickstart items 10 to 14):
+
+- A new Project needs a second scaffold round, because views cannot be
+  configured on creation. The quickstart now says to plan again until empty.
+- A refused scaffold apply printed a Python traceback. Scaffold, bootstrap and
+  iteration authorization errors now print the same JSON error as sync.
+- The first scaffold plan went stale because items were added between review
+  and apply, and the scaffold digest covered the whole manifest. It now binds
+  only the `github` and `workflow` sections the scaffold reads.
+- `aegolius-labs` defines the native types `Feature` and `User Story`, so the
+  Feature got its native type and the two stories got the `type:story` label.
+  That per-type fallback is intended; the quickstart now describes it.
+- The example's email story already outranked the reset story, so `next` never
+  showed the dependency gate. The reset story now scores higher, and
+  `next --explain` lists it as passed over, "waiting on S-EMAIL".
+
+The scaffold and init receipts in this run record `authorization: null`. They
+came from a checkout older than #151, which records `digest` on every receipt.
+
+**Permissions.** In Claude Code auto mode the GitHub writes were denied until
+the operator added a `permissions.allow` rule for
+`python <kit>/scripts/backlog.py:*` to the session folder's
+`.claude/settings.local.json`; after that every command ran without a prompt.
+An agent writing a skill that declares `allowed-tools` was itself denied as
+self-modification.
+
+**Not covered:** a personal-account owner, macOS and Linux hosts, and the
+plugin installed from the marketplace rather than run from a checkout.

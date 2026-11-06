@@ -16,6 +16,14 @@ The format follows Keep a Changelog, and releases use semantic versioning.
   stderr and a hint to pass `--force`, instead of a Python traceback (QA kit
   Q06-O01).
 
+- A refused `scaffold-apply`, `init-apply` or `iteration-apply` exits with a
+  JSON error on stderr instead of a Python traceback.
+
+- Adding or editing items no longer invalidates a reviewed scaffold plan. Its
+  digest now binds only the manifest's `github` and `workflow` sections, which
+  are all the scaffold reads. Scaffold plans made before this change must be
+  rebuilt once.
+
 ### Added
 
 - Antigravity is a supported host. `.antigravity-plugin/plugin.json` describes

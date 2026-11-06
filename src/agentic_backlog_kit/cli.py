@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .bootstrap import (
+    BootstrapAuthorizationError,
     BootstrapExecutor,
     apply_bootstrap_plan,
     bootstrap_plan_from_dict,
@@ -52,6 +53,7 @@ from .github import (
 )
 from .manifest import ManifestError, default_manifest, load_manifest
 from .iterations import (
+    IterationAuthorizationError,
     apply_iteration_plan,
     build_iteration_plan,
     iteration_plan_from_dict,
@@ -66,6 +68,7 @@ from .schedule import (
     render_mermaid,
 )
 from .scaffold import (
+    ScaffoldAuthorizationError,
     apply_scaffold_plan,
     build_scaffold_plan,
     scaffold_plan_from_dict,
@@ -605,6 +608,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         ManifestError,
         GitHubApiError,
         ApplyAuthorizationError,
+        BootstrapAuthorizationError,
+        IterationAuthorizationError,
+        ScaffoldAuthorizationError,
         CapabilityError,
         FreshnessError,
         FileExistsError,
