@@ -18,6 +18,11 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Added
 
+- Antigravity is a supported host. `.antigravity-plugin/plugin.json` describes
+  the same plugin over the shared `skills/`, so `agy plugin install` loads all
+  six skills. `agy plugin validate` 1.3.3 does not report unknown keys, so the
+  host parity test checks the manifest against Antigravity's published schema.
+
 - Items accept an optional `source`: a producer's reference to the record the
   item was handed over from, such as an Agentic QA Kit session and finding.
   It is unique across the manifest, so `item-add` refuses a second item for the

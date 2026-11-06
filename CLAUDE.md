@@ -26,6 +26,7 @@ The plugin ships one manifest per host, and they must agree:
 - `.codex-plugin/plugin.json` — Codex
 - `.claude-plugin/plugin.json` — Claude Code
 - `.claude-plugin/marketplace.json` — Claude Code marketplace entry
+- `.antigravity-plugin/plugin.json` — Antigravity
 
 `skills/` is the single source of truth for behavior and is auto-discovered by
 both hosts. Do not fork skill content per host. `tests/test_host_manifest_parity.py`

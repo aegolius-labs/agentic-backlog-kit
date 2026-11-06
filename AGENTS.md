@@ -29,7 +29,10 @@ This repository packages Codex skills and a deterministic Python engine for GitH
   per host.
 - Each host gets a thin manifest: `.codex-plugin/plugin.json` for Codex,
   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` for Claude
-  Code. `tests/test_host_manifest_parity.py` enforces that they agree.
+  Code, `.antigravity-plugin/plugin.json` for Antigravity.
+  `tests/test_host_manifest_parity.py` enforces that they agree. Validate the
+  Antigravity manifest with `agy plugin validate .`; it does not report unknown
+  keys, so the parity test checks them against the published schema.
 - Claude Code specifics are in `CLAUDE.md`, which imports this file.
 
 ## Verification

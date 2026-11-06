@@ -1,0 +1,20 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "agentic-backlog-kit",
+  "displayName": "Agentic Backlog Kit",
+  "description": "Deterministic GitHub Issues and Projects backlog workflows for agents",
+  "author": {
+    "name": "Aegolius Labs",
+    "url": "https://github.com/aegolius-labs"
+  },
+  "homepage": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "repository": "https://github.com/aegolius-labs/agentic-backlog-kit",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "agile",
+    "backlog",
+    "github-issues",
+    "github-projects",
+    "sprint-planning"
+  ]
+}
