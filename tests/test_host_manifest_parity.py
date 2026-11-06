@@ -1,4 +1,4 @@
-"""Keep the Codex and Claude Code plugin manifests from drifting apart.
+"""Keep the Codex, Claude Code and Antigravity plugin manifests from drifting apart.
 
 `skills/` is the single source of truth for behavior. Each supported host gets a
 thin manifest over it. These tests enforce that the manifests describe the same
@@ -24,6 +24,20 @@ ROOT = Path(__file__).resolve().parents[1]
 CODEX_MANIFEST = ROOT / ".codex-plugin" / "plugin.json"
 CLAUDE_MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 CLAUDE_MARKETPLACE = ROOT / ".claude-plugin" / "marketplace.json"
+ANTIGRAVITY_MANIFEST = ROOT / ".antigravity-plugin" / "plugin.json"
+
+# Top-level and author keys of https://antigravity.google/schemas/v1/plugin.json
+# (read 2026-11-06). The schema is closed, but `agy plugin validate` 1.3.3
+# accepts unknown keys silently, so this list is the only guard.
+ANTIGRAVITY_KEYS = frozenset(
+    {
+        "$schema", "name", "displayName", "display_name", "description",
+        "version", "disabled", "logo", "suggestedPrompts", "suggested_prompts",
+        "skills", "author", "homepage", "repository", "license", "keywords",
+        "extensions",
+    }
+)
+ANTIGRAVITY_AUTHOR_KEYS = frozenset({"name", "email", "url"})
 
 
 def _load(path: Path) -> dict:
@@ -38,7 +52,12 @@ def _base_version(version: str) -> str:
 
 class HostManifestParityTests(unittest.TestCase):
     def test_every_supported_host_manifest_exists(self) -> None:
-        for path in (CODEX_MANIFEST, CLAUDE_MANIFEST, CLAUDE_MARKETPLACE):
+        for path in (
+            CODEX_MANIFEST,
+            CLAUDE_MANIFEST,
+            CLAUDE_MARKETPLACE,
+            ANTIGRAVITY_MANIFEST,
+        ):
             self.assertTrue(path.is_file(), f"missing host manifest: {path}")
 
     def test_identity_agrees_across_hosts(self) -> None:
@@ -48,6 +67,21 @@ class HostManifestParityTests(unittest.TestCase):
         self.assertEqual(codex["name"], claude["name"])
         self.assertEqual(codex["description"], claude["description"])
         self.assertRegex(_base_version(codex["version"]), r"^\d+\.\d+\.\d+$")
+
+    def test_antigravity_manifest_agrees_and_stays_within_its_schema(self) -> None:
+        antigravity = _load(ANTIGRAVITY_MANIFEST)
+        claude = _load(CLAUDE_MANIFEST)
+
+        for key in ("name", "displayName", "description", "author", "license"):
+            self.assertEqual(claude[key], antigravity[key], key)
+        self.assertRegex(antigravity["name"], r"^[a-z0-9]+(-[a-z0-9]+)*$")
+        self.assertLessEqual(set(antigravity), ANTIGRAVITY_KEYS)
+        self.assertLessEqual(set(antigravity["author"]), ANTIGRAVITY_AUTHOR_KEYS)
+        # Versioned by commit, like Claude Code, so updates are never pinned.
+        self.assertNotIn("version", antigravity)
+        # Skills are discovered from skills/ at the root; no extra folders.
+        self.assertNotIn("skills", antigravity)
+        self.assertFalse((ROOT / "plugin.json").exists(), "one Antigravity manifest")
 
     def test_claude_code_manifests_declare_no_version(self) -> None:
         marketplace = _load(CLAUDE_MARKETPLACE)

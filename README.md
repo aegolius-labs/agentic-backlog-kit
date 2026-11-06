@@ -1,6 +1,6 @@
 # Agentic Backlog Kit
 
-An agent plugin for managing GitHub Issues and Projects as a structured, deterministic Agile backlog. Claude Code, Codex and Antigravity are its supported hosts; Claude Code and Codex ship today, and Antigravity support is planned.
+An agent plugin for managing GitHub Issues and Projects as a structured, deterministic Agile backlog. Claude Code, Codex and Antigravity are its supported hosts.
 
 The kit combines focused skills with a zero-runtime-dependency Python engine. Agents use natural language for judgment-heavy work such as idea refinement, then hand validation, scoring, sprint packing, remote discovery, and synchronization to deterministic code. This keeps large backlogs out of model context and makes mutations reviewable.
 
@@ -39,9 +39,11 @@ GitHub currently supports nested sub-issues, issue dependencies, issue types, Pr
 ## Install
 
 The kit ships one thin manifest per supported host over a single shared
-`skills/` directory. Both hosts install it straight from this GitHub
-repository, with no clone. Both routes were verified from clean host homes on
-2026-10-06; see [docs/validation.md](docs/validation.md#remote-install-s-r30-1-2026-10-06).
+`skills/` directory. Claude Code and Codex install it straight from this
+GitHub repository, with no clone; both routes were verified from clean host
+homes on 2026-10-06, see [docs/validation.md](docs/validation.md#remote-install-s-r30-1-2026-10-06).
+Antigravity's manifest was validated and installed from a local checkout on
+2026-11-06.
 
 ### Claude Code
 
@@ -88,6 +90,18 @@ codex plugin add agentic-backlog-kit@aegolius-labs-backlog
 `codex plugin list` then shows the plugin `installed, enabled`; start a new
 task to use it. Pin a release with `--ref vX.Y.Z` on the marketplace add.
 `codex plugin marketplace upgrade` refreshes the installed copy in place.
+
+### Antigravity
+
+```bash
+agy plugin install https://github.com/aegolius-labs/agentic-backlog-kit
+```
+
+Or install a checkout with `agy plugin install ./agentic-backlog-kit`.
+`agy plugin list` then shows `agentic-backlog-kit` with its six skills. The
+manifest is `.antigravity-plugin/plugin.json`. A local install and
+`agy plugin validate` were verified with `agy` 1.3.3 on 2026-11-06; the
+git-URL install follows Antigravity's documentation and has not yet been run.
 
 ### From a local clone
 
