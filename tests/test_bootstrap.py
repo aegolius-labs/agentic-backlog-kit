@@ -128,6 +128,7 @@ class BootstrapPlanningTests(unittest.TestCase):
         )
 
         self.assertEqual(11, result.project["number"])
+        self.assertEqual("digest", result.receipt.authorization)
         self.assertEqual("PROJECT_11", result.project["id"])
         self.assertEqual("project.create", service.calls[0][0])
         self.assertEqual(["project.create"], [call[0] for call in service.calls])
