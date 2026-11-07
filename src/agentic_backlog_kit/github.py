@@ -877,7 +877,6 @@ class GitHubService:
             query Project($owner: String!, $number: Int!) {
               owner: repositoryOwner(login: $owner) {
                 __typename
-                ... on User { databaseId }
                 ... on ProjectV2Owner {
                 projectV2(number: $number) {
                   id
@@ -913,10 +912,11 @@ class GitHubService:
                 404,
                 f"Project {self.owner}#{self.project_number} was not found",
             )
-        # The REST views API addresses an organization by login but a user by
-        # numeric ID: POST /users/{user_id}/projectsV2/{number}/views.
+        # The REST views API addresses both kinds of owner by login. GitHub's
+        # docs call the user segment {user_id}, but a numeric ID returns 404
+        # there (verified live on 2026-11-07); /users/{login} resolves.
         if account.get("__typename") == "User":
-            self._owner_views_path = f"/users/{account['databaseId']}"
+            self._owner_views_path = f"/users/{self.owner}"
         else:
             self._owner_views_path = f"/orgs/{self.owner}"
         self._project_id = str(project["id"])

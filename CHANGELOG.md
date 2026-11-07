@@ -8,6 +8,14 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Fixed
 
+- Project views on a personal account are created at `/users/{login}`. The
+  numeric user ID the kit used returned 404, so a personal-account scaffold
+  created its fields and labels but no views.
+
+- The Codex installed-plugin trace reads the catalog of the workspace
+  marketplace it installs from (`r06-local`), not the empty personal catalog,
+  so an installed plugin is no longer reported as missing.
+
 - Init, scaffold, import and iteration receipts record `"authorization":
   "digest"` like sync receipts, instead of `null`. Every one of those applies
   already required the confirmed digest; the receipt now says so.

@@ -508,11 +508,17 @@ class GitHubServiceTests(unittest.TestCase):
         )
 
     def test_project_lookup_accepts_a_personal_account_owner(self) -> None:
+        self.service = GitHubService(
+            self.transport,
+            owner="MustacheMushroom",
+            repository="example",
+            project_number=1,
+            issue_type_mode="native_or_label",
+        )
         self.transport.responses = [
             {
                 "owner": {
                     "__typename": "User",
-                    "databaseId": 25103616,
                     "projectV2": {"id": "PROJECT_1", "fields": {"nodes": []}},
                 }
             },
@@ -534,9 +540,9 @@ class GitHubServiceTests(unittest.TestCase):
         self.assertIn("repositoryOwner(login: $owner)", query)
         self.assertIn("... on ProjectV2Owner", query)
         self.assertNotIn("organization(", query)
-        # The REST views API names a user by numeric ID, not by login.
+        # The REST views API names a user by login; a numeric ID returns 404.
         self.assertEqual(
-            "/users/25103616/projectsV2/1/views", self.transport.calls[1][1]
+            "/users/MustacheMushroom/projectsV2/1/views", self.transport.calls[1][1]
         )
 
     def test_update_view_uses_graphql_for_supported_complete_configuration(self) -> None:

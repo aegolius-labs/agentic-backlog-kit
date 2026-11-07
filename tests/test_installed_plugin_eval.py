@@ -198,6 +198,28 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertEqual("failed", result["status"])
         self.assertIsNone(result["plugin"])
 
+    def test_plugin_catalog_probe_reads_the_workspace_marketplace(self) -> None:
+        commands = []
+
+        def runner(command, **kwargs):
+            commands.append(list(command))
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"installed": [{
+                    "name": "agentic-backlog-kit", "installed": True, "enabled": True,
+                    "source": {"source": "local"},
+                }], "available": []}),
+                stderr="",
+            )
+
+        result = self.harness.probe_plugin_catalog(executable="codex.cmd", runner=runner)
+        self.assertEqual("passed", result["status"])
+        self.assertEqual(
+            ["codex.cmd", "plugin", "list", "--marketplace", "r06-local", "--json"],
+            commands[0],
+        )
+
     def test_mcp_probe_does_not_treat_unavailable_row_as_available(self) -> None:
         def runner(command, **kwargs):
             return subprocess.CompletedProcess(
