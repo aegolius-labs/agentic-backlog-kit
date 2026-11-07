@@ -72,7 +72,11 @@ not from the release artifacts, and keys its cache on the declared version, so a
 version that never moves in the tree would make `claude plugin update` keep the
 first copy forever. With none declared, Claude Code versions by commit and
 updates arrive. Codex refreshes from the repository regardless of version, so
-its manifest keeps the stamped one. See the
+its manifest keeps a version field. That field is stamped only in the
+preflight checkout; the published wheel and sdist do not carry the plugin, and
+nothing is committed, so a Codex install from the repository reports the
+tree's `0.2.0` for every release. Identify an installed Codex copy by the tag
+or commit it came from, not by that field. See the
 [remote install evidence](validation.md#remote-install-s-r30-1-2026-10-06).
 
 This closes R14-F8. Before it, a release-bearing merge computed a tag the tree

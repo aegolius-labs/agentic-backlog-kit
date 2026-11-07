@@ -235,16 +235,26 @@ def _probe(command: Sequence[str], runner: Callable[..., Any] | None) -> tuple[A
         return None, _redact(exc)
 
 
+LOCAL_MARKETPLACE = "r06-local"
+"""Name of the workspace marketplace that `prepare` writes and the README installs from."""
+
+
 def probe_plugin_catalog(
-    *, executable: str | Path | None = None, runner: Callable[..., Any] | None = None
+    *, executable: str | Path | None = None, runner: Callable[..., Any] | None = None,
+    marketplace: str = LOCAL_MARKETPLACE,
 ) -> dict[str, Any]:
-    """Read the installed personal catalog without changing it."""
+    """Read the catalog of the marketplace the plugin was installed from, without changing it.
+
+    The README installs from the prepared workspace marketplace, so that is the
+    catalog that can prove the install. Codex lists a plugin only under the
+    marketplace that holds it; the personal catalog stays empty.
+    """
 
     candidate = _cli(executable)
     if not candidate:
         return {"status": "unavailable", "plugin": None, "reason": "Codex CLI not found"}
     completed, error = _probe(
-        [candidate, "plugin", "list", "--marketplace", "personal", "--json"], runner
+        [candidate, "plugin", "list", "--marketplace", marketplace, "--json"], runner
     )
     if error:
         return {"status": "blocked", "plugin": None, "reason": error}
