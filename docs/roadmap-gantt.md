@@ -3,8 +3,8 @@
 **Generated. Do not edit by hand.** Regenerate with `abk gantt --offline --lanes 1 --days-per-effort 2`.
 
 - Projection start: `2026-09-18`
-- Projected finish: `2027-04-15`
-- Scheduled items: 42
+- Projected finish: `2027-04-21`
+- Scheduled items: 43
 - Duration basis: 2 day(s) per effort point
 - Parallel lanes: 1
 - Critical path: `S-R15-1 -> S-R15-2 -> S-R11-1 -> S-R11-2`
@@ -33,7 +33,7 @@ gantt
     Preview unmanaged issues read-only :S-R11-1, 2026-10-06, 6d
     Assign stable IDs and apply adoption in deterministic bat... :S-R11-2, 2026-11-09, 6d
     Cover adoption in the skills, not only the CLI :S-R11-3, 2026-12-05, 4d
-    Recover an orphan with the structure GitHub records, not... :S-R11-4, 2027-02-21, 4d
+    Recover an orphan with the structure GitHub records, not... :S-R11-4, 2027-02-27, 4d
     section R29 - Tell GitHub's read-after-write lag apart from real...
     Resolve Project membership from the issue when the item l... :S-R29-1, 2026-10-16, 4d
     Re-read within a bounded window before calling post-apply... :S-R29-2, 2027-01-28, 6d
@@ -56,7 +56,7 @@ gantt
     R27 - Project the backlog onto a timeline and render a Ga... :active, R27, 2027-01-04, 6d
     section R14 - Adopt organization-managed semantic releases
     Enforce the release baseline prerequisite without auto-ta... :S-R14-1, 2026-12-09, 6d
-    Prove hosted recovery after draft creation and partial up... :S-R14-2, 2027-03-01, 6d
+    Prove hosted recovery after draft creation and partial up... :S-R14-2, 2027-03-07, 6d
     section v0.4.0+ - Reconciliation and reach
     R25 - Carry a canonical GUID through to GitHub for Seam A... :R25, 2026-12-31, 4d
     R13 - Complete native transport parity and decide on a de... :R13, 2027-02-03, 10d
@@ -70,18 +70,19 @@ gantt
     State supported account types and repository scope up front :active, S-R33-1, 2027-02-15, 2d
     section v0.1.2 - Apply ergonomics
     R23 - Converge a fresh Project in one scaffold apply :R23, 2027-01-22, 6d
-    section R10 - Close the work lifecycle from evidence
-    Make agents link PRs to kit issues with closing keywords :active, S-R10-1, 2027-02-19, 2d
-    Recognize Priority-only plans as pre-authorized :active, S-R10-4, 2027-02-25, 4d
-    Propose closing a parent once every child is closed :active, S-R10-2, 2027-03-13, 6d
-    Remove relationships the manifest no longer declares :active, S-R10-3, 2027-03-19, 10d
-    section Unparented
-    Infer hierarchy and dependencies when importing existing... :GH-63, 2027-03-07, 6d
     section Unscheduled - portfolio scale
-    R24 - Reconsider hierarchy expressiveness for small work :R24, 2027-03-29, 6d
-    R12 - Support multi-repository portfolio planning :R12, 2027-04-06, 10d
+    R37 - Record opt-in usage evidence in projects that use t... :R37, 2027-02-19, 6d
+    R24 - Reconsider hierarchy expressiveness for small work :R24, 2027-04-04, 6d
+    R12 - Support multi-repository portfolio planning :R12, 2027-04-12, 10d
+    section R10 - Close the work lifecycle from evidence
+    Make agents link PRs to kit issues with closing keywords :active, S-R10-1, 2027-02-25, 2d
+    Recognize Priority-only plans as pre-authorized :active, S-R10-4, 2027-03-03, 4d
+    Propose closing a parent once every child is closed :active, S-R10-2, 2027-03-19, 6d
+    Remove relationships the manifest no longer declares :active, S-R10-3, 2027-03-25, 10d
+    section Unparented
+    Infer hierarchy and dependencies when importing existing... :GH-63, 2027-03-13, 6d
     section R20 - Resolve remaining disposable evaluation resources
-    Refresh disposable resource identities before any cleanup... :S-R20-1, 2027-04-04, 2d
+    Refresh disposable resource identities before any cleanup... :S-R20-1, 2027-04-10, 2d
 ```
 
 ## Not scheduled

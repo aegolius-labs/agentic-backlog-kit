@@ -1798,6 +1798,28 @@
       "status": "In Progress",
       "maturity": "ready",
       "sprint": null
+    },
+    {
+      "id": "R37",
+      "title": "R37 - Record opt-in usage evidence in projects that use the kit",
+      "type": "Feature",
+      "description": "Implement the organization's usage evidence contract (docs/usage-evidence.md in aegolius-labs/.github): an opt-in, gitignored .aegolius-usage/ ledger written by the engine for each command, validated agent and person feedback, a read-only usage report, and usage publish to an owner-authorized repository. Usage is evidence about the kit, never intent. Approved by the owner on 2026-11-07 (hybrid route); scheduled after the production-readiness line.",
+      "acceptance_criteria": [
+        "Without .aegolius-usage/config.json enabled, no command writes any usage file",
+        "Each engine command in an opted-in project appends one event matching the contract, and never records paths, names, arguments or message text",
+        "usage feedback rejects unknown fields, over-long phrases and phrases that look like paths, URLs, emails or secrets",
+        "usage publish refuses unless the config records an owner authorization, and posts only the generated summary",
+        "The shared fixture is held byte-identical and accepted by the tests"
+      ],
+      "parent": "EPIC-UNSCHED",
+      "depends_on": [],
+      "impact": 3,
+      "effort": 3,
+      "business_value": 3,
+      "enabler_value": 3,
+      "status": "Inbox",
+      "maturity": "refined",
+      "sprint": null
     }
   ]
 }
