@@ -534,6 +534,9 @@ def parse_trace_jsonl(
                 compact["item"] = _redact(_canonical(item), root=workspace, limit=2000)
             if event.get("usage") is not None:
                 compact["usage"] = _redact(_canonical(event["usage"]), root=workspace, limit=800)
+            message = _provider_error(event)
+            if message:
+                compact["error"] = _redact(message, root=workspace, limit=300)
             events.append(compact)
         if event.get("type") == "thread.started" and event.get("thread_id"):
             thread_ids.append(str(event["thread_id"]))
@@ -666,6 +669,18 @@ def _mode_reason(case: Mapping[str, Any], mode: str, catalog: Mapping[str, Any] 
     if mode == "mcp_unavailable" and github is not False:
         return "mcp_unavailable was not proven by an unavailable GitHub MCP row"
     return None
+
+
+def _provider_error(event: Mapping[str, Any]) -> str | None:
+    """The message of an `error` or `turn.failed` event, if it carries one."""
+
+    if event.get("type") not in {"error", "turn.failed"}:
+        return None
+    message = event.get("message")
+    error = event.get("error")
+    if not message and isinstance(error, Mapping):
+        message = error.get("message")
+    return str(message) if message else None
 
 
 def _merge(parts: Sequence[Mapping[str, Any]], events: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -853,9 +868,14 @@ def run_trace_case(
                     if workspace["before"].get(key) != after.get(key))
     if len(parts) != len(prompts):
         failures.append("not every corpus turn was observed")
+    provider_errors = [event["error"] for event in events if event.get("error")]
     for index, (status, exit_code) in enumerate(zip(statuses, exits), 1):
         if status != "completed" or exit_code != 0:
             failures.append(f"CLI turn {index} did not complete: status={status}, exit_code={exit_code}")
+    if provider_errors:
+        # A provider refusal (credits, auth, rate limits) is not a plugin
+        # failure; name it so the record cannot be read as one.
+        failures.insert(0, f"provider error: {provider_errors[0]}")
     if not parts or not trace["jsonl_valid"]:
         failures.append("CLI stdout was not valid JSONL")
     if trace["output_truncated"]:

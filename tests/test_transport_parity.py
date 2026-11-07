@@ -149,7 +149,7 @@ class RouteParityTests(unittest.TestCase):
 
     @staticmethod
     def _issue_payload() -> dict:
-        return {"number": 7, "id": 70, "node_id": "I_7", "html_url": "u"}
+        return {"number": 7, "id": 70, "node_id": "I_7", "html_url": "u", "type": {"name": "Story"}}
 
     def _payload(self) -> dict:
         return {
