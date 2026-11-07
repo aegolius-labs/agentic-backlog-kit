@@ -387,6 +387,23 @@ class GitHubIssueRef:
     project_item_id: str | None = None
 
 
+def _type_dropped(response: Any, requested: str) -> bool:
+    """Whether GitHub accepted an issue write but left its native type unset.
+
+    A repository whose owner defines no issue types, such as one owned by a
+    personal account, answers a write that names a type with 2xx and silently
+    ignores the type rather than rejecting it with 422. Only a response that
+    reports a `type` field and shows a different one counts; a response that
+    omits the field says nothing either way and is left alone.
+    """
+
+    if not isinstance(response, dict) or "type" not in response:
+        return False
+    current = response.get("type")
+    name = current.get("name") if isinstance(current, dict) else current
+    return name != requested
+
+
 class GitHubService:
     """High-level GitHub mutations used by the reviewed sync-plan executor."""
 
@@ -506,6 +523,17 @@ class GitHubService:
             response = self.transport.rest(
                 "POST", f"{self.repository_path}/issues", request_payload
             )
+        else:
+            if self.issue_type_mode == "native_or_label" and _type_dropped(
+                response, payload["type"]
+            ):
+                ref = self._issue_ref(item_id, response)
+                self.transport.rest(
+                    "POST",
+                    f"{self.repository_path}/issues/{ref.number}/labels",
+                    {"labels": [payload["fallback_label"]]},
+                )
+                return ref
         return self._issue_ref(item_id, response)
 
     def update_issue(self, issue: GitHubIssueRef, payload: dict[str, Any]) -> None:
@@ -535,12 +563,30 @@ class GitHubService:
                 )
                 return
         try:
+            response = None
             if request_payload:
-                self.transport.rest(
+                response = self.transport.rest(
                     "PATCH",
                     f"{self.repository_path}/issues/{issue.number}",
                     request_payload,
                 )
+            if (
+                desired_type
+                and self.issue_type_mode == "native_or_label"
+                and _type_dropped(response, desired_type)
+            ):
+                if isinstance(desired_labels, list):
+                    self.transport.rest(
+                        "PATCH",
+                        f"{self.repository_path}/issues/{issue.number}",
+                        {"labels": desired_labels},
+                    )
+                else:
+                    self.transport.rest(
+                        "POST",
+                        f"{self.repository_path}/issues/{issue.number}/labels",
+                        {"labels": [payload["fallback_label"]]},
+                    )
         except GitHubApiError as exc:
             if (
                 not desired_type

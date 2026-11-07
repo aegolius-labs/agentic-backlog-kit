@@ -343,6 +343,71 @@ class GitHubServiceTests(unittest.TestCase):
             {"labels": ["customer", "type:task"]}, self.transport.calls[1][2]
         )
 
+    def test_creation_labels_an_issue_whose_type_github_silently_dropped(self) -> None:
+        # A personal-account repository accepts a typed issue with 201 and
+        # leaves its type null instead of answering 422.
+        self.transport.responses = [
+            {
+                "number": 12,
+                "id": 1200,
+                "node_id": "NODE_12",
+                "html_url": "issue-url",
+                "type": None,
+            },
+            [],
+        ]
+
+        issue = self.service.create_issue(
+            "T-1",
+            {
+                "title": "Task",
+                "body": "Body",
+                "type": "Task",
+                "fallback_label": "type:task",
+            },
+        )
+
+        self.assertEqual(12, issue.number)
+        self.assertEqual(
+            ("POST", "/repos/aegolius-labs/example/issues/12/labels", {"labels": ["type:task"]}),
+            self.transport.calls[1],
+        )
+
+    def test_creation_keeps_a_native_type_github_applied(self) -> None:
+        self.transport.responses = [
+            {
+                "number": 12,
+                "id": 1200,
+                "node_id": "NODE_12",
+                "html_url": "issue-url",
+                "type": {"name": "Task"},
+            }
+        ]
+
+        self.service.create_issue(
+            "T-1",
+            {"title": "Task", "body": "", "type": "Task", "fallback_label": "type:task"},
+        )
+
+        self.assertEqual(1, len(self.transport.calls))
+
+    def test_update_labels_an_issue_whose_type_github_silently_dropped(self) -> None:
+        self.transport.responses = [{"number": 11, "type": None}, {}]
+
+        self.service.update_issue(
+            self.child,
+            {
+                "type": "Task",
+                "fallback_label": "type:task",
+                "labels": ["customer", "type:task"],
+            },
+        )
+
+        self.assertEqual({"type": "Task"}, self.transport.calls[0][2])
+        self.assertEqual(
+            {"labels": ["customer", "type:task"]}, self.transport.calls[1][2]
+        )
+
     def test_iteration_assignment_rejects_completed_titles_and_aliases(self) -> None:
         issue = GitHubIssueRef(
             "T-1", 11, 111, "NODE_11", "child-url", project_item_id="PITEM_1"

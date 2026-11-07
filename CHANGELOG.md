@@ -8,6 +8,16 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ### Fixed
 
+- Items on a personal account, or on any owner without that issue type, get
+  their `type:*` label. GitHub accepts a typed issue there with 2xx and drops
+  the type instead of answering 422, so the label fallback never ran and every
+  sync re-proposed the same update. A write whose response shows the type was
+  not applied now falls back to the label.
+
+- A Codex trace that the provider refuses (out of credits, signed out) records
+  `provider error: <message>` as its first failure instead of only a non-zero
+  exit code.
+
 - Project views on a personal account are created at `/users/{login}`. The
   numeric user ID the kit used returned 404, so a personal-account scaffold
   created its fields and labels but no views.

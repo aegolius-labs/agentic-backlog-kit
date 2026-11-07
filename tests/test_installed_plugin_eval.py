@@ -626,6 +626,28 @@ class InstalledPluginEvaluationTests(unittest.TestCase):
         self.assertFalse(record["passed"])
         self.assertTrue(any("later prompts were not sent" in value for value in record["failures"]))
 
+    def test_run_trace_case_names_a_provider_error_instead_of_hiding_it(self) -> None:
+        output = "".join(json.dumps(event) + "\n" for event in (
+            {"type": "thread.started", "thread_id": "thread-credits"},
+            {"type": "error", "message": "Your workspace is out of credits."},
+            {"type": "turn.failed", "error": {"message": "Your workspace is out of credits."}},
+        ))
+
+        def runner(command, **kwargs):
+            return subprocess.CompletedProcess(command, 1, stdout=output, stderr="")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = self._trace_suite(temporary)
+            record = self.harness.run_trace_case(
+                suite, Path(temporary) / "traces", case_id="direct-ingest",
+                mode="mcp_unavailable", executable="codex.cmd", runner=runner,
+            )
+
+        self.assertFalse(record["passed"])
+        self.assertEqual(
+            "provider error: Your workspace is out of credits.", record["failures"][0]
+        )
+
     def test_follow_up_requires_a_reused_result_identifier(self) -> None:
         calls = 0
 
