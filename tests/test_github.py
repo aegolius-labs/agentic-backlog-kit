@@ -373,6 +373,23 @@ class GitHubServiceTests(unittest.TestCase):
             self.transport.calls[1],
         )
 
+    def test_creation_labels_an_issue_from_a_repository_without_issue_types(self) -> None:
+        # A personal-account repository omits the `type` field entirely.
+        self.transport.responses = [
+            {"number": 12, "id": 1200, "node_id": "NODE_12", "html_url": "issue-url"},
+            [],
+        ]
+
+        self.service.create_issue(
+            "T-1",
+            {"title": "Task", "body": "", "type": "Task", "fallback_label": "type:task"},
+        )
+
+        self.assertEqual(
+            ("POST", "/repos/aegolius-labs/example/issues/12/labels", {"labels": ["type:task"]}),
+            self.transport.calls[1],
+        )
+
     def test_creation_keeps_a_native_type_github_applied(self) -> None:
         self.transport.responses = [
             {

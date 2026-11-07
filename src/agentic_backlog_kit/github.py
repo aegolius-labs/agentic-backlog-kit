@@ -393,11 +393,12 @@ def _type_dropped(response: Any, requested: str) -> bool:
     A repository whose owner defines no issue types, such as one owned by a
     personal account, answers a write that names a type with 2xx and silently
     ignores the type rather than rejecting it with 422. Only a response that
-    reports a `type` field and shows a different one counts; a response that
-    omits the field says nothing either way and is left alone.
+    names the requested type proves it applied. A repository with no issue
+    types omits the `type` field altogether, which counts as dropped too.
+    Anything that does not describe an issue is left alone.
     """
 
-    if not isinstance(response, dict) or "type" not in response:
+    if not isinstance(response, dict) or "number" not in response:
         return False
     current = response.get("type")
     name = current.get("name") if isinstance(current, dict) else current
