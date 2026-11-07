@@ -161,7 +161,7 @@ What shipped is recorded after the fact.
 | Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R25 ready, R10 refined into four stories |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
 | Production readiness | R28-R35 | pending | Filed 2026-09-24 from the [readiness report](docs/production-readiness-2026-09-24.md); scale first. R35 added 2026-09-28 |
-| Unscheduled | R12, R24 | - | Deferred |
+| Unscheduled | R12, R24, R37 | - | Deferred; R37 approved 2026-11-07, after production readiness |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
 
@@ -556,6 +556,15 @@ next, who did not watch the last session work. See
 - **Context:** The hierarchy is a strict ladder and a parent must be exactly one level above its child, so a small chore directly under a Feature has no type: `Task` is reserved for level 5 under a `Story` or `Bug`. Six decomposed items in the kit's own backlog were written as Tasks and had to be retyped as Stories, which overstates them.
 - **High-level approach:** Decide whether the strict ladder is intentional. If it is, document why; if it is not, consider permitting a Task directly under a Feature.
 - **Done when:** A decision is recorded either way with its modeling rationale.
+
+#### R37 - Record opt-in usage evidence in projects that use the kit
+
+- **Status:** Inbox; approved by the owner on 2026-11-07, scheduled after the production-readiness line. Not a 1.0 gate.
+- **Importance:** Medium
+- **Complexity:** Medium
+- **Context:** Nothing records how the kit is used outside its own repository, so there is no evidence of use beyond the owner's word. The organization's [usage evidence contract](https://github.com/aegolius-labs/.github/blob/main/docs/usage-evidence.md) defines one opt-in record shared by every kit. Agents writing free text automatically to a public issue per project was considered and rejected: it would leak other projects, break this kit's confirm-before-write rule, and give uncountable data.
+- **High-level approach:** Implement the contract in the engine: `usage enable`, `disable`, `purge`, `feedback`, `report` and `publish`, one event per command in an opted-in project, the shared fixture, and a skill prompt for one feedback note at the end of a workflow. This kit goes first because it is not under a trial and already owns a GitHub transport for `publish`.
+- **Done when:** A project without the opt-in gets no usage files; an opted-in project gets one valid event per command and nothing from the project itself; `publish` refuses without a recorded owner authorization; the shared fixture passes.
 
 #### R12 - Support multi-repository portfolio planning
 
