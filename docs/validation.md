@@ -565,3 +565,45 @@ self-modification.
 
 **Not covered:** a personal-account owner, macOS and Linux hosts, and the
 plugin installed from the marketplace rather than run from a checkout.
+
+## Personal-account owner, live (2026-11-07)
+
+[quickstart.md](quickstart.md) was followed on a new private repository owned
+by a personal account, `MustacheMushroom/abk-personal-20261107`, on Windows
+with `gh` signed in with the `project` scope. Every write went through plan,
+digest confirmation, apply and a receipt.
+
+The run found three defects, each fixed before the next round:
+
+| Round | Engine | Result |
+| --- | --- | --- |
+| `init-apply` | v0.21.1 | completed 1/1; created `/users/MustacheMushroom/projects/1` |
+| `scaffold-apply` | v0.21.1 | failed 13/17 at the first `project.view.create`: `HTTP 404`. Fields and labels were written |
+| `scaffold-apply-r2` | v0.21.2 (#155) | completed 4/4 view creations |
+| `scaffold-apply-r3` | v0.21.2 | completed 3/3 view updates; the next scaffold plan had 0 actions |
+| `sync-apply` | v0.21.2 | completed 9/9 (3 `issue.create`, 3 `project.add_item`, 2 `issue.set_parent`, 1 `issue.add_dependency`); verification "drift" |
+| `sync-apply-2` | v0.21.2 | completed 3/3 `issue.update`, but changed nothing; verification "drift" |
+| `sync-apply-3` | main at `c204cd1` (#156) | completed 3/3, verification "converged" in 1.75 s |
+| `sync-plan` | main at `c204cd1` | 0 actions, digest `8654329b…` |
+
+The Project ended with its 7 fields, 6 `type:*` labels and 4 configured views.
+Issues #1 to #3 carry `type:feature`, `type:story` and `type:story`, with their
+parent and "blocked by" links. `next --explain 3` selected `S-EMAIL` and passed
+over the higher-scoring reset story, "waiting on S-EMAIL".
+
+**Defects found:**
+
+- The REST views route resolves `/users/{login}`; the numeric user ID the kit
+  sent returns 404 (verified on API versions 2022-11-28 and 2026-03-10). Fixed
+  in #155.
+- A personal-account repository accepts a typed issue with 2xx, drops the
+  type, and omits `type` from the issue response, so the label fallback, which
+  waited for a 422, never ran. Sync re-proposed the same label update forever
+  while its receipts said "completed". Fixed in #156: unless a response names
+  the requested type, the kit writes the label.
+- The first sync's verification re-read for 69.9 s before reporting the
+  dropped types as drift, because it allows for GitHub's read lag before
+  calling a residual drift. That is the intended verify window; not changed.
+
+**Not covered:** a personal account with an existing Project, and Linux or
+macOS for this owner kind.

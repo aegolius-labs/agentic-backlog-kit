@@ -5,8 +5,9 @@ has verified. Each step writes nothing to GitHub until you confirm the exact
 plan it showed you.
 
 > **Status.** Written 2026-10-15 for S-R30-2. Followed end to end on a fresh
-> organization repository between 2026-10-29 and 2026-11-06, to a sync plan
-> with no actions left. The friction that run found is fixed here; the
+> organization repository between 2026-10-29 and 2026-11-06, and on a fresh
+> personal-account repository on 2026-11-07, each to a sync plan with no
+> actions left. The friction that run found is fixed here; the
 > evidence is in [validation.md](validation.md).
 
 ## Before you start
