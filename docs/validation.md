@@ -601,8 +601,9 @@ over the higher-scoring reset story, "waiting on S-EMAIL".
   waited for a 422, never ran. Sync re-proposed the same label update forever
   while its receipts said "completed". Fixed in #156: unless a response names
   the requested type, the kit writes the label.
-- Verification of the no-op round waited 69.9 s before reporting drift.
-  Expected for an unchanged write; not fixed.
+- The first sync's verification re-read for 69.9 s before reporting the
+  dropped types as drift, because it allows for GitHub's read lag before
+  calling a residual drift. That is the intended verify window; not changed.
 
 **Not covered:** a personal account with an existing Project, and Linux or
 macOS for this owner kind.
