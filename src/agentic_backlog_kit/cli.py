@@ -52,6 +52,8 @@ from .github import (
     GitHubService,
 )
 from .manifest import ManifestError, default_manifest, load_manifest
+from . import usage
+from .usage import UsageError, record_event
 from .iterations import (
     IterationAuthorizationError,
     apply_iteration_plan,
@@ -498,6 +500,48 @@ def _parser() -> argparse.ArgumentParser:
     iteration_apply.add_argument(
         "--backend", choices=("auto", "gh", "api"), default="auto"
     )
+    usage = commands.add_parser(
+        "usage",
+        help="Opt-in usage evidence for this project (off unless enabled)",
+    )
+    usage_commands = usage.add_subparsers(dest="usage_command", required=True)
+    usage_commands.add_parser("enable", help="Opt this project in to usage recording")
+    usage_commands.add_parser("disable", help="Stop recording; keeps what exists")
+    usage_commands.add_parser("purge", help="Delete this project's usage folder")
+    usage_feedback = usage_commands.add_parser(
+        "feedback", help="Append one validated feedback note"
+    )
+    usage_feedback.add_argument(
+        "--verdict", required=True, choices=("helped", "neutral", "got_in_the_way")
+    )
+    usage_feedback.add_argument(
+        "--source", required=True, choices=("agent-judgment", "person")
+    )
+    usage_feedback.add_argument(
+        "--friction",
+        action="append",
+        default=[],
+        help="One short friction phrase, never project data; repeat up to 5 times",
+    )
+    usage_feedback.add_argument("--run-id")
+    usage_report = usage_commands.add_parser(
+        "report", help="Read-only summary over one or more projects"
+    )
+    usage_report.add_argument(
+        "--root", action="append", help="Project folder; repeat for several"
+    )
+    usage_report.add_argument(
+        "--share",
+        action="store_true",
+        help="Print the summary as Markdown for a person to post",
+    )
+    usage_publish = usage_commands.add_parser(
+        "publish",
+        help="Post the summary to the repository the owner authorized in config",
+    )
+    usage_publish.add_argument(
+        "--backend", choices=("auto", "gh", "api"), default="auto"
+    )
     return parser
 
 
@@ -603,6 +647,34 @@ def _parse_transitions(
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        status = _main(args)
+    except BaseException as error:
+        _record_usage(args, "error", type(error).__name__)
+        raise
+    failure = getattr(args, "_failure_class", None)
+    if status == 0:
+        outcome = "ok"
+    elif failure == GitHubApiError.__name__:
+        outcome = "error"
+    else:
+        outcome = "refused"
+    _record_usage(args, outcome, failure)
+    return status
+
+
+def _record_usage(args: argparse.Namespace, outcome: str, error_class: str | None) -> None:
+    """One event per command in a project that opted in (R37), else a no-op.
+
+    Usage commands manage the ledger itself and are not recorded as usage.
+    """
+
+    command = getattr(args, "command", "") or ""
+    if command and command != "usage":
+        record_event(command, outcome, error_class)
+
+
+def _main(args: argparse.Namespace) -> int:
+    try:
         return _dispatch(args)
     except (
         ManifestError,
@@ -614,7 +686,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         CapabilityError,
         FreshnessError,
         FileExistsError,
+        UsageError,
     ) as error:
+        args._failure_class = type(error).__name__
         # A rejected write should read as a decision, not a stack trace. The
         # receipt already records the exact failing action; this is the line the
         # operator sees, so it names the failure and, where the cause is known,
@@ -652,6 +726,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _dispatch(args: argparse.Namespace) -> int:
+
+    if args.command == "usage":
+        return _usage(args)
 
     if args.command == "init":
         path = Path(args.manifest)
@@ -1295,3 +1372,32 @@ def _dispatch(args: argparse.Namespace) -> int:
         _print_json(asdict(receipt))
         return 0
     raise AssertionError(f"Unhandled command: {args.command}")
+
+
+def _usage(args: argparse.Namespace) -> int:
+    action = args.usage_command
+    if action == "enable":
+        _print_json(usage.enable())
+    elif action == "disable":
+        _print_json(usage.disable())
+    elif action == "purge":
+        _print_json(usage.purge())
+    elif action == "feedback":
+        _print_json(
+            usage.add_feedback(
+                args.verdict,
+                source=args.source,
+                friction=args.friction,
+                run_id=args.run_id,
+            )
+        )
+    elif action == "report":
+        report = usage.build_report(args.root or ["."])
+        if args.share:
+            print(usage.render_report_markdown(report), end="")
+        else:
+            _print_json(report)
+    elif action == "publish":
+        _print_json(usage.publish(".", _transport(args.backend)))
+    return 0
+

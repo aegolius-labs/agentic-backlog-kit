@@ -6,6 +6,17 @@ The format follows Keep a Changelog, and releases use semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in usage evidence under the organization's usage evidence contract (R37).
+  `usage enable` creates `.aegolius-usage/` and adds it to `.gitignore`; after
+  that each command appends one event with its name, outcome and a fixed error
+  code, and nothing from the project. `usage feedback`, `usage report`
+  (counts under 5 withheld, agent judgment labelled) and `usage publish`
+  (refuses until the owner records a destination) complete the set. A project
+  that never runs `usage enable` gets no files. See
+  [docs/usage-evidence.md](docs/usage-evidence.md).
+
 ### Fixed
 
 - Items on a personal account, or on any owner without that issue type, get

@@ -1,0 +1,11 @@
+{
+  "schema": "aegolius-usage-config/v1",
+  "enabled": true,
+  "enabled_at": "2026-11-08T14:00:00Z",
+  "project_id": "u-7f3c9a2e5b14",
+  "publish": {
+    "repository": "example-owner/kit-usage",
+    "authorized_by": "the project owner, in their own words",
+    "authorized_at": "2026-11-08T14:00:00Z"
+  }
+}
