@@ -126,9 +126,22 @@ human edits are detected and held (S-R35-2), and `abk observe` exports a
 versioned `abk-observed-state` evidence contract (S-R35-3). The aio-agentic-sdlc
 consumer of that contract belongs to that repository.
 
-Outstanding product work: **R28** and **R29** (scale and GitHub lag), then
-installation and evaluation (**R30**-**R32**), then **R10**, then the stability
-policy and an outside pilot (**R33**, **R34**). Outstanding operations work,
+**2026-11-08.** Everything above has shipped except two 1.0 gates. Scale and
+lag (R28, R29), CI coverage (R32), cross-session state (R35), the lifecycle
+(R10, closed on 2026-10-29 after its post-merge sync), the remote install and
+quickstart (R30, followed end to end on an organization fixture and on a
+personal account, #153 and #157), the supported-configuration statement and
+compatibility policy (R33), and the Claude Code installed-plugin run (S-R31-2)
+are done. The two gates still open in the
+[1.0 criteria](docs/compatibility.md#10-criteria) are the Codex
+installed-plugin run on the current release (S-R31-1), blocked on Codex
+credits, and one outside pilot (R34), which only the owner can recruit. R37 was
+added on 2026-11-07 and is not a 1.0 gate. The release is `v0.21.3`.
+
+Earlier ordering, kept for history: **R28** and **R29** (scale and GitHub
+lag), then installation and evaluation (**R30**-**R32**), then **R10**, then
+the stability policy and an outside pilot (**R33**, **R34**). Outstanding
+operations work,
 excluded from the product completion basis: none. R20 closed on 2026-09-26 when the
 owner deleted the four retired resources by hand and each read back absent. R14 closed on 2026-09-24
 when Plan M proved hosted draft/partial-upload recovery against the retained
@@ -158,9 +171,9 @@ What shipped is recorded after the fact.
 | Operational authority | R15, R16 | `v0.2.0`, `v0.3.0` | **Shipped** 2026-09-19 |
 | Apply ergonomics | R22, R23 | `v0.4.0` | **Shipped** 2026-09-19; raised by first use |
 | Adoption | R11 | `v0.5.0` | **Shipped** 2026-09-19 |
-| Reconciliation and reach | R10, R13, GH-63, R25 | pending | R13 and GH-63 complete; R25 ready, R10 refined into four stories |
+| Reconciliation and reach | R10, R13, GH-63, R25 | see [CHANGELOG](CHANGELOG.md) | **Shipped**; R10 closed 2026-10-29 after its post-merge sync |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
-| Production readiness | R28-R35 | pending | Filed 2026-09-24 from the [readiness report](docs/production-readiness-2026-09-24.md); scale first. R35 added 2026-09-28 |
+| Production readiness | R28-R35 | pending | All shipped except S-R31-1 (Codex run, blocked on credits) and R34 (outside pilot); see the 2026-11-08 checkpoint |
 | Unscheduled | R12, R24, R37 | - | Deferred; R37 approved 2026-11-07, after production readiness |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
@@ -198,17 +211,18 @@ effort, production readiness, or safety approval.
 | Apply ergonomics R22-R23 | 2/2 | 100% |
 | Operational authority R15-R16 | 2/2 | 100% |
 | Adoption R11 | 1/1 | 100% |
-| Reconciliation and reach R10, R13, GH-63, R25 | 2/4 | 50% |
+| Reconciliation and reach R10, R13, GH-63, R25 | 4/4 | 100% |
 | Planning and handoff R26, R27 | 2/2 | 100% |
-| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25-R27 | **20/22** | **91%** |
+| **Scheduled product work** - R01-R11, R13, R15-R18, R22, R23, GH-63, R25-R27 | **22/22** | **100%** |
 | Operations R14, R19, R20 | 3/3 | 100% |
 
 The former headline figure was "9/20 items - 45%". That denominator included
 R12, which is explicitly deferred, and three operations chores. The scheduled
 product figure above is the number that describes readiness.
 
-R10 and R13 are the two scheduled items still open, which is why this figure
-is 89% rather than 100%. An earlier revision of this table said 16/16; that
+As of 2026-11-08 both have closed, so the figure is 22/22. Earlier, R10 and
+R13 were the two scheduled items still open, which is why this figure
+was 89% rather than 100%. An earlier revision of this table said 16/16; that
 was arithmetic that quietly dropped them, and a completion basis that loses
 its own open items is worse than no basis at all.
 
