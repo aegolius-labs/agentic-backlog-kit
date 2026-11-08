@@ -1,0 +1,124 @@
+{
+  "contract": "seam-a-work",
+  "contract_version": 1,
+  "note": "aio-agentic-sdlc exports the work drift triage authorizes into an Agentic Backlog Kit manifest (dag-tool export-abk). Pinned: one Task per authorized Intention node keyed by canonical GUID, item id SDLC-<first 8 hex digits>, impact and effort copied, business_value equal to impact, enabler_value 3, acceptance criteria from the Intent IR, status Ready on first export. The base manifest supplies github, workflow and scoring, and items without a guid pass through unchanged. Here one approved node lacks acceptance evidence (verify_acceptance) and one review_required node is not exported.",
+  "base_manifest": {
+    "schema_version": 1,
+    "github": {
+      "owner": "aegolius-labs",
+      "repository": "example",
+      "project_number": 1,
+      "issue_type_mode": "native_or_label"
+    },
+    "workflow": {
+      "statuses": [
+        "Inbox",
+        "Refining",
+        "Ready",
+        "Planned",
+        "In Progress",
+        "In Review",
+        "Done",
+        "Blocked"
+      ],
+      "done_statuses": ["Done"],
+      "work_item_types": ["Story", "Bug", "Task"],
+      "default_capacity": 10
+    },
+    "scoring": {
+      "weights": {
+        "impact": 2.0,
+        "business_value": 2.0,
+        "enabler_value": 1.0,
+        "effort": 1.0
+      },
+      "dependency_boost": 0.25
+    },
+    "items": [
+      {
+        "id": "S-HAND",
+        "title": "Hand-written story the export never touches",
+        "type": "Story",
+        "description": "A team-owned item without a guid.",
+        "acceptance_criteria": ["It is kept byte for byte"],
+        "parent": null,
+        "depends_on": [],
+        "impact": 2,
+        "effort": 2,
+        "business_value": 2,
+        "enabler_value": 1,
+        "status": "Inbox",
+        "maturity": "idea",
+        "sprint": null
+      }
+    ]
+  },
+  "manifest": {
+    "schema_version": 2,
+    "github": {
+      "owner": "aegolius-labs",
+      "repository": "example",
+      "project_number": 1,
+      "issue_type_mode": "native_or_label"
+    },
+    "workflow": {
+      "statuses": [
+        "Inbox",
+        "Refining",
+        "Ready",
+        "Planned",
+        "In Progress",
+        "In Review",
+        "Done",
+        "Blocked"
+      ],
+      "done_statuses": ["Done"],
+      "work_item_types": ["Story", "Bug", "Task"],
+      "default_capacity": 10
+    },
+    "scoring": {
+      "weights": {
+        "impact": 2.0,
+        "business_value": 2.0,
+        "enabler_value": 1.0,
+        "effort": 1.0
+      },
+      "dependency_boost": 0.25
+    },
+    "items": [
+      {
+        "id": "S-HAND",
+        "title": "Hand-written story the export never touches",
+        "type": "Story",
+        "description": "A team-owned item without a guid.",
+        "acceptance_criteria": ["It is kept byte for byte"],
+        "parent": null,
+        "depends_on": [],
+        "impact": 2,
+        "effort": 2,
+        "business_value": 2,
+        "enabler_value": 1,
+        "status": "Inbox",
+        "maturity": "idea",
+        "sprint": null
+      },
+      {
+        "id": "SDLC-3f2b8c1e",
+        "title": "Verify acceptance of Component 'Widget'",
+        "type": "Task",
+        "description": "Node ID: 3f2b8c1e-6d4a-4b7e-9c2f-8a1d5e6f7a90\nConfirmed by canonical GUID, but 1 of 1 acceptance criteria lack their required evidence: AC1. Produce the evidence each criterion names and record it with `dag-tool evidence record`; a mapping alone is not done.",
+        "acceptance_criteria": ["The widget renders."],
+        "parent": null,
+        "depends_on": [],
+        "impact": 3,
+        "effort": 2,
+        "business_value": 3,
+        "enabler_value": 3,
+        "status": "Ready",
+        "maturity": "ready",
+        "sprint": null,
+        "guid": "3f2b8c1e-6d4a-4b7e-9c2f-8a1d5e6f7a90"
+      }
+    ]
+  }
+}
