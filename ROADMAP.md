@@ -174,7 +174,7 @@ What shipped is recorded after the fact.
 | Reconciliation and reach | R10, R13, GH-63, R25 | see [CHANGELOG](CHANGELOG.md) | **Shipped**; R10 closed 2026-10-29 after its post-merge sync |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
 | Production readiness | R28-R35 | pending | All shipped except S-R31-1 (Codex run, blocked on credits) and R34 (outside pilot); see the 2026-11-08 checkpoint |
-| Unscheduled | R12, R24, R37 | - | Deferred; R37 approved 2026-11-07, after production readiness |
+| Unscheduled | R12, R24 | - | Deferred; R37 done 2026-11-08 |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
 
@@ -573,7 +573,7 @@ next, who did not watch the last session work. See
 
 #### R37 - Record opt-in usage evidence in projects that use the kit
 
-- **Status:** Inbox; approved by the owner on 2026-11-07, scheduled after the production-readiness line. Not a 1.0 gate.
+- **Status:** Done in the engine on 2026-11-08, pulled forward by the owner that day. Not a 1.0 gate. Publishing needs a private aggregation repository, which the owner creates and authorizes per project; until then reports stay local.
 - **Importance:** Medium
 - **Complexity:** Medium
 - **Context:** Nothing records how the kit is used outside its own repository, so there is no evidence of use beyond the owner's word. The organization's [usage evidence contract](https://github.com/aegolius-labs/.github/blob/main/docs/usage-evidence.md) defines one opt-in record shared by every kit. Agents writing free text automatically to a public issue per project was considered and rejected: it would leak other projects, break this kit's confirm-before-write rule, and give uncountable data.

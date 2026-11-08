@@ -277,6 +277,7 @@ python -c "import sys, unittest; sys.path.insert(0, 'src'); suite=unittest.defau
 
 See [docs/handoff.md](docs/handoff.md) for how to pick this repository up, [docs/roadmap-gantt.md](docs/roadmap-gantt.md) for the current generated schedule projection, [ROADMAP.md](ROADMAP.md) for delivery status and [docs/architecture.md](docs/architecture.md) for the source-of-truth and synchronization design.
 The deterministic payload benchmark and its byte/token budgets are documented in [docs/benchmarks.md](docs/benchmarks.md).
+Opt-in usage evidence (off unless a project runs `usage enable`) is described in [docs/usage-evidence.md](docs/usage-evidence.md).
 Release-candidate Windows and local Linux/WSL validation evidence is recorded in [docs/validation.md](docs/validation.md).
 The offline preparation and evidence contract for disposable live GitHub testing are documented in [evals/live_github/README.md](evals/live_github/README.md).
 
