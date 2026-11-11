@@ -7,7 +7,9 @@ This file adds only what differs when the host is Claude Code.
 
 ## Organization authority model
 
-This repository is one of three related Aegolius Labs repositories. The
+`aio-agentic-sdlc` is the organization's end product: a framework whose backlog
+is the diff between intended and actual software. This kit is its projection
+layer and is also used on its own. The
 normative statement of which repository owns which kind of truth is
 `doc/authority-model.md` in `aegolius-labs/aio-agentic-sdlc`.
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository packages Codex skills and a deterministic Python engine for GitHub Issues and Projects backlog management.
+This repository packages host-portable agent skills and a deterministic Python engine for GitHub Issues and Projects backlog management. Claude Code, Codex and Antigravity are its supported hosts.
 
 ## Invariants
 
@@ -19,6 +19,10 @@ This repository packages Codex skills and a deterministic Python engine for GitH
   truth is `doc/authority-model.md` in `aegolius-labs/aio-agentic-sdlc`.
 - Composed with that framework, this kit is a one-way projection of work onto
   GitHub for human and team visibility. It does not decide what should be built.
+- Composed, the framework's scoring engine orders the work, and this kit's
+  projection should show that order (owner direction, 2026-11-11). The engine
+  does not do this yet: it computes its own Priority from the inputs the
+  framework exports (ROADMAP R38). Standalone, this kit's scoring decides.
 - Used standalone, GitHub is the system of record outright. Standalone use is a
   supported configuration, not a degraded mode.
 - Downstream state flows back as evidence, never as intent.

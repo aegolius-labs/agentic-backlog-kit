@@ -1,10 +1,12 @@
 # Agentic Backlog Kit Roadmap
 
-Last updated: 2026-09-18
+Last updated: 2026-11-11
 
 ## Product goal
 
 Create a host-portable plugin that lets agents manage GitHub Issues and Projects through focused skills and deterministic, low-token local tooling. Claude Code, Codex and Antigravity are equally supported hosts (owner decision, 2026-11-02, replacing the original Codex-first goal); each gets a thin manifest over one shared `skills/` directory.
+
+The kit is the projection layer of the Aegolius Labs suite, whose end product is the `aio-agentic-sdlc` framework: it shows that framework's work on GitHub for people and teams, and returns what GitHub shows as evidence. It stays usable on its own, where GitHub is the system of record outright.
 
 ## Architectural decisions
 
@@ -14,7 +16,7 @@ Create a host-portable plugin that lets agents manage GitHub Issues and Projects
 - Every external mutation follows `plan -> validate -> apply`; planning is the default.
 - Backlog hierarchy defaults to `Initiative -> Epic -> Feature -> Story/Bug -> Task`.
 - GitHub sub-issues represent hierarchy; native issue dependencies represent blocking relationships; Project fields represent planning metadata.
-- Priority is computed locally from Impact, Effort, Dependencies, Enabler value, and Business Value. Dependency ordering is cycle-safe and deterministic.
+- Priority is computed locally from Impact, Effort, Dependencies, Enabler value, and Business Value. Dependency ordering is cycle-safe and deterministic. Composed with `aio-agentic-sdlc`, that framework's order is authoritative and the projection should show it (R38); this scoring decides order when the kit is used standalone.
 - Native GitHub Projects access is a first-class transport invariant across a capability-complete Codex GitHub integration/GitHub MCP, authenticated GitHub CLI, and direct GraphQL/REST API. Skills select one complete route per apply, never silently mix write transports, and keep the local engine provider-neutral.
 - The implementation uses test-first development for schemas, scoring, planning, reconciliation, and mutation safety.
 
@@ -174,7 +176,7 @@ What shipped is recorded after the fact.
 | Reconciliation and reach | R10, R13, GH-63, R25 | see [CHANGELOG](CHANGELOG.md) | **Shipped**; R10 closed 2026-10-29 after its post-merge sync |
 | Planning and handoff | R26, R27 | pending | Both complete; see the generated [schedule projection](docs/roadmap-gantt.md) |
 | Production readiness | R28-R35 | pending | All shipped except S-R31-1 (Codex run, blocked on credits) and R34 (outside pilot); see the 2026-11-08 checkpoint |
-| Unscheduled | R12, R24 | - | Deferred; R37 done 2026-11-08 |
+| Unscheduled | R12, R24, R38 | - | Deferred; R37 done 2026-11-08; R38 proposed 2026-11-11 |
 | Continuous | R21 | - | Converged; reporting open |
 | Operations | R14, R19, R20 | - | Excluded from product basis |
 
@@ -579,6 +581,15 @@ next, who did not watch the last session work. See
 - **Context:** Nothing records how the kit is used outside its own repository, so there is no evidence of use beyond the owner's word. The organization's [usage evidence contract](https://github.com/aegolius-labs/.github/blob/main/docs/usage-evidence.md) defines one opt-in record shared by every kit. Agents writing free text automatically to a public issue per project was considered and rejected: it would leak other projects, break this kit's confirm-before-write rule, and give uncountable data.
 - **High-level approach:** Implement the contract in the engine: `usage enable`, `disable`, `purge`, `feedback`, `report` and `publish`, one event per command in an opted-in project, the shared fixture, and a skill prompt for one feedback note at the end of a workflow. This kit goes first because it is not under a trial and already owns a GitHub transport for `publish`.
 - **Done when:** A project without the opt-in gets no usage files; an opted-in project gets one valid event per command and nothing from the project itself; `publish` refuses without a recorded owner authorization; the shared fixture passes.
+
+#### R38 - Show the framework's order when composed
+
+- **Status:** Proposal, recorded 2026-11-11 from the owner's direction; not scheduled and not a 1.0 gate. It needs the `aio-agentic-sdlc` side first (its ROADMAP M5 proposal).
+- **Importance:** Medium
+- **Complexity:** Medium
+- **Context:** In the composed system the framework's scoring engine orders the leaves of the Intention and Reality diff. Today `dag-tool export-abk` writes each task's impact and effort into the manifest, copies impact into business value, and this kit computes its own Priority from them. That is a second ranking of work the framework already ordered.
+- **High-level approach:** Extend the Seam A work contract additively so an exported item can carry the framework's computed order or score, and have the engine project that value as Priority for those items instead of recomputing it. Items without a `guid` keep the kit's own scoring. Standalone behavior does not change.
+- **Done when:** For a manifest exported by the framework, the Priority shown on GitHub matches the framework's order; the shared fixture pins it on both sides; and a standalone manifest scores exactly as before.
 
 #### R12 - Support multi-repository portfolio planning
 
